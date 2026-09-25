@@ -3,54 +3,38 @@
 ## Purpose
 The foundation every module builds on: the dev environment (conda, Docker, Makefile, CI), the Flask app factory and module auto-discovery, the JSON error format, OpenAPI docs, and the shared services in `backend/app/core/`: db, security (encryption), storage, email, notifications, ai (Gemini wrapper), ocr, plus `backend/worker.py`.
 
-## Owner
-Member B (Infrastructure, documents & AI)
+## What exists now
+Code: `backend/app/__init__.py`, `config.py`, `extensions.py`, `cli.py`, `backend/app/core/`, `backend/app/modules/__init__.py`, `backend/worker.py`, `backend/conftest.py`, `backend/migrations/`, root configs, `scripts/setup_dev.sh`, `.github/`.
+- **Works:** app factory with development/testing/production config (reads the root `.env`); extensions (SQLAlchemy, Migrate, JWT, CORS, Limiter, flask-smorest); module auto-discovery registering all 9 module blueprints; `flask seed` (runs every module's `seed()`); the JSON error format (`CaHelperApi`, `ApiError`); `GET /api/health`; OpenAPI spec + Swagger UI; declarative `Base` with a constraint naming convention (`core/db/base.py`); Alembic set up with **no migrations yet**; worker (`AppScheduler`: Asia/Kolkata cron, every job in the app context) that collects `register_jobs` from modules (none define it yet).
+- **Empty packages (docstring only):** `core/security`, `core/storage`, `core/email`, `core/notifications`, `core/ai`, `core/ocr`; no db mixins or money helpers yet.
+- **Tests:** 11 backend tests in `backend/tests/` (app factory and error format, health, seed command, worker, Tesseract smoke test); shared fixtures in `backend/conftest.py` create the test database.
+- **Dev environment:** conda env `ca-helper` + `make setup`, Docker Compose with 5 services (db, mailpit, backend, worker, frontend), Makefile, pre-commit hooks, CI with backend, frontend and Docker jobs.
 
-Folders: `backend/app/__init__.py`, `config.py`, `extensions.py`, `cli.py`, `backend/app/core/{db,security,storage,email,notifications,ai,ocr}/`, `backend/app/core/errors.py`, `backend/app/core/health.py`, `backend/app/modules/__init__.py`, `backend/worker.py`, `backend/conftest.py`, `backend/migrations/`, root configs, `scripts/`, `.github/`
+## Tables
+None yet. Planned:
+- `notifications`: in-app tray entries per user
 
-## Tasks
-Format: `- [ ] ID · P<phase> · <owner> · <description>`; states `[ ]` to do, `[~]` in progress, `[x]` done.
-
-- [x] INF-01 · P0 · B · Conda env, setup script, Docker infra, Makefile, CI, pre-commit
-- [x] INF-02 · P0 · B · Flask app factory, module auto-discovery, error format, OpenAPI docs, health endpoint
-- [x] INF-03 · P0 · B · CLAUDE.md, docs, module docs, progress tracker script
-- [ ] INF-04 · P1 · B · EncryptedString + blind index + encrypted file storage
-- [ ] INF-05 · P1 · B · Email service (Mailpit in dev) + notification model + tray API
-- [ ] INF-06 · P1 · B · Worker process + per-module job registration
-- [ ] INF-07 · P1 · B · Gemini client wrapper with PII scrub
-- [ ] INF-08 · P2 · B · OCR utility (Tesseract/PyMuPDF) + requires_tesseract tests
-- [ ] INF-09 · P5 · B · Production deployment configuration
-
-## Tables owned
-- `notifications` (INF-05, planned): in-app tray entries per user
-- Base class with naming convention: `app/core/db/base.py` (exists)
-
-## Endpoints exposed
+## Endpoints
 - `GET /api/health`: API + database status (exists)
 - `GET /api/openapi.json`, `GET /api/docs`: OpenAPI spec and Swagger UI (exist)
-- Notification tray API under `/api/notifications/...` (INF-05, planned)
+- Planned: notification tray API under `/api/notifications/...`
 
-## Service functions others may call
+## Service functions other modules call
 - `app.core.errors.ApiError(status, code, message, details=None)`: raise for expected errors (exists)
 - `app.modules.discover_modules() / register_all_jobs() / run_all_seeds()` (exist)
-- Planned: `EncryptedString`, `blind_index()`, `hash_password()/verify_password()` (INF-04); `storage.save_file()/load_file()` (INF-04); `send_email()` and `notify()` (INF-05); `gemini_client.generate()/embed()` (INF-07); OCR helpers (INF-08)
+- Planned: `EncryptedString`, `blind_index()`, `hash_password()/verify_password()`; `storage.save_file()/load_file()`; `send_email()` and `notify()`; `gemini_client.generate()/embed()`; OCR helpers
 
 ## Depends on
 Nothing (this is the base layer).
 
-## Contracts others rely on
+## Contracts (don't change without telling the team)
 - Error body: `{"error": {"code", "message", "details?"}}` (see docs/API_CONVENTIONS.md)
 - A module package exposes `blp`, optional `seed()`, `SEED_ORDER`, `register_jobs(scheduler)`
 - Jobs run inside the Flask app context; cron times are Asia/Kolkata; give every job a unique `id` like `alerts.due_reminders`
 - Every Gemini call goes through `app/core/ai/gemini_client.py` (rule 1)
 
 ## Known issues
-- The CI workflow (`.github/workflows/ci.yml`) has not run on GitHub yet; its first run is on the Phase 0 PR.
+- The CI workflow (`.github/workflows/ci.yml`) has not run on GitHub yet; its first run is on the bootstrap PR.
   Every step was verified locally with the same commands.
-- Flask-Limiter uses the client IP. Behind nginx (full-Docker/production) every request shows nginx's IP until `ProxyFix` is configured (do this with AUTH-05 / INF-09).
+- Flask-Limiter uses the client IP. Behind nginx (full-Docker/production) every request shows nginx's IP until `ProxyFix` is configured (do this together with login rate limiting or the production deployment).
 - `RATELIMIT_STORAGE_URI=memory://` counts per gunicorn worker process; fine for dev.
-
-## Session log
-Newest first. Keep the last 10 entries.
-
-- 2026-09-25 · Builder · Phase 0 bootstrap: dev environment, app factory, module discovery, error format, OpenAPI docs, health endpoint, worker skeleton, docs and tracker.

@@ -3,47 +3,30 @@
 ## Purpose
 Turns a regulatory profile into dated compliance items for the 7 forms, shows them in the calendar and on the home dashboard, runs the item page (explanation, self-file path, consult-a-CA hand-off), the status lifecycle, checklists, instruction pages, peer insights and the admin editors for its config.
 
-## Owner
-Member A (Business domain)
+## What exists now
+Skeleton only; no features yet.
+- Backend (`backend/app/modules/compliance/`): the `compliance` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
+- Frontend (`frontend/src/features/compliance/`): one placeholder page, "Compliance calendar" at `/app/compliance` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
+- Form content: `content/forms/<FORM>/` holds a TODO template (explanation, instructions, checklist) for each of the 7 forms; nothing reads it yet.
 
-Folders: `backend/app/modules/compliance/`, `frontend/src/features/compliance/`
+## Tables
+None yet. Planned:
+- `obligation_templates` (config): form code, applicability, frequency, due-date rule, `source_reference`, `effective_from/to`
+- `compliance_items`: business, form, period, FY, due date, status, path (self/CA), filed_at, acknowledgement document
+- `checklist_ticks`: per item, which checklist entries the user has
 
-## Tasks
-Format: `- [ ] ID · P<phase> · <owner> · <description>`; states `[ ]` to do, `[~]` in progress, `[x]` done.
+## Endpoints
+None yet. Planned: `/api/compliance/...` (calendar, items, dashboard); admin editors at `/api/admin/compliance/...`.
 
-- [ ] COM-01 · P1 · A · Obligation templates for all 7 forms (placeholder due-date rules, TODO_VERIFY) + compliance item generation
-- [ ] COM-02 · P1 · A · Calendar (month + list views) with item statuses
-- [ ] COM-03 · P1 · A · Item page: explanation placeholder + self-file path (mark filed + optional acknowledgement upload) + consult-a-CA hand-off (form code to marketplace)
-- [ ] COM-04 · P1 · A · Basic home dashboard (next deadline, due/overdue counts)
-- [ ] COM-05 · P2 · A · Verified due-date rules (monthly/QRMP/quarterly/yearly, audit-dependent ITR date)
-- [ ] COM-06 · P2 · A · Checklists from content/ + checklist UI with tick state
-- [ ] COM-07 · P2 · A · Instruction pages rendered from content/ in a polished layout
-- [ ] COM-08 · P2 · A · Full status lifecycle incl. Overdue and "With CA" from engagements
-- [ ] COM-09 · P3 · A · Peer insights (segmented, ≥10-user rule)
-- [ ] COM-10 · P3 · A · Admin editors: rules/thresholds, obligation templates, checklists, instructions
-
-## Tables owned
-- `obligation_templates` (planned config): form code, applicability, frequency, due-date rule, `source_reference`, `effective_from/to`
-- `compliance_items` (planned): business, form, period, FY, due date, status, path (self/CA), filed_at, acknowledgement document
-- `checklist_ticks` (planned): per item, which checklist entries the user has
-
-## Endpoints exposed
-Planned: `/api/compliance/...` (calendar, items, dashboard); admin editors at `/api/admin/compliance/...`.
-
-## Service functions others may call
-- Planned: `list_items(business_id, ...)`, `get_item(item_id)`, `mark_filed(item_id, ...)`, `upcoming_items(days)` (used by alerts, ca_workspace, marketplace)
+## Service functions other modules call
+None yet. Planned: `list_items(business_id, ...)`, `get_item(item_id)`, `mark_filed(item_id, ...)`, `upcoming_items(days)` (used by alerts, ca_workspace, marketplace).
 
 ## Depends on
 onboarding (regulatory profile), documents (acknowledgement upload), marketplace ("With CA" status from engagements).
 
-## Contracts others rely on
-- Status values: `Upcoming → Docs pending → Ready → With CA → Filed → Filed–verified`, plus `Overdue` from any pre-filed state
+## Contracts (don't change without telling the team)
+- Status values: `Upcoming → Docs pending → Ready → With CA → Filed → Filed–verified`, plus `Overdue` from any pre-filed state (authoritative list: `docs/DATA_MODEL.md`, "Status values")
 - Form codes: `ITR`, `GSTR-1`, `GSTR-3B`, `CMP-08`, `GSTR-4`, `24Q`, `26Q` (same as `content/forms/<code>/`)
 
 ## Known issues
-_None yet._
-
-## Session log
-Newest first. Keep the last 10 entries.
-
-- 2026-09-25 · Builder · Phase 0: created this doc and its task list.
+None yet.

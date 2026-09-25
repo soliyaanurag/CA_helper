@@ -3,39 +3,27 @@
 ## Purpose
 Encrypted upload/download of documents (acknowledgements, checklist documents), the vault organised by FY/period/type, filing-proof OCR (ARN/ack number, date, period → Filed–verified) and document-type verification.
 
-## Owner
-Member B (Infrastructure, documents & AI)
+## What exists now
+Skeleton only; no features yet.
+- Backend (`backend/app/modules/documents/`): the `documents` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
+- Frontend (`frontend/src/features/documents/`): one placeholder page, "Document vault" at `/app/documents` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
+- The encrypted storage and OCR helpers it needs (`core/storage`, `core/ocr`) are empty packages too; only a Tesseract smoke test exists.
 
-Folders: `backend/app/modules/documents/`, `frontend/src/features/documents/`
+## Tables
+None yet. Planned:
+- `documents`: owner business, uploader, FY, period, type, storage key, mime, size, sha256, OCR status/fields, soft delete
 
-## Tasks
-Format: `- [ ] ID · P<phase> · <owner> · <description>`; states `[ ]` to do, `[~]` in progress, `[x]` done.
+## Endpoints
+None yet. Planned: `/api/documents/...` (upload, list, download).
 
-- [ ] DOC-01 · P1 · B · Encrypted upload/download of acknowledgement when marking filed
-- [ ] DOC-02 · P2 · B · Document vault (upload per item, browse by FY/period/type, download)
-- [ ] DOC-03 · P2 · B · Filing-proof OCR: extract ARN/ack number, date, period → Filed–verified
-- [ ] DOC-04 · P3 · B · OCR document-type verification against the checklist
-- [ ] DOC-05 · P5 · B · OCR field-accuracy evaluation on ~30 sample documents
-
-## Tables owned
-- `documents` (planned): owner business, uploader, FY, period, type, storage key, mime, size, sha256, OCR status/fields, soft delete
-
-## Endpoints exposed
-Planned: `/api/documents/...` (upload, list, download).
-
-## Service functions others may call
-- Planned: `save_document(...)`, `get_document(...)`, `verify_acknowledgement(document_id)` (used by compliance, ca_workspace)
+## Service functions other modules call
+None yet. Planned: `save_document(...)`, `get_document(...)`, `verify_acknowledgement(document_id)` (used by compliance, ca_workspace).
 
 ## Depends on
 core-infra (encrypted storage, OCR), compliance (items), core-auth (access checks).
 
-## Contracts others rely on
+## Contracts (don't change without telling the team)
 - Files are encrypted at rest and never leave the server (rule 2); OCR is local only
 
 ## Known issues
-_None yet._
-
-## Session log
-Newest first. Keep the last 10 entries.
-
-- 2026-09-25 · Builder · Phase 0: created this doc and its task list.
+None yet.

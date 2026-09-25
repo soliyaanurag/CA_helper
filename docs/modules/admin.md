@@ -1,40 +1,28 @@
 # admin: admin shell, users and CAs, service catalog
 
 ## Purpose
-The admin area shell, user/CA management (verify, suspend, soft-delete), the service catalog editor and the admin action audit log. Other modules' admin screens are built by their owners and appear here through route aggregation.
+The admin area shell, user/CA management (verify, suspend, soft-delete), the service catalog editor and the admin action audit log. Other modules' admin screens live in their own `features/<module>/admin/` folders and appear here through route aggregation.
 
-## Owner
-Member C (CA side & platform shell)
+## What exists now
+Skeleton only; no features yet.
+- Backend (`backend/app/modules/admin/`): the `admin` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
+- Frontend (`frontend/src/features/admin/`): one placeholder page, "Users & CAs" at `/admin/users` (admin nav), built from `ModulePlaceholder`; `api.ts` is empty. The admin layout itself (`AdminLayout`) is in frontend core.
 
-Folders: `backend/app/modules/admin/`, `frontend/src/features/admin/`
+## Tables
+None yet. Planned:
+- `admin_audit_log`: admin, action, target, details, timestamp
 
-## Tasks
-Format: `- [ ] ID · P<phase> · <owner> · <description>`; states `[ ]` to do, `[~]` in progress, `[x]` done.
+## Endpoints
+None yet. Planned: `/api/admin/users/...`, `/api/admin/cas/...`.
 
-- [ ] ADM-01 · P1 · C · Admin shell + list users/CAs + verify-CA toggle
-- [ ] ADM-02 · P2 · C · Suspend/remove (soft delete) users and CAs
-- [ ] ADM-03 · P3 · C · Service catalog editor
-- [ ] ADM-04 · P4 · C · Admin action audit log
-
-## Tables owned
-- `admin_audit_log` (planned, P4): admin, action, target, details, timestamp
-
-## Endpoints exposed
-Planned: `/api/admin/users/...`, `/api/admin/cas/...`.
-
-## Service functions others may call
-_None yet._
+## Service functions other modules call
+None yet.
 
 ## Depends on
 core-auth (users), marketplace (CA verification, service catalog).
 
-## Contracts others rely on
+## Contracts (don't change without telling the team)
 - No database-structure changes from the UI; admins edit configuration data only
 
 ## Known issues
-_None yet._
-
-## Session log
-Newest first. Keep the last 10 entries.
-
-- 2026-09-25 · Builder · Phase 0: created this doc and its task list.
+None yet.
