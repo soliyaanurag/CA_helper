@@ -30,8 +30,10 @@ def health():
     try:
         db.session.execute(text("SELECT 1"))
         database = "ok"
-    except SQLAlchemyError:
-        log.warning("Health check: database unavailable", exc_info=True)
+    except SQLAlchemyError as exc:
+        # One line, not a traceback: this repeats on every check while the db is down.
+        cause = getattr(exc, "orig", None) or exc  # the driver's error, e.g. OperationalError
+        log.warning("Health check: database unavailable (%s)", type(cause).__name__)
         db.session.rollback()
         database = "unavailable"
 

@@ -69,10 +69,13 @@ def run_all_seeds() -> list[str]:
     from app.core.auth.seed import seed as seed_users
     from app.extensions import db
 
-    seed_users()
+    # Core seeds (not auto-discovered): add new ones here, in dependency order.
+    core_seeds = [("core.auth", seed_users)]
+    for _, core_seed in core_seeds:
+        core_seed()
     modules = [m for m in discover_modules() if getattr(m, "seed", None) is not None]
     modules.sort(key=lambda m: (getattr(m, "SEED_ORDER", DEFAULT_SEED_ORDER), module_name(m)))
     for module in modules:
         module.seed()
     db.session.commit()
-    return ["core.auth"] + [module_name(m) for m in modules]
+    return [name for name, _ in core_seeds] + [module_name(m) for m in modules]

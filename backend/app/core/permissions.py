@@ -7,6 +7,8 @@
         def get(self):
             return services.get_dashboard(current_user())
 
+    @login_required        # any logged-in user, whatever the role (e.g. GET /auth/me)
+
 - No token, a bad or expired token, or a deactivated user -> 401 (app/core/auth/tokens.py).
 - Logged in with another role -> 403 FORBIDDEN.
 - The role is checked against the user row in the database, not only the token
@@ -47,3 +49,8 @@ def roles_required(*roles: UserRole) -> Callable:
         return wrapper
 
     return decorator
+
+
+def login_required(view: Callable) -> Callable:
+    """Allow the endpoint for any logged-in, active user (every role)."""
+    return roles_required(*UserRole)(view)

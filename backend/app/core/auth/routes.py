@@ -12,9 +12,8 @@ from flask_smorest import Blueprint
 from app.core.auth import services
 from app.core.auth.schemas import LoginResponseSchema, LoginSchema, UserSchema
 from app.core.auth.tokens import issue_access_token
-from app.core.db.enums import UserRole
 from app.core.errors import ErrorSchema
-from app.core.permissions import current_user, roles_required
+from app.core.permissions import current_user, login_required
 from app.extensions import limiter
 
 blp = Blueprint("auth", __name__, description="Login and the current user")
@@ -36,7 +35,7 @@ class Login(MethodView):
 
 @blp.route("/auth/me")
 class Me(MethodView):
-    @roles_required(UserRole.BUSINESS, UserRole.CA, UserRole.ADMIN)
+    @login_required
     @blp.response(200, UserSchema)
     def get(self):
         return current_user()
