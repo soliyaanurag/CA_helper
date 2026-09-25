@@ -1,4 +1,8 @@
-"""Declarative base for all models (used via `db.Model`)."""
+"""Declarative base for all models.
+
+Flask-SQLAlchemy builds `db.Model` from it (app/extensions.py). Models subclass
+`BaseModel` from app/core/db/models.py, never this class directly.
+"""
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
