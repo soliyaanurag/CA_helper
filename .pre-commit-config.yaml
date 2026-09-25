@@ -3,6 +3,8 @@
 #
 # The local hooks run from the shared conda env (`conda run`): ruff at the version
 # pinned in backend/requirements-dev.txt, ESLint/Prettier with the env's Node 22.
+# --force-exclude: pre-commit passes file names explicitly, and ruff ignores its own
+# exclude list (ruff.toml: backend/migrations) for explicit names unless told otherwise.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -20,12 +22,12 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check (Python)
-        entry: conda run -n ca-helper ruff check --fix
+        entry: conda run -n ca-helper ruff check --fix --force-exclude
         language: system
         types: [python]
       - id: ruff-format
         name: ruff format (Python)
-        entry: conda run -n ca-helper ruff format
+        entry: conda run -n ca-helper ruff format --force-exclude
         language: system
         types: [python]
       - id: frontend-eslint
