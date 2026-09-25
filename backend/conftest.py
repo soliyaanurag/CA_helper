@@ -7,8 +7,10 @@ backend/tests/ and in app/modules/<module>/tests/.
 Fixtures:
     app       Flask app built with TestingConfig (one per test session)
     client    Flask test client for calling the API
-    database  test database with every table created; rows are deleted after
-              each test. Request it in any test that touches the DB.
+    database  test database with every table created. Each test runs inside one
+              transaction that is rolled back afterwards, so nothing a test
+              writes (even after a service's commit()) survives it. Request it in
+              any test that touches the DB.
 
 The test database (TEST_DATABASE_URL, default `ca_helper_test`) is created
 automatically if it does not exist. It needs `make infra` to be running.
@@ -20,6 +22,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app import create_app
 from app.extensions import db as _db
@@ -75,12 +78,38 @@ def _schema(app):
 
 @pytest.fixture()
 def database(_schema):
-    yield _schema
-    # Clean up: delete all rows (children before parents) so tests stay independent.
-    _schema.session.rollback()
-    for table in reversed(_schema.metadata.sorted_tables):
-        _schema.session.execute(table.delete())
-    _schema.session.commit()
+    """Run the test inside one outer transaction, rolled back at the end.
+
+    Services commit at the end of each unit of work. With
+    join_transaction_mode="create_savepoint" (SQLAlchemy 2.0), each of those
+    commits only releases a SAVEPOINT inside our outer transaction, and each
+    rollback() returns to the last savepoint. The outer transaction is never
+    committed, so every test starts from empty tables.
+
+    TEST-ONLY: the swap of `db.session` below. This is the only place it happens.
+    The documented recipe binds the session to our connection
+    (`Session(bind=connection, ...)`). Flask-SQLAlchemy 3.1 ignores that: its
+    Session.get_bind() always returns the app's engine (`db.engines[None]`), so
+    the session would open its own connection and really commit. We therefore
+    replace `db.session` for the duration of this test with a plain SQLAlchemy
+    scoped session bound to the connection. Code finds the session through the
+    `db` object at call time (`db.session.add(...)`, `Model.query`, Flask-SQLAlchemy's
+    teardown), so routes, services and CLI commands all use it without knowing.
+    The real `db.session` is restored afterwards. Application code never does this.
+    """
+    connection = _schema.engine.connect()
+    outer_transaction = connection.begin()
+    real_session = _schema.session
+    _schema.session = scoped_session(
+        sessionmaker(bind=connection, join_transaction_mode="create_savepoint")
+    )
+    try:
+        yield _schema
+    finally:
+        _schema.session.remove()
+        _schema.session = real_session
+        outer_transaction.rollback()
+        connection.close()
 
 
 def pytest_runtest_setup(item):

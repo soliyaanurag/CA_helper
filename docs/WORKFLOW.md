@@ -28,7 +28,7 @@ checklist in the root `CLAUDE.md`.
 6. **Environment check:**
    - The conda env `ca-helper` exists (`conda env list`); otherwise tell the user to run `make setup`.
    - If `environment.yml` or `backend/requirements*.txt` changed, run `make env-update`.
-     If `frontend/package*.json` changed, run `cd frontend && npm ci`.
+     If `frontend/package*.json` changed, run `conda run -n ca-helper --cwd frontend npm ci`.
    - `make infra` is running.
    - `make migrate`, `make gen-api` and `make test` pass **before** changing anything.
 
@@ -48,12 +48,12 @@ checklist in the root `CLAUDE.md`.
 - **New dependency:**
   - Python: pin it (`package==x.y.z`) in `backend/requirements.txt` (runtime) or `requirements-dev.txt` (dev only),
     then `make env-update`. Never `conda install` a Python library.
-  - Frontend: `npm install <pkg>` inside `frontend/` (exact version is saved automatically).
+  - Frontend: `conda run -n ca-helper --cwd frontend npm install <pkg>` (exact version is saved automatically).
   - Mention it in the PR.
 - Every new service or route gets tests. Every new table gets seed data.
 
 ## Session end / before a PR
-- `make lint` and `make test` pass and the frontend builds (`cd frontend && npm run build`). Never leave the branch red.
+- `make lint` and `make test` pass and the frontend builds (`conda run -n ca-helper --cwd frontend npm run build`). Never leave the branch red.
 - Update the module doc so it stays true: "What exists now", tables, endpoints, service functions, contracts and
   known issues.
 - If the data model or conventions changed, update `docs/DATA_MODEL.md` / `docs/DECISIONS.md`.

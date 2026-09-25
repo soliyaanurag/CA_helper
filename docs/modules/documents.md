@@ -14,7 +14,7 @@ None yet. Planned:
 - `documents`: owner business, uploader, FY, period, type, storage key, mime, size, sha256, OCR status/fields, soft delete
 
 ## Endpoints
-None yet. Planned: `/api/documents/...` (upload, list, download).
+None yet. Planned: `/api/v1/documents/...` (upload, list, download).
 
 ## Service functions other modules call
 None yet. Planned: `save_document(...)`, `get_document(...)`, `verify_acknowledgement(document_id)` (used by compliance, ca_workspace).

@@ -7,11 +7,15 @@
 # default bash 3.2: no bash-4 features and no GNU-only flags on purpose.
 #
 # Steps:
-#   1. detect OS / architecture          6. npm install in frontend/
-#   2. find conda (or offer Miniforge)   7. create .env with random dev secrets
-#   3. create / update the conda env     8. install git pre-commit hooks
-#   4. verify Python 3.12 + Tesseract    9. generate API types, print a checklist
-#   5. check Docker, Node 22+, git
+#   1. detect OS / architecture            6. npm ci in frontend/ (env's Node)
+#   2. find conda (or offer Miniforge)     7. create .env with random dev secrets
+#   3. create / update the conda env       8. install git pre-commit hooks
+#   4. verify Python 3.12, Tesseract and   9. generate API types, print a checklist
+#      Node 22.22+ inside the env
+#   5. check Docker and git
+#
+# Node.js comes from the conda env (environment.yml), like Python. Every node/npm
+# command below runs through `conda run -n ca-helper`; no system Node is needed.
 #
 # Options:  -y / --yes   answer "yes" to confirmation prompts (non-interactive)
 # =============================================================================
@@ -153,7 +157,7 @@ if [ $? -eq 0 ]; then ok_item "conda env '$ENV_NAME' up to date"; else warn_item
 # =============================================================================
 # 4. Verify the env
 # =============================================================================
-step "4/9 Verifying the env"
+step "4/9 Verifying the env (Python, Tesseract, Node)"
 PY_VERSION="$("$CONDA_BIN" run -n "$ENV_NAME" python --version 2>&1)"
 case "$PY_VERSION" in
   "Python 3.12."*) info "$PY_VERSION"; ok_item "Python: $PY_VERSION" ;;
@@ -163,6 +167,24 @@ TESS_VERSION="$("$CONDA_BIN" run -n "$ENV_NAME" tesseract --version 2>&1 | head 
 case "$TESS_VERSION" in
   tesseract*) info "$TESS_VERSION"; ok_item "Tesseract: $TESS_VERSION" ;;
   *) warn "tesseract not working in env: $TESS_VERSION"; warn_item "Tesseract missing in env" ;;
+esac
+
+NODE_OK=0
+NODE_VERSION="$("$CONDA_BIN" run -n "$ENV_NAME" node --version 2>/dev/null)"   # e.g. v22.23.2
+case "$NODE_VERSION" in
+  v*)
+    NODE_MAJOR="$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f1)"
+    NODE_MINOR="$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f2)"
+    if [ "$NODE_MAJOR" -gt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 22 ]; }; then
+      info "Node $NODE_VERSION, npm $("$CONDA_BIN" run -n "$ENV_NAME" npm --version 2>/dev/null)"
+      ok_item "Node.js: $NODE_VERSION (conda env)"
+      NODE_OK=1
+    else
+      warn "Node $NODE_VERSION in the env is too old; the frontend needs 22.22+. Run: make env-update"
+      warn_item "Node.js in env too old ($NODE_VERSION); need 22.22+"
+    fi
+    ;;
+  *) warn "node not found in env '$ENV_NAME'. Run: make env-update"; warn_item "Node.js missing in env" ;;
 esac
 
 # Stable path for VS Code: .conda-env -> <your env prefix> (gitignored).
@@ -175,7 +197,7 @@ fi
 # =============================================================================
 # 5. Docker, Node, git (never auto-installed)
 # =============================================================================
-step "5/9 Checking Docker, Node.js and git"
+step "5/9 Checking Docker and git"
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   DOCKER_INFO="$(docker info 2>&1)"
   if [ $? -eq 0 ]; then
@@ -203,29 +225,6 @@ else
   warn_item "Docker not installed (needed for make infra / make up)"
 fi
 
-NODE_OK=0
-if command -v node >/dev/null 2>&1; then
-  NODE_VERSION="$(node --version)"            # e.g. v22.23.3
-  NODE_MAJOR="$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f1)"
-  NODE_MINOR="$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f2)"
-  if [ "$NODE_MAJOR" -gt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 22 ]; }; then
-    info "Node $NODE_VERSION, npm $(npm --version)"
-    ok_item "Node.js $NODE_VERSION"
-    NODE_OK=1
-  else
-    warn "Node $NODE_VERSION is too old; the frontend needs Node 22.22+ (the version in .nvmrc)."
-    warn_item "Node.js too old ($NODE_VERSION); need 22.22+"
-  fi
-else
-  warn "Node.js was not found."
-  warn_item "Node.js not installed (need 22.22+)"
-fi
-if [ "$NODE_OK" -eq 0 ]; then
-  info "Recommended: nvm (per-user, no sudo). See https://github.com/nvm-sh/nvm#installing-and-updating"
-  info "  then:  nvm install 22 && nvm alias default 22   (and open a new terminal)"
-  if [ "$OS_NAME" = "Darwin" ]; then info "  or:    brew install node@22"; fi
-fi
-
 if command -v git >/dev/null 2>&1; then
   ok_item "git: $(git --version)"
 else
@@ -247,14 +246,14 @@ fi
 step "6/9 Installing frontend packages"
 if [ "$NODE_OK" -eq 1 ]; then
   if [ -f frontend/package-lock.json ]; then
-    (cd frontend && npm ci)
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" --cwd frontend npm ci
   else
-    (cd frontend && npm install)
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" --cwd frontend npm install
   fi
   if [ $? -eq 0 ]; then ok_item "npm packages installed"; else warn_item "npm install FAILED (see output above)"; fi
 else
-  warn "Skipped: needs Node.js 22.22+"
-  warn_item "npm packages NOT installed (fix Node, then re-run make setup)"
+  warn "Skipped: needs Node.js 22.22+ in the conda env"
+  warn_item "npm packages NOT installed (fix the env, then re-run make setup)"
 fi
 
 # =============================================================================
@@ -316,7 +315,7 @@ fi
 step "9/9 Generating frontend API types from the backend OpenAPI spec"
 if [ "$NODE_OK" -eq 1 ] && [ -d frontend/node_modules ]; then
   if "$CONDA_BIN" run -n "$ENV_NAME" --cwd backend flask --app app openapi write --format=json ../openapi.json \
-     && (cd frontend && npm run gen:api); then
+     && "$CONDA_BIN" run -n "$ENV_NAME" --cwd frontend npm run gen:api; then
     ok_item "API types generated (make gen-api)"
   else
     warn_item "make gen-api FAILED (see output above)"

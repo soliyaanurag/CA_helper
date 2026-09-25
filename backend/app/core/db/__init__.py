@@ -1,6 +1,9 @@
-"""Database foundations.
+"""Database foundations (see docs/PATTERNS.md, "Foundations").
 
-Now:     base.py, the declarative Base with deterministic constraint names.
-Planned: shared mixins (UTC created_at/updated_at, soft delete via
-         is_active/deleted_at) and money helpers (Decimal, Numeric(12, 2) rupees).
+    base.py    declarative Base with deterministic constraint names (for Alembic)
+    models.py  BaseModel (UUID id + created_at/updated_at), TimestampMixin,
+               SoftDeleteMixin (is_active/deleted_at), utcnow()
+    enums.py   str_enum(): StrEnum columns stored as text + a CHECK constraint
+
+Planned: money helpers (Decimal, Numeric(12, 2) rupees).
 """

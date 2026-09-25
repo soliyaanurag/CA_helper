@@ -15,7 +15,7 @@ None yet. Planned:
 - `chat_messages`: per-user history
 
 ## Endpoints
-None yet. Planned: `/api/assistant/...` (ask).
+None yet. Planned: `/api/v1/assistant/...` (ask).
 
 ## Service functions other modules call
 None yet.

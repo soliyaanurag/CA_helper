@@ -16,7 +16,7 @@ Accountant, and keeps verifiable proof of what was filed. MTech CSE lab project,
 | OS | Ubuntu on WSL2. **Native Windows is not supported.** | Intel or Apple Silicon | any recent distro |
 | Repo location | **inside Linux**, e.g. `~/projects/ca-helper` (never under `/mnt/c`) | anywhere | anywhere |
 | Docker | Docker Desktop for Windows with **WSL integration** enabled for your distro | Docker Desktop for Mac | Docker Engine + Compose plugin |
-| Node.js | 22 LTS (≥ 22.22) via [nvm](https://github.com/nvm-sh/nvm) | same, or `brew install node@22` | same |
+| Node.js | nothing to install: Node 22 LTS comes from the conda env | same | same |
 | conda | Miniforge recommended; `make setup` offers to install it | same | same |
 | git, make | `sudo apt install git make` | `xcode-select --install` | package manager |
 
@@ -29,8 +29,8 @@ make setup            # safe to re-run; asks before installing anything system-l
 ```
 
 `make setup` (`scripts/setup_dev.sh`) detects your OS, finds conda (or offers to install Miniforge), creates or
-updates the `ca-helper` conda env (Python 3.12 + Tesseract + all pip packages), checks Docker/Node/git, installs
-npm packages, creates `.env` with random dev secrets, installs the git pre-commit hooks, generates the API types
+updates the `ca-helper` conda env (Python 3.12 + Tesseract + Node 22 + all pip packages), checks Docker/git,
+installs npm packages with the env's Node, creates `.env` with random dev secrets, installs the git pre-commit hooks, generates the API types
 and prints a ✅/⚠️ checklist. If it installed Miniforge, restart your terminal and VS Code afterwards.
 
 Then:
@@ -56,6 +56,7 @@ make dev-frontend   # Vite dev server             -> http://localhost:5173
 |---|---|
 | App (hybrid) | http://localhost:5173 |
 | API health | http://localhost:8000/api/health |
+| API routes | http://localhost:8000/api/v1/... (see API docs) |
 | API docs (Swagger UI) | http://localhost:8000/api/docs |
 | Mailpit (caught emails) | http://localhost:8025 |
 
@@ -74,7 +75,8 @@ Frontend: http://localhost:8080 (nginx, proxies `/api`) · API: http://localhost
 
 ## Command reference
 
-Every Python command runs inside the conda env through `conda run` (never an activated env or system Python).
+Every Python and Node command runs inside the conda env through `conda run` (never an activated env, system
+Python or a system Node).
 
 | Make target | What it does | Raw command |
 |---|---|---|
@@ -84,19 +86,19 @@ Every Python command runs inside the conda env through `conda run` (never an act
 | `make infra-down` | stop db + Mailpit | `docker compose stop db mailpit` |
 | `make dev-backend` | Flask dev server | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app run --debug --port 8000` |
 | `make dev-worker` | worker | `conda run --no-capture-output -n ca-helper --cwd backend python worker.py` |
-| `make dev-frontend` | Vite dev server | `cd frontend && npm run dev` |
+| `make dev-frontend` | Vite dev server | `conda run --no-capture-output -n ca-helper --cwd frontend npm run dev` |
 | `make up` | full-Docker mode | `make gen-api && docker compose up -d --build --wait` |
 | `make down` | stop containers | `docker compose down` |
 | `make logs` | follow logs | `docker compose logs -f --tail=100` |
 | `make test` | all tests | the two below |
 | `make test-backend` | pytest (needs `make infra`) | `conda run --no-capture-output -n ca-helper --cwd backend pytest` |
-| `make test-frontend` | Vitest | `cd frontend && npm test` |
-| `make lint` | ruff + ESLint + Prettier + tsc | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `cd frontend && npm run lint && npm run format:check && npm run typecheck` |
-| `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend`, `conda run -n ca-helper ruff format backend`, `cd frontend && npm run format` |
+| `make test-frontend` | Vitest | `conda run --no-capture-output -n ca-helper --cwd frontend npm test` |
+| `make lint` | ruff + mypy + ESLint + Prettier + tsc | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `conda run -n ca-helper --cwd backend mypy`, `conda run -n ca-helper --cwd frontend npm run lint` (then `format:check`, `typecheck`) |
+| `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend`, `conda run -n ca-helper ruff format backend`, `conda run -n ca-helper --cwd frontend npm run format` |
 | `make migrate` | apply migrations | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db upgrade` |
 | `make migration name="onboarding: add businesses"` | new migration | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db migrate -m "onboarding: add businesses"` |
 | `make seed` | dev seed data | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed` |
-| `make gen-api` | OpenAPI → TypeScript types | `conda run -n ca-helper --cwd backend flask --app app openapi write --format=json ../openapi.json && cd frontend && npm run gen:api` |
+| `make gen-api` | OpenAPI → TypeScript types | `conda run -n ca-helper --cwd backend flask --app app openapi write --format=json ../openapi.json && conda run -n ca-helper --cwd frontend npm run gen:api` |
 
 ## VS Code
 
@@ -112,10 +114,9 @@ Every Python command runs inside the conda env through `conda run` (never an act
 - **`permission denied ... docker.sock`** right after installing Docker Desktop: open a new terminal. If that is
   not enough, run `wsl --shutdown` in PowerShell and reopen Ubuntu. Check Docker Desktop → Settings → Resources
   → WSL integration.
-- **nvm's install script fails with an SSL error** (some networks block `raw.githubusercontent.com`): install nvm
-  with git instead:
-  `git clone --depth 1 --branch v0.40.8 https://github.com/nvm-sh/nvm.git ~/.nvm`, then add the three lines from
-  the nvm README to `~/.bashrc` (or `~/.zshrc`), open a new terminal, and run `nvm install 22`.
+- **`node: command not found` in your terminal:** expected. Node lives in the conda env; use the Make targets or
+  `conda run -n ca-helper --cwd frontend npm <command>`. If `make setup` reports Node missing or older than 22.22,
+  run `make env-update`.
 - **Port already in use:** another Postgres on 5432 → set `DB_HOST_PORT` and the port in `DATABASE_URL` /
   `TEST_DATABASE_URL` in `.env`. On macOS, never use port 5000 (AirPlay Receiver); the backend uses 8000.
 - **Frontend type errors about `./generated/schema`:** run `make gen-api` (the types are generated, not committed).

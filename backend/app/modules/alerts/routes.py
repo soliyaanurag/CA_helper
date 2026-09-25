@@ -1,7 +1,8 @@
 """HTTP routes for the alerts module.
 
-URLs: /api/alerts/...  and admin screens under /api/admin/alerts/...
-Routes stay thin: parse input (schemas.py), call services.py, return output.
+URLs: /api/v1/alerts/...  and admin screens under /api/v1/admin/alerts/...
+Routes stay thin: parse input (schemas.py), call one service function, serialize
+the result. No queries and no db.session here (docs/PATTERNS.md, "Foundations").
 """
 
 from flask_smorest import Blueprint
@@ -9,6 +10,5 @@ from flask_smorest import Blueprint
 blp = Blueprint(
     "alerts",
     __name__,
-    url_prefix="/api",
     description="Scheduled reminders, notification settings and penalty estimator",
 )

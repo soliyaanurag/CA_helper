@@ -13,7 +13,7 @@ None yet. Planned:
 - `news_sources` (config), `news_articles`, `regulatory_changes` (extracted change + approval status)
 
 ## Endpoints
-None yet. Planned: admin approval at `/api/admin/regulatory/...`.
+None yet. Planned: admin approval at `/api/v1/admin/regulatory/...`.
 
 ## Service functions other modules call
 None yet. Planned: `active_changes_for(business_id)` (used by ca_workspace urgency).
