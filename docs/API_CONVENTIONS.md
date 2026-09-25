@@ -8,6 +8,7 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
   prefix to every module blueprint, so blueprints set no `url_prefix` of their own.
 - **Unversioned (infrastructure only):** `/api/health` (Docker/CI healthchecks, the frontend status badge),
   `/api/docs` (Swagger UI) and `/api/openapi.json`.
+- The API's bare root `/` redirects to `/api/docs` (the API serves no pages; the app is the frontend).
 - Module resources: `/api/v1/<module>/<resource>`, with kebab-case segments and plural nouns:
   `/api/v1/compliance/items`, `/api/v1/compliance/items/{item_id}`, `/api/v1/ca-workspace/clients`.
 - Actions that are not plain CRUD use a verb sub-path: `POST /api/v1/compliance/items/{item_id}/mark-filed`.
@@ -66,6 +67,8 @@ Every error response has the same body (built in `backend/app/core/errors.py`):
 - `request_id`: the request's ID (see "Request IDs" below). Show it to users with unexpected errors ("quote this
   ID") so the matching log lines can be found.
 - Never put PII or stack traces in error messages.
+- Frontend: every call goes through `unwrap()` (`frontend/src/core/api/errors.ts`), which turns this body into an
+  `ApiRequestError` with `status`, `code`, `message` and `requestId`.
 
 ## Request IDs
 - Every response has an `X-Request-ID` header. If the request carried a valid `X-Request-ID` (1–128 characters of

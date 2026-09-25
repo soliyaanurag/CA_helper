@@ -12,13 +12,13 @@ Basic login works: email + password → JWT access token, role-checked endpoints
   - `routes.py`: login and me.
   - `seed.py`: one demo user per role from `DEMO_*` in `.env`, idempotent. `run_all_seeds()` runs it before the module seeds.
 - **Password hashing:** `backend/app/core/security/passwords.py` (`hash_password`, `verify_password`, `needs_rehash`; argon2-cffi defaults).
-- **Access control:** `backend/app/core/permissions.py` has `roles_required(*roles)` and `current_user()`. The role is checked against the DB row, not only the token claim.
+- **Access control:** `backend/app/core/permissions.py` has `roles_required(*roles)`, `login_required` (any role) and `current_user()`. The role is checked against the DB row, not only the token claim.
 - **Enum:** `UserRole` (`business` | `ca` | `admin`) in `backend/app/core/db/enums.py`.
 - **Config:** `JWT_ACCESS_TOKEN_EXPIRES` from `JWT_ACCESS_TOKEN_MINUTES` (default 60).
 - **OpenAPI:** bearer auth is the global default (`API_SPEC_OPTIONS["security"]`). Public endpoints opt out with `@blp.doc(security=[])`.
 - **Frontend** (`frontend/src/core/auth/`):
   - `AuthProvider` (session in localStorage; TODO: move to a refresh cookie). An `api.use()` middleware adds the Bearer header and logs out on any 401 to a request that carried a token.
-  - `useAuth()` / `LoginError` in `auth-context.ts`.
+  - `useAuth()` in `auth-context.ts`; `login()` throws `ApiRequestError` (`core/api/errors.ts`) with the API error code.
   - `RequireRole` guard; `ROLE_HOME` in `session.ts`.
   - The login page is `frontend/src/core/pages/LoginPage.tsx` (`/login`).
 - **Tests:**
@@ -46,7 +46,7 @@ Token errors on any protected endpoint: 401 `AUTH_REQUIRED` (no token), `TOKEN_I
 Planned: signup, refresh, logout, verify-email (OTP), password reset.
 
 ## Service functions other modules call
-- `roles_required(*roles)` and `current_user()` from `app.core.permissions`: use them on every protected endpoint (example: `backend/app/modules/compliance/routes.py`).
+- `roles_required(*roles)`, `login_required` and `current_user()` from `app.core.permissions`: one of the decorators on every protected endpoint (examples: `backend/app/modules/compliance/routes.py`; `/auth/me` in `backend/app/core/auth/routes.py`).
 - `UserRole` from `app.core.db.enums`.
 - `get_active_user(user_id)`, `normalize_email(email)` from `app.core.auth.services`.
 - Planned: `ca_has_active_access(ca_id, business_id)`.

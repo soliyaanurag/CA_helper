@@ -99,7 +99,8 @@ The login feature is the first one built end to end. Copy these files.
 - Schemas: `backend/app/modules/compliance/schemas.py`; `backend/app/core/auth/schemas.py` (request vs response).
   Name schemas uniquely across modules (`ComplianceDashboardSchema`, not `DashboardSchema`): the OpenAPI component
   name comes from the class name.
-- Role check: `roles_required(*roles)` and `current_user()` in `backend/app/core/permissions.py`.
+- Role check: `roles_required(*roles)`, `login_required` (any logged-in user) and `current_user()` in
+  `backend/app/core/permissions.py`.
 - Tests: `backend/app/modules/compliance/tests/test_dashboard.py` (allowed role, other roles 403, no token 401)
   with the `make_user` and `auth_headers` fixtures from `backend/conftest.py`; `backend/tests/test_auth_login.py`.
 
@@ -146,8 +147,8 @@ class Widgets(MethodView):
 
 - Routes are thin: validate input (schemas), call one service function, return data. No queries or
   `db.session` in routes (see "Foundations").
-- Protect **every** endpoint with `@roles_required(...)` from `app/core/permissions.py` (example:
-  `app/modules/compliance/routes.py`). A public endpoint instead declares `@blp.doc(security=[])` (example:
+- Protect **every** endpoint with `@roles_required(...)` (or `@login_required` for any role) from
+  `app/core/permissions.py` (example: `app/modules/compliance/routes.py`). A public endpoint instead declares `@blp.doc(security=[])` (example:
   `app/core/auth/routes.py`, login).
 - Expected errors: `raise ApiError(409, "DUPLICATE_WIDGET", "A widget with this name exists.")`
   (`app/core/errors.py`). Never return ad-hoc error JSON.
@@ -228,18 +229,21 @@ An area's home page is a feature's `{ index: true, element: ... }` route with a 
 ## 9. Frontend data fetching
 ```ts
 // features/<module>/api.ts
+import { api } from "@/core/api/client";
+import { unwrap } from "@/core/api/errors";
+
 export function useWidgets() {
   return useQuery({
     queryKey: ["<module>", "widgets"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/v1/<module>/widgets");
-      if (error) throw new Error(error.error.message);
-      return data;
-    },
+    queryFn: () => unwrap(api.GET("/api/v1/<module>/widgets")),
   });
 }
 ```
-Types come from the generated OpenAPI types. Never hand-write API types. Forms: React Hook Form + Zod.
+`unwrap()` returns the typed data or throws `ApiRequestError` (`status`, `code`, `message`, `requestId`). Show
+a failure with `errorMessage(query.error)` (adds the request ID as a reference); switch on `error.code` when a
+page reacts to a specific error (example: `LOGIN_ERROR_TEXT` in `core/pages/LoginPage.tsx`). Example hook:
+`features/compliance/api.ts`. Types come from the generated OpenAPI types. Never hand-write API types. Forms:
+React Hook Form + Zod.
 
 ## 10. Admin screen for a module's config
 The module that holds the data also holds its admin screen. Backend under `/api/v1/admin/<module>/...`; frontend

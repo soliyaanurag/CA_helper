@@ -35,6 +35,14 @@ in the same PR.
 - **API client:** `baseUrl` is the page origin (no path) instead of `""`, and `fetch` is looked up per call, so
   frontend tests running in Node can build requests and stub `fetch`. Browser behaviour is the same.
 - **shadcn `input` and `label`** added (no new npm packages).
+- **One frontend error type:** every API call goes through `unwrap()` (`frontend/src/core/api/errors.ts`), which
+  throws `ApiRequestError` (`status`, `code`, `message`, `requestId`); pages show `errorMessage(error)` and switch on
+  `code` when needed. No per-feature error classes.
+- **`login_required`** (any role) next to `roles_required`; the role areas in `frontend/src/core/routes.tsx` are
+  built from one `ROLE_LAYOUTS` map, so a new role/area is one entry plus its layout.
+- **Health:** a database outage logs one warning line (no traceback) and the landing badge says "API up,
+  database unavailable" instead of "unreachable".
+- **`GET /` on the API redirects to `/api/docs`** instead of a 404 JSON, since people open the API's root URL.
 
 **Why:** a working login for all three roles is the base every later feature builds on; module-owned URLs keep
 the "grep the module segment" rule without exceptions; the DB role check and 401-on-deactivation make an admin's
