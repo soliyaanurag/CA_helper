@@ -8,11 +8,15 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
   prefix to every module blueprint, so blueprints set no `url_prefix` of their own.
 - **Unversioned (infrastructure only):** `/api/health` (Docker/CI healthchecks, the frontend status badge),
   `/api/docs` (Swagger UI) and `/api/openapi.json`.
+- The API's bare root `/` redirects to `/api/docs` (the API serves no pages; the app is the frontend).
 - Module resources: `/api/v1/<module>/<resource>`, with kebab-case segments and plural nouns:
   `/api/v1/compliance/items`, `/api/v1/compliance/items/{item_id}`, `/api/v1/ca-workspace/clients`.
 - Actions that are not plain CRUD use a verb sub-path: `POST /api/v1/compliance/items/{item_id}/mark-filed`.
 - Admin endpoints for a module's configuration: `/api/v1/admin/<module>/...`, in that module's blueprint.
-- Core endpoints: `/api/health` (exists), `/api/v1/auth/...` and `/api/v1/notifications/...` (planned).
+- Core endpoints: `/api/health`, `/api/v1/auth/login`, `/api/v1/auth/me` (exist); more of `/api/v1/auth/...` and
+  `/api/v1/notifications/...` (planned).
+- An area's home-page data is served by the module that owns that page, under its own segment:
+  `/api/v1/compliance/dashboard` (business), `/api/v1/ca-workspace/dashboard` (CA), `/api/v1/admin/dashboard`.
 - A breaking change would get a new prefix (`/api/v2`) next to the old one; nothing needs that yet.
 - The Vite proxy (hybrid) and nginx (Docker) forward all of `/api/`, which covers both. The frontend client uses
   `baseUrl: ""` because the generated paths already contain `/api/v1` (`frontend/src/core/api/client.ts`).
@@ -31,9 +35,15 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
   sends display text for an enum; the frontend maps codes to labels in `frontend/src/core/labels.ts`.
 
 ## Authentication
-- `Authorization: Bearer <access_token>` (JWT). The token carries a `role` claim: `business` | `ca` | `admin`.
-- Refresh tokens get new access tokens via the refresh endpoint (details fixed when auth is built).
-- Every endpoint except health, docs, signup/login/OTP is protected by a role decorator from `core/permissions.py`.
+- `POST /api/v1/auth/login` `{email, password}` → `{access_token, user}`; rate limited to 10 per minute per IP.
+- `Authorization: Bearer <access_token>` (JWT). `sub` is the user id; a `role` claim is `business` | `ca` |
+  `admin`; the lifetime is `JWT_ACCESS_TOKEN_MINUTES` (default 60). No refresh token yet (planned).
+- Every endpoint except health, docs, signup/login/OTP is protected by `@roles_required(...)` from
+  `app/core/permissions.py`, which checks the role stored in the database. In the OpenAPI spec bearer auth is the
+  global default; public endpoints declare `@blp.doc(security=[])`.
+- Auth error codes: 401 `AUTH_REQUIRED` (no token), `TOKEN_INVALID`, `TOKEN_EXPIRED`, `ACCOUNT_INACTIVE` (user
+  deactivated), `INVALID_CREDENTIALS` (login); 403 `FORBIDDEN` (wrong role), `ACCOUNT_INACTIVE` (login);
+  429 `TOO_MANY_REQUESTS`. The frontend logs out on any 401 to a request that carried a token.
 - A CA reads business data only via `ca_has_active_access(ca_id, business_id)`.
 
 ## Errors
@@ -57,6 +67,8 @@ Every error response has the same body (built in `backend/app/core/errors.py`):
 - `request_id`: the request's ID (see "Request IDs" below). Show it to users with unexpected errors ("quote this
   ID") so the matching log lines can be found.
 - Never put PII or stack traces in error messages.
+- Frontend: every call goes through `unwrap()` (`frontend/src/core/api/errors.ts`), which turns this body into an
+  `ApiRequestError` with `status`, `code`, `message` and `requestId`.
 
 ## Request IDs
 - Every response has an `X-Request-ID` header. If the request carried a valid `X-Request-ID` (1–128 characters of

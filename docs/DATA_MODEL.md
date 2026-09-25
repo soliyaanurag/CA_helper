@@ -1,8 +1,8 @@
 # Data model
 
-> **DRAFT: planned tables, not built yet.** No migration exists yet, so there are no tables. Each PR that adds a
-> migration updates this file to match reality. Column lists are indicative; the module that holds the table
-> decides details.
+> **Mostly planned.** Implemented tables are marked **(implemented)** and list their real columns; the rest are
+> planned and indicative. Each PR that adds a migration updates this file to match reality. The module that holds
+> a table decides its details.
 
 ## Global rules (from CLAUDE.md)
 - Every model subclasses `BaseModel` (`backend/app/core/db/models.py`): primary key `id` is a **UUID** (uuid4,
@@ -23,11 +23,11 @@
 - Constraint/index names are generated from the naming convention in `backend/app/core/db/base.py`.
 - A module never imports another module's models; it calls that module's service functions.
 
-## Planned tables
+## Tables
 
 | Table | Module | One row is... | Key columns (indicative) |
 |---|---|---|---|
-| `users` | core/auth | a login account | email (unique), password_hash, role, email_verified, is_active, deleted_at |
+| `users` **(implemented)** | core/auth | a login account | id, email (unique; stored trimmed + lowercased), password_hash (argon2), full_name, role (`user_role`), is_active, deleted_at, created_at, updated_at. Planned: email_verified (OTP task) |
 | `email_otps` | core/auth | a one-time code | user_id, purpose (verify/reset), code_hash, expires_at, attempts, used_at |
 | `notifications` | core/notifications | a tray entry | user_id, type, title, body, link, read_at, created_at |
 | `businesses` | onboarding | a registered business | user_id, legal_name, entity_type, state, description, turnover_range, investment_amount, pan (enc) + pan_bidx, gst_registered, gstin (enc) + gstin_bidx, tan (enc), deducts_tds, pays_salary_above_limit, cin_llpin, udyam_number, phone (enc), nic_code |
@@ -63,6 +63,16 @@ means telling the team (it is a contract). The **code** is what the database sto
 (lowercase snake_case, via `str_enum()`); the **label** is display text only, shown by the frontend through
 `frontend/src/core/labels.ts`, which must match these tables. The migration that creates each column fixes its
 CHECK constraint to exactly these codes.
+
+**`users.role`** (core/auth; `UserRole` in `backend/app/core/db/enums.py`; CHECK `ck_users_user_role`)
+
+| Code | Label | Notes |
+|---|---|---|
+| `business` | Business | business owner / gig worker; home `/business` |
+| `ca` | Chartered Accountant | home `/ca` |
+| `admin` | Admin | home `/admin` |
+
+Also the `role` claim in the JWT.
 
 **`compliance_items.status`** (compliance)
 

@@ -11,6 +11,11 @@ Fixtures:
               transaction that is rolled back afterwards, so nothing a test
               writes (even after a service's commit()) survives it. Request it in
               any test that touches the DB.
+    make_user    factory: make_user(role=UserRole.CA, is_active=False) -> User (needs `database`)
+    auth_headers auth_headers(user) -> {"Authorization": "Bearer <access token>"}
+
+Rate-limit counters are cleared before every test (autouse), so login tests
+never hit the limit because of earlier tests.
 
 The test database (TEST_DATABASE_URL, default `ca_helper_test`) is created
 automatically if it does not exist. It needs `make infra` to be running.
@@ -25,7 +30,14 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app import create_app
+from app.core.auth.models import User
+from app.core.auth.tokens import issue_access_token
+from app.core.db.enums import UserRole
+from app.core.security.passwords import hash_password
 from app.extensions import db as _db
+from app.extensions import limiter
+
+TEST_PASSWORD = "Correct-Horse-9"
 
 
 @pytest.fixture(scope="session")
@@ -110,6 +122,46 @@ def database(_schema):
         _schema.session = real_session
         outer_transaction.rollback()
         connection.close()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits(app):
+    limiter.reset()
+
+
+@pytest.fixture()
+def make_user(database):
+    """Create and commit a user; the password is always TEST_PASSWORD."""
+    counter = iter(range(1, 10_000))
+
+    def _make_user(
+        role: UserRole = UserRole.BUSINESS,
+        email: str | None = None,
+        full_name: str = "Test User",
+        **fields,
+    ) -> User:
+        fields.setdefault("password_hash", hash_password(TEST_PASSWORD))
+        user = User(
+            email=email or f"user{next(counter)}@example.com",
+            full_name=full_name,
+            role=role,
+            **fields,
+        )
+        database.session.add(user)
+        database.session.commit()
+        return user
+
+    return _make_user
+
+
+@pytest.fixture()
+def auth_headers(app):
+    """Build an Authorization header with a real access token for a user."""
+
+    def _auth_headers(user: User) -> dict[str, str]:
+        return {"Authorization": f"Bearer {issue_access_token(user)}"}
+
+    return _auth_headers
 
 
 def pytest_runtest_setup(item):

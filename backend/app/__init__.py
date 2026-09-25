@@ -8,17 +8,19 @@
 - the test fixtures: `backend/conftest.py`
 """
 
-from flask import Flask
+from flask import Flask, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app import cli
 from app.config import get_config
+from app.core.auth.routes import blp as auth_blp
+from app.core.auth.tokens import register_jwt_callbacks
 from app.core.errors import register_error_handlers
 from app.core.health import blp as health_blp
 from app.core.logging_config import configure_logging
 from app.core.request_id import init_request_id
 from app.extensions import api, cors, db, jwt, limiter, migrate
-from app.modules import register_blueprints
+from app.modules import API_PREFIX, register_blueprints
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -48,14 +50,20 @@ def create_app(config_name: str | None = None) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    register_jwt_callbacks(jwt)
     cors.init_app(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
     limiter.init_app(app)
     api.init_app(app)
 
     # Routes: the core health check (/api/health, unversioned for infra healthchecks),
-    # then every feature module under /api/v1 (auto-discovered).
+    # core auth (/api/v1/auth/...), then every feature module under /api/v1 (auto-discovered).
     api.register_blueprint(health_blp)
+    api.register_blueprint(auth_blp, url_prefix=API_PREFIX)
     register_blueprints(api)
+
+    # The API has no pages of its own, so its bare root opens the API docs instead of
+    # a 404. A plain Flask route: it stays out of the OpenAPI spec and generated types.
+    app.add_url_rule("/", "root", lambda: redirect("/api/docs"))
 
     register_error_handlers(app)
     cli.register_commands(app)

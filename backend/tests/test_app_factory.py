@@ -65,3 +65,11 @@ def test_api_error_returns_standard_error(app):
             "details": {"field": "pan"},
         }
     }
+
+
+def test_api_root_redirects_to_the_docs(client):
+    response = client.get("/")
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/docs"
+    assert "/" not in client.get("/api/openapi.json").get_json()["paths"]

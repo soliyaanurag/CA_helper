@@ -29,6 +29,12 @@ export const ENGAGEMENT_STATUS_LABELS = {
   expired: "Expired",
 } as const satisfies Record<string, string>;
 
+export const USER_ROLE_LABELS = {
+  business: "Business",
+  ca: "Chartered Accountant",
+  admin: "Admin",
+} as const satisfies Record<string, string>;
+
 /** The label for `code`, or the code itself if the map has no entry (never crash on a new value). */
 export function label(labels: Readonly<Record<string, string>>, code: string): string {
   return labels[code] ?? code;

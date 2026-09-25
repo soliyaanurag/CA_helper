@@ -56,3 +56,16 @@ def str_enum(enum_cls: type[StrEnum], name: str | None = None) -> sa.Enum:
         values_callable=lambda cls: [member.value for member in cls],  # store values
         length=ENUM_COLUMN_LENGTH,
     )
+
+
+# --- Shared enums ---------------------------------------------------------------
+# Enums used by more than one module live here; a module's own enums live in its
+# models.py. Codes and labels: docs/DATA_MODEL.md, "Status values".
+
+
+class UserRole(StrEnum):
+    """Who a login account belongs to; also the `role` claim in the JWT."""
+
+    BUSINESS = "business"
+    CA = "ca"
+    ADMIN = "admin"

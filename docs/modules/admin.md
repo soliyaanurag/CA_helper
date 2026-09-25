@@ -4,16 +4,20 @@
 The admin area shell, user/CA management (verify, suspend, soft-delete), the service catalog editor and the admin action audit log. Other modules' admin screens live in their own `features/<module>/admin/` folders and appear here through route aggregation.
 
 ## What exists now
-Skeleton only; no features yet.
-- Backend (`backend/app/modules/admin/`): the `admin` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
-- Frontend (`frontend/src/features/admin/`): one placeholder page, "Users & CAs" at `/admin/users` (admin nav), built from `ModulePlaceholder`; `api.ts` is empty. The admin layout itself (`AdminLayout`) is in frontend core.
+Only the admin dashboard stub; no admin features yet.
+- Backend (`backend/app/modules/admin/`): `GET /api/v1/admin/dashboard` (admin role only) returns a welcome message: route in `routes.py`, `AdminDashboardSchema` in `schemas.py`, `get_dashboard(user)` in `services.py`, tests in `tests/test_dashboard.py`. No models; `seed()` does nothing. The demo admin user is seeded by core-auth.
+- Frontend (`frontend/src/features/admin/`): `AdminDashboardPage` is the admin area home (`/admin`, index route, nav "Dashboard"), using `useAdminDashboard()` from `api.ts`; placeholder "Users & CAs" page at `/admin/users`. The admin layout itself (`AdminLayout`) is in frontend core.
 
 ## Tables
 None yet. Planned:
 - `admin_audit_log`: admin, action, target, details, timestamp
 
 ## Endpoints
-None yet. Planned: `/api/v1/admin/users/...`, `/api/v1/admin/cas/...`.
+| Method | Path | Who | Returns |
+|---|---|---|---|
+| GET | `/api/v1/admin/dashboard` | admin | `{message}` (welcome text; grows into the admin home) |
+
+Planned: `/api/v1/admin/users/...`, `/api/v1/admin/cas/...`.
 
 ## Service functions other modules call
 None yet.
