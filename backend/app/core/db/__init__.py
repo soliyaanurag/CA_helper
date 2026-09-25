@@ -1,4 +1,4 @@
-"""Database foundations (owner: Member B).
+"""Database foundations.
 
 Now:     base.py, the declarative Base with deterministic constraint names.
 Planned: shared mixins (UTC created_at/updated_at, soft delete via

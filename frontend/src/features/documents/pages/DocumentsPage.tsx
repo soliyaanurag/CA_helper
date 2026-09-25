@@ -5,8 +5,6 @@ export function DocumentsPage() {
     <ModulePlaceholder
       title="Document vault"
       description="Encrypted uploads, filing acknowledgements and OCR verification."
-      owner="B"
-      tasks={["DOC-01"]}
     />
   );
 }

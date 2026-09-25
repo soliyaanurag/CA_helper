@@ -1,6 +1,6 @@
 import { Link, Outlet } from "react-router";
 
-/** Layout for public pages (landing; login and signup arrive in Phase 1). */
+/** Layout for public pages (landing; login and signup pages are not built yet). */
 export function PublicLayout() {
   return (
     <div className="min-h-screen bg-background text-foreground">

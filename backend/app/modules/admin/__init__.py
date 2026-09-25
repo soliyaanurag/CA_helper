@@ -1,6 +1,6 @@
 """Admin module: Admin: users, CA verification and service catalog.
 
-Owner: Member C. Tasks and contracts: docs/modules/admin.md
+Context and contracts: docs/modules/admin.md
 Discovered automatically by app/modules/__init__.py.
 """
 

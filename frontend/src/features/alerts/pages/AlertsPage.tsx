@@ -5,8 +5,6 @@ export function AlertsPage() {
     <ModulePlaceholder
       title="Notification settings"
       description="Deadline reminders (email + tray) and the penalty estimator."
-      owner="B"
-      tasks={["ALR-01"]}
     />
   );
 }

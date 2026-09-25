@@ -8,7 +8,7 @@ import type { components, paths } from "./generated/schema";
  * `make gen-api` and are never written by hand (and never committed).
  *
  * Requests go to the same origin: in hybrid mode Vite proxies /api to Flask,
- * in Docker nginx does. Auth headers are added in FE-02 via `api.use(...)`.
+ * in Docker nginx does. Auth headers will be added via `api.use(...)` once auth exists.
  *
  * Usage: const { data, error } = await api.GET("/api/health");
  */

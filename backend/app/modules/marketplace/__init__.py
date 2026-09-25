@@ -1,6 +1,6 @@
 """Marketplace module: CA profiles, marketplace, requests and engagements.
 
-Owner: Member C. Tasks and contracts: docs/modules/marketplace.md
+Context and contracts: docs/modules/marketplace.md
 Discovered automatically by app/modules/__init__.py.
 """
 

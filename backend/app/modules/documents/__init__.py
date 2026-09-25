@@ -1,6 +1,6 @@
 """Documents module: Encrypted document vault and filing-proof OCR.
 
-Owner: Member B. Tasks and contracts: docs/modules/documents.md
+Context and contracts: docs/modules/documents.md
 Discovered automatically by app/modules/__init__.py.
 """
 

@@ -1,7 +1,7 @@
-"""Authentication (owner: Member A). Empty in Phase 0.
+"""Authentication. Not built yet.
 
-Planned (AUTH-01, AUTH-02, AUTH-05):
-- signup/login for businesses and CAs; seeded admin (AUTH-04)
+Planned:
+- signup/login for businesses and CAs; seeded admin account
 - JWT access + refresh tokens carrying a `role` claim (business | ca | admin)
 - loading the current user from the token
 - email OTP verification and password reset

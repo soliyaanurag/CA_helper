@@ -53,13 +53,13 @@ class BaseConfig:
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD") or None
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "CA Helper <no-reply@ca-helper.local>")
 
-    # --- Encryption and file storage (used from Phase 1) ---
+    # --- Encryption and file storage (EncryptedString, blind index, encrypted uploads) ---
     FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
     BLIND_INDEX_KEY = os.getenv("BLIND_INDEX_KEY")
     # A relative path is resolved against backend/.
     UPLOAD_DIR = str(BACKEND_DIR / os.getenv("UPLOAD_DIR", "instance/uploads"))
 
-    # --- Gemini (used from Phase 1, only through app/core/ai/gemini_client.py) ---
+    # --- Gemini (used only through app/core/ai/gemini_client.py) ---
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
     GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL")

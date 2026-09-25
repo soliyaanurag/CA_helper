@@ -1,6 +1,6 @@
 """Regulatory module: Regulatory news monitor and admin approval.
 
-Owner: Member B. Tasks and contracts: docs/modules/regulatory.md
+Context and contracts: docs/modules/regulatory.md
 Discovered automatically by app/modules/__init__.py.
 """
 

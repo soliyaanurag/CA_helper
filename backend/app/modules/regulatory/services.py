@@ -1,6 +1,6 @@
 """Business logic for the regulatory module. None yet.
 
 Functions here are the module's public interface: routes call them, and other
-modules may call the ones listed under "Service functions others may call" in
+modules may call the ones listed under "Service functions other modules call" in
 docs/modules/regulatory.md.
 """

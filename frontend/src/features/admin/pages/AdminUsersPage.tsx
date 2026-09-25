@@ -5,8 +5,6 @@ export function AdminUsersPage() {
     <ModulePlaceholder
       title="Users & CAs"
       description="List, verify, suspend and remove users and CAs."
-      owner="C"
-      tasks={["ADM-01"]}
     />
   );
 }

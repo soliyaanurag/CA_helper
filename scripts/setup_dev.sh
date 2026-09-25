@@ -296,7 +296,7 @@ PY
   ok_item ".env created from .env.example"
 fi
 if grep -q '^GEMINI_API_KEY=$' .env; then
-  warn "Add your own GEMINI_API_KEY to .env (https://aistudio.google.com/apikey); needed from Phase 1."
+  warn "Add your own GEMINI_API_KEY to .env (https://aistudio.google.com/apikey); needed for the AI features."
   warn_item "GEMINI_API_KEY is empty in .env"
 fi
 

@@ -1,6 +1,6 @@
 """Alerts module: Scheduled reminders, notification settings and penalty estimator.
 
-Owner: Member B. Tasks and contracts: docs/modules/alerts.md
+Context and contracts: docs/modules/alerts.md
 Discovered automatically by app/modules/__init__.py.
 """
 

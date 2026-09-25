@@ -1,7 +1,6 @@
 """GET /api/health: is the API up and can it reach the database?
 
 Used by the Docker healthcheck, CI and the frontend's status badge.
-Owner: Member B (INF-02).
 """
 
 import logging

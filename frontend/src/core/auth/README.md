@@ -1,8 +1,8 @@
 # core/auth (frontend)
 
-Owner: Member C. Empty in Phase 0.
+Empty so far.
 
-Planned (FE-02, Phase 1):
+Planned:
 
 - `AuthProvider` / `useAuth()`: current user, role (`business` | `ca` | `admin`), login/logout, token refresh
 - route guards used by the business, CA and admin layouts

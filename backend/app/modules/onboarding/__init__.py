@@ -1,6 +1,6 @@
 """Onboarding module: Business registration, regulatory profile and NIC code.
 
-Owner: Member A. Tasks and contracts: docs/modules/onboarding.md
+Context and contracts: docs/modules/onboarding.md
 Discovered automatically by app/modules/__init__.py.
 """
 

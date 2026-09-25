@@ -1,9 +1,8 @@
 """Shared building blocks used by every feature module.
 
-Owners (see docs/OWNERSHIP.md):
-    auth/, permissions.py                     Member A
+    auth/, permissions.py                     authentication and access control
     db/, security/, email/, notifications/,
-    ai/, ocr/, storage/, errors.py, health.py Member B
+    ai/, ocr/, storage/, errors.py, health.py shared infrastructure
 
-Changes here go in a separate small PR labelled `core`, reviewed by the owner.
+Every module depends on this package, so a change here must be called out clearly in the PR.
 """

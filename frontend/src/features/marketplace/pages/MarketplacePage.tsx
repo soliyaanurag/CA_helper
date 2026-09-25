@@ -5,8 +5,6 @@ export function MarketplacePage() {
     <ModulePlaceholder
       title="Find a CA"
       description="CA listings filtered by form, requests and engagements."
-      owner="C"
-      tasks={["MKT-01", "MKT-02", "MKT-03"]}
     />
   );
 }

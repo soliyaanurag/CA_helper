@@ -1,6 +1,6 @@
 """Compliance module: Obligations, compliance calendar, item pages and home dashboard.
 
-Owner: Member A. Tasks and contracts: docs/modules/compliance.md
+Context and contracts: docs/modules/compliance.md
 Discovered automatically by app/modules/__init__.py.
 """
 

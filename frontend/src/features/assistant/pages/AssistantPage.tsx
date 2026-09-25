@@ -5,8 +5,6 @@ export function AssistantPage() {
     <ModulePlaceholder
       title="AI assistant"
       description="Answers with citations. Becomes the floating widget on every page."
-      owner="B"
-      tasks={["AST-01"]}
     />
   );
 }
