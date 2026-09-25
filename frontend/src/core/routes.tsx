@@ -1,6 +1,9 @@
+import type { ComponentType } from "react";
 import type { RouteObject } from "react-router";
 
 import { RequireRole } from "@/core/auth/RequireRole";
+import type { Role } from "@/core/auth/session";
+import { USER_ROLE_LABELS } from "@/core/labels";
 import { AdminLayout } from "@/core/layout/AdminLayout";
 import { BusinessLayout } from "@/core/layout/BusinessLayout";
 import { CaLayout } from "@/core/layout/CaLayout";
@@ -30,9 +33,10 @@ function routesFor(area: Area): RouteObject[] {
 }
 
 /** The area's routes, plus AreaIndexPage as its home if no module gives an index route. */
-function areaChildren(area: Area, title: string): RouteObject[] {
+function areaChildren(area: Area): RouteObject[] {
   const routes = routesFor(area);
   if (routes.some((route) => route.index)) return routes;
+  const title = area === "public" ? "" : USER_ROLE_LABELS[area];
   return [{ index: true, element: <AreaIndexPage title={title} nav={navFor(area)} /> }, ...routes];
 }
 
@@ -47,6 +51,27 @@ export function navFor(area: Area): NavItem[] {
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 }
 
+/** The logged-in areas: one per role, each with its own layout. */
+const ROLE_LAYOUTS: Record<Role, ComponentType<{ nav: NavItem[] }>> = {
+  business: BusinessLayout,
+  ca: CaLayout,
+  admin: AdminLayout,
+};
+
+function roleArea(role: Role): RouteObject {
+  const Layout = ROLE_LAYOUTS[role];
+  return {
+    path: AREA_PREFIX[role],
+    // Only for this role (RequireRole); the backend checks again on every request.
+    element: (
+      <RequireRole role={role}>
+        <Layout nav={navFor(role)} />
+      </RequireRole>
+    ),
+    children: areaChildren(role),
+  };
+}
+
 export const appRoutes: RouteObject[] = [
   {
     path: "/",
@@ -57,33 +82,6 @@ export const appRoutes: RouteObject[] = [
       ...routesFor("public"),
     ],
   },
-  // Each area is only for its own role (RequireRole); the backend checks again.
-  {
-    path: AREA_PREFIX.business,
-    element: (
-      <RequireRole role="business">
-        <BusinessLayout nav={navFor("business")} />
-      </RequireRole>
-    ),
-    children: areaChildren("business", "Business"),
-  },
-  {
-    path: AREA_PREFIX.ca,
-    element: (
-      <RequireRole role="ca">
-        <CaLayout nav={navFor("ca")} />
-      </RequireRole>
-    ),
-    children: areaChildren("ca", "Chartered Accountant"),
-  },
-  {
-    path: AREA_PREFIX.admin,
-    element: (
-      <RequireRole role="admin">
-        <AdminLayout nav={navFor("admin")} />
-      </RequireRole>
-    ),
-    children: areaChildren("admin", "Admin"),
-  },
+  ...(Object.keys(ROLE_LAYOUTS) as Role[]).map(roleArea),
   { path: "*", element: <NotFoundPage /> },
 ];

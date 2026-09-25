@@ -39,10 +39,10 @@ export function HomePage() {
             <Badge variant="secondary">checking...</Badge>
           ) : health.isError ? (
             <Badge variant="destructive">unreachable</Badge>
+          ) : health.data.status === "ok" ? (
+            <Badge>ok</Badge>
           ) : (
-            <Badge>
-              {health.data.status} (database {health.data.database})
-            </Badge>
+            <Badge variant="destructive">API up, database {health.data.database}</Badge>
           )}
         </p>
       </div>

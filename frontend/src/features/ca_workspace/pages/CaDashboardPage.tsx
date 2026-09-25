@@ -1,3 +1,4 @@
+import { errorMessage } from "@/core/api/errors";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card";
 
 import { useCaDashboard } from "../api";
@@ -19,7 +20,7 @@ export function CaDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Could not load the dashboard</CardTitle>
-            <CardDescription>{dashboard.error.message}</CardDescription>
+            <CardDescription>{errorMessage(dashboard.error)}</CardDescription>
           </CardHeader>
         </Card>
       )}

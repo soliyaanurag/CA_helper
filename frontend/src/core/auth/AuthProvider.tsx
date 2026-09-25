@@ -3,8 +3,9 @@ import type { Middleware } from "openapi-fetch";
 import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "@/core/api/client";
+import { unwrap } from "@/core/api/errors";
 
-import { AuthContext, type AuthContextValue, LoginError } from "./auth-context";
+import { AuthContext, type AuthContextValue } from "./auth-context";
 import { clearSession, loadSession, saveSession, type Session } from "./session";
 
 /**
@@ -46,10 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data, error } = await api.POST("/api/v1/auth/login", { body: { email, password } });
-    if (error) {
-      throw new LoginError(error.error.code, error.error.message, error.error.request_id);
-    }
+    const data = await unwrap(api.POST("/api/v1/auth/login", { body: { email, password } }));
     const next = { accessToken: data.access_token, user: data.user };
     tokenRef.current = next.accessToken;
     saveSession(next);

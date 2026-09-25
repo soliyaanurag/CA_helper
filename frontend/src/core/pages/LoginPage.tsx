@@ -4,7 +4,8 @@ import { useForm } from "react-hook-form";
 import { Navigate, useLocation } from "react-router";
 import { z } from "zod";
 
-import { LoginError, useAuth } from "@/core/auth/auth-context";
+import { ApiRequestError, errorMessage } from "@/core/api/errors";
+import { useAuth } from "@/core/auth/auth-context";
 import { ROLE_HOME, type Role } from "@/core/auth/session";
 import { Button } from "@/core/components/ui/button";
 import {
@@ -31,13 +32,10 @@ const LOGIN_ERROR_TEXT: Record<string, string> = {
 };
 
 function errorText(error: unknown): string {
-  if (error instanceof LoginError) {
-    const known = LOGIN_ERROR_TEXT[error.code];
-    if (known) return known;
-    const ref = error.requestId ? ` (reference: ${error.requestId})` : "";
-    return `Login failed: ${error.message}${ref}`;
+  if (error instanceof ApiRequestError && LOGIN_ERROR_TEXT[error.code]) {
+    return LOGIN_ERROR_TEXT[error.code];
   }
-  return "Cannot reach the server. Check your connection and try again.";
+  return errorMessage(error);
 }
 
 /** After login: back to the page the guard sent the user from, if it is in their area. */
