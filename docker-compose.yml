@@ -6,7 +6,8 @@
 #
 # Every service reads the root .env. For the backend and worker containers,
 # the `environment:` block below overrides the hostnames (localhost -> service
-# names), so the same .env works in both modes.
+# names) and switches to JSON logs, so the same .env works in both modes.
+# Every service has a healthcheck; `make up` waits until all five are healthy.
 name: ca-helper
 
 # Values shared by the backend and worker containers (a YAML anchor).
@@ -15,6 +16,7 @@ x-backend-environment: &backend-environment
   MAIL_SERVER: mailpit
   MAIL_PORT: "1025"
   UPLOAD_DIR: /data/uploads
+  LOG_FORMAT: json
 
 services:
   # PostgreSQL 16 with the pgvector extension available.
@@ -46,7 +48,11 @@ services:
   backend:
     build: ./backend
     env_file: .env
-    environment: *backend-environment
+    environment:
+      <<: *backend-environment
+      # Requests arrive through nginx (the frontend container), so trust its
+      # X-Forwarded-* headers (client IP for rate limits, https scheme).
+      TRUST_PROXY: "1"
     ports:
       - "8000:8000"
     volumes:
@@ -69,6 +75,7 @@ services:
 
   # Background worker (APScheduler). Same image as the backend, different command.
   # It waits until the backend is healthy, which means migrations have been applied.
+  # Healthy = its built-in heartbeat job ran in the last 90 seconds (see worker.py).
   worker:
     build: ./backend
     command: ["python", "worker.py"]
@@ -79,9 +86,16 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "worker.py", "--healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Built React app served by nginx, which also proxies /api to the backend.
   # Open http://localhost:8080
+  # Healthy = nginx serves the built app's index.html (127.0.0.1: nginx listens on IPv4 only).
   frontend:
     build: ./frontend
     ports:
@@ -89,6 +103,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/index.html"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
 
 volumes:
   pgdata:
