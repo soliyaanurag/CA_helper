@@ -2,7 +2,10 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 
-// Unmount rendered components after each test.
-afterEach(cleanup);
+afterEach(() => {
+  cleanup(); // unmount rendered components
+  localStorage.clear(); // no session leaks into the next test
+  vi.unstubAllGlobals(); // undo fakeApi()'s fetch stub
+});

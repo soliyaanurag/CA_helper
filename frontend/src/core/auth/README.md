@@ -1,9 +1,16 @@
 # core/auth (frontend)
 
-Empty so far.
+Login state and route guards. Backend side: `backend/app/core/auth/` and `docs/modules/core-auth.md`.
 
-Planned:
+- `session.ts`: `User` / `Role` types (from the generated API types), `ROLE_HOME` (where each role lands),
+  and the session in localStorage. TODO: move the token to a refresh-token cookie.
+- `auth-context.ts`: `useAuth()` → `{ user, login, logout }`, and `LoginError` (carries the API error code).
+- `AuthProvider.tsx`: holds the session; an `api.use(...)` middleware adds `Authorization: Bearer <token>` to
+  every request and logs out on any 401 to a request that carried a token.
+- `RequireRole.tsx`: guard around each area layout (`core/routes.tsx`). Not logged in → `/login`; wrong role →
+  your own home.
 
-- `AuthProvider` / `useAuth()`: current user, role (`business` | `ca` | `admin`), login/logout, token refresh
-- route guards used by the business, CA and admin layouts
-- an openapi-fetch middleware (`api.use(...)`) that adds `Authorization: Bearer <access token>`
+The login page is `core/pages/LoginPage.tsx`. Tests: `auth.test.tsx` here and `core/pages/LoginPage.test.tsx`,
+using the helpers in `src/test/utils.tsx`.
+
+Planned: signup, refresh token (httpOnly cookie), email OTP.
