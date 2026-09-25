@@ -8,10 +8,10 @@ in the same PR.
 **What**
 - Tasks are assigned and split among the team outside the repo. The repo no longer records who owns which
   module, which phase we are in, or which tasks are open.
-- Removed: `docs/OWNERSHIP.md`, `docs/PHASES.md`, `docs/prompts/`, `docs/modules/content.md` and `finish.md`,
-  `scripts/progress.py` and its tests, `make progress` / `progress-md` / `test-scripts`, the two CI steps that ran
-  them, the `~/.claude/ca-helper-member.md` import in `CLAUDE.md`, and member letters, task IDs and owner fields in
-  docs, `content/` front matter, `eval/` READMEs and code comments.
+- Removed: the ownership and phases docs, `docs/prompts/`, the `content` and `finish` module trackers, the progress
+  tracker script (`scripts/progress.py`) with its tests, its three Make targets and the two CI steps that ran it,
+  the import of each member's personal identity file in `CLAUDE.md`, and member letters, task IDs and owner fields
+  in docs, `content/` front matter, `eval/` READMEs and code comments. `git log` has the exact files.
 - Module docs have eight sections: Purpose · What exists now · Tables · Endpoints · Service functions other modules
   call · Depends on · Contracts (don't change without telling the team) · Known issues.
 - Compliance item and engagement status values now live in `docs/DATA_MODEL.md` ("Status values"), their one
