@@ -1,0 +1,36 @@
+# Git hooks that run on every `git commit`. Installed by `make setup`.
+# Run on all files manually:  conda run -n ca-helper pre-commit run --all-files
+#
+# The Python hooks run ruff from the shared conda env (`conda run`), so they use
+# exactly the version pinned in backend/requirements-dev.txt.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (Python)
+        entry: conda run -n ca-helper ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format (Python)
+        entry: conda run -n ca-helper ruff format
+        language: system
+        types: [python]
+      - id: frontend-lint
+        name: eslint + prettier (frontend)
+        entry: bash -c 'cd frontend && npx --no-install eslint --max-warnings=0 . && npx --no-install prettier --check .'
+        language: system
+        files: ^frontend/
+        pass_filenames: false

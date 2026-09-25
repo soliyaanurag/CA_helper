@@ -1,0 +1,123 @@
+# CA Helper developer commands. Run `make` or `make help` to list them.
+#
+# Every Python command runs inside the shared conda env through `conda run`
+# (never the terminal's activated env, never system Python). See CLAUDE.md.
+# Works with the old GNU Make 3.81 that ships with macOS.
+
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
+
+CONDA ?= conda
+ENV_NAME := ca-helper
+# `--no-capture-output` streams output live (needed for servers, nicer for tests).
+PY := $(CONDA) run --no-capture-output -n $(ENV_NAME)
+# Same, but running inside backend/ (where the `app` package and pyproject.toml live).
+BACKEND := $(PY) --cwd backend
+FLASK := $(BACKEND) flask --app app
+
+.PHONY: help setup env-update infra infra-down dev-backend dev-worker dev-frontend \
+	up down logs test test-backend test-scripts test-frontend lint format \
+	migrate migration seed gen-api progress progress-md
+
+help: ## List all targets
+	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+# `.env` is required by Docker Compose and the backend. `make setup` creates it.
+.env:
+	@echo "ERROR: .env is missing. Run 'make setup' (or: cp .env.example .env)." >&2
+	@exit 1
+
+# ----------------------------------------------------------------------------
+# Setup
+# ----------------------------------------------------------------------------
+setup: ## One-time (and re-runnable) developer setup: conda env, npm, .env, git hooks
+	bash scripts/setup_dev.sh
+
+env-update: ## Sync the conda env after environment.yml / requirements*.txt change
+	$(CONDA) env update -n $(ENV_NAME) -f environment.yml --prune
+
+# ----------------------------------------------------------------------------
+# Infrastructure for hybrid mode (db + Mailpit in Docker)
+# ----------------------------------------------------------------------------
+infra: .env ## Start db + Mailpit in Docker and wait until they are ready
+	docker compose up -d --wait db mailpit
+	@echo "Postgres: localhost:$${DB_HOST_PORT:-5432}   Mailpit UI: http://localhost:8025"
+
+infra-down: ## Stop db + Mailpit (data is kept in the Docker volume)
+	docker compose stop db mailpit
+
+# ----------------------------------------------------------------------------
+# Hybrid development (each in its own terminal)
+# ----------------------------------------------------------------------------
+dev-backend: .env ## Flask dev server with auto-reload on http://localhost:8000
+	$(FLASK) run --debug --port 8000
+
+dev-worker: .env ## Background worker (APScheduler) in the foreground
+	$(BACKEND) python worker.py
+
+dev-frontend: gen-api ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
+	cd frontend && npm run dev
+
+# ----------------------------------------------------------------------------
+# Full-Docker mode (all five services in containers)
+# ----------------------------------------------------------------------------
+up: .env gen-api ## Build and start all services (frontend: http://localhost:8080)
+	docker compose up -d --build --wait
+	@echo "Frontend: http://localhost:8080   API: http://localhost:8000/api/docs   Mailpit: http://localhost:8025"
+
+down: ## Stop and remove all containers (volumes are kept)
+	docker compose down
+
+logs: ## Follow logs of all services
+	docker compose logs -f --tail=100
+
+# ----------------------------------------------------------------------------
+# Quality
+# ----------------------------------------------------------------------------
+test: test-backend test-scripts test-frontend ## Run all tests (backend needs `make infra`)
+
+test-backend: ## Backend tests (pytest)
+	$(BACKEND) pytest
+
+test-scripts: ## Tests for scripts/ (progress tracker)
+	$(PY) pytest scripts/tests -q
+
+test-frontend: gen-api ## Frontend tests (Vitest)
+	cd frontend && npm test
+
+lint: gen-api ## Lint + format check: ruff (Python), ESLint + Prettier + tsc (frontend)
+	$(PY) ruff check backend scripts
+	$(PY) ruff format --check backend scripts
+	cd frontend && npm run lint && npm run format:check && npm run typecheck
+
+format: ## Auto-format and auto-fix Python and frontend code
+	$(PY) ruff check --fix backend scripts
+	$(PY) ruff format backend scripts
+	cd frontend && npm run format
+
+# ----------------------------------------------------------------------------
+# Database
+# ----------------------------------------------------------------------------
+migrate: .env ## Apply all migrations (flask db upgrade)
+	$(FLASK) db upgrade
+
+migration: .env ## Create a migration: make migration name="onboarding: add business table"
+	@if [ -z "$(name)" ]; then echo 'Usage: make migration name="<module>: <message>"' >&2; exit 1; fi
+	$(FLASK) db migrate -m "$(name)"
+
+seed: .env ## Insert development seed data from every module (safe to re-run)
+	$(FLASK) seed
+
+# ----------------------------------------------------------------------------
+# Other
+# ----------------------------------------------------------------------------
+gen-api: ## Export OpenAPI spec (openapi.json) and generate frontend TypeScript types
+	$(FLASK) openapi write --format=json ../openapi.json
+	cd frontend && npm run gen:api
+
+progress: ## Task progress summary from docs/modules/*.md
+	@$(PY) python scripts/progress.py
+
+progress-md: ## Same summary as Markdown tables (for PRs and the sync)
+	@$(PY) python scripts/progress.py --markdown

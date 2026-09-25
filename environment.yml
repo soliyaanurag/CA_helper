@@ -1,0 +1,19 @@
+# Shared conda environment for CA Helper. Every member uses exactly this file.
+#
+# Rules (see CLAUDE.md → "Conda rules"):
+#   - conda installs ONLY python, tesseract and pip (from conda-forge).
+#   - ALL Python packages come from pip via backend/requirements*.txt,
+#     the same files Docker and CI use.
+#
+# Create:  conda env create -f environment.yml          (make setup does this)
+# Update:  conda env update -n ca-helper -f environment.yml --prune   (make env-update)
+name: ca-helper
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - tesseract
+  - pip
+  - pip:
+      - -r backend/requirements-dev.txt

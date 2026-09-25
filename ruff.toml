@@ -1,0 +1,21 @@
+# Ruff (Python linter + formatter) settings for the whole repo: backend/ and scripts/.
+# Run via `make lint` / `make format`; also runs as a pre-commit hook.
+
+line-length = 100
+target-version = "py312"
+# Folders holding our own importable code (app, worker, progress) for import sorting.
+src = ["backend", "scripts"]
+# Alembic files are generated; keep them exactly as generated.
+extend-exclude = ["backend/migrations"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # modern Python syntax
+    "B",   # common bugs
+    "SIM", # simplifications
+    "DTZ", # naive datetimes (we store UTC; see CLAUDE.md rule 7)
+]

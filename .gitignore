@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit. Only .env.example is tracked.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Generated files — never commit (recreate with `make gen-api`)
+# ---------------------------------------------------------------------------
+/openapi.json
+frontend/src/core/api/generated/
+
+# ---------------------------------------------------------------------------
+# Uploaded files and local instance data — never commit
+# ---------------------------------------------------------------------------
+backend/instance/
+uploads/
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.venv/
+# Symlink to your ca-helper conda env, created by `make setup` for VS Code
+.conda-env
+
+# ---------------------------------------------------------------------------
+# Node / frontend
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Editors, OS, logs
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.log
