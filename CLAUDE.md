@@ -94,6 +94,8 @@ agrees in the sync. The current phase is shown by `make progress`. Phase 0 and 1
 **While working**
 - Stay in your own module folders; for anything else stop, explain and propose a separate small `core` /
   `cross-module` PR. Follow `docs/PATTERNS.md`; copy the closest existing example.
+- **The repo is the single source of truth:** anything decided in chat that affects others goes into `docs/`
+  (module doc, `DECISIONS.md`, `DATA_MODEL.md` or `API_CONVENTIONS.md`) in the same PR.
 - Small Conventional Commits (`feat(documents): ...`); stage specific files, never `git add -A` blindly.
 - Migrations: pull main right before `make migration`; one per PR, message prefixed with the module; never edit a
   migration already on main; multiple heads → create a merge revision.
