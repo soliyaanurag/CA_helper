@@ -16,8 +16,8 @@ BACKEND := $(PY) --cwd backend
 FLASK := $(BACKEND) flask --app app
 
 .PHONY: help setup env-update infra infra-down dev-backend dev-worker dev-frontend \
-	up down logs test test-backend test-scripts test-frontend lint format \
-	migrate migration seed gen-api progress progress-md
+	up down logs test test-backend test-frontend lint format \
+	migrate migration seed gen-api
 
 help: ## List all targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -75,25 +75,22 @@ logs: ## Follow logs of all services
 # ----------------------------------------------------------------------------
 # Quality
 # ----------------------------------------------------------------------------
-test: test-backend test-scripts test-frontend ## Run all tests (backend needs `make infra`)
+test: test-backend test-frontend ## Run all tests (backend needs `make infra`)
 
 test-backend: ## Backend tests (pytest)
 	$(BACKEND) pytest
-
-test-scripts: ## Tests for scripts/ (progress tracker)
-	$(PY) pytest scripts/tests -q
 
 test-frontend: gen-api ## Frontend tests (Vitest)
 	cd frontend && npm test
 
 lint: gen-api ## Lint + format check: ruff (Python), ESLint + Prettier + tsc (frontend)
-	$(PY) ruff check backend scripts
-	$(PY) ruff format --check backend scripts
+	$(PY) ruff check backend
+	$(PY) ruff format --check backend
 	cd frontend && npm run lint && npm run format:check && npm run typecheck
 
 format: ## Auto-format and auto-fix Python and frontend code
-	$(PY) ruff check --fix backend scripts
-	$(PY) ruff format backend scripts
+	$(PY) ruff check --fix backend
+	$(PY) ruff format backend
 	cd frontend && npm run format
 
 # ----------------------------------------------------------------------------
@@ -115,9 +112,3 @@ seed: .env ## Insert development seed data from every module (safe to re-run)
 gen-api: ## Export OpenAPI spec (openapi.json) and generate frontend TypeScript types
 	$(FLASK) openapi write --format=json ../openapi.json
 	cd frontend && npm run gen:api
-
-progress: ## Task progress summary from docs/modules/*.md
-	@$(PY) python scripts/progress.py
-
-progress-md: ## Same summary as Markdown tables (for PRs and the sync)
-	@$(PY) python scripts/progress.py --markdown

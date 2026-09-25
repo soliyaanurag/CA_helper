@@ -1,6 +1,6 @@
 # Continuous integration: runs on every pull request and on pushes to main.
 #
-#   backend   ruff, tracker format, migrations, pytest (with Postgres + Tesseract),
+#   backend   ruff, migrations, pytest (with Postgres + Tesseract),
 #             then exports the OpenAPI spec for the frontend job
 #   frontend  generates API types from that spec, then lint, format, types, tests, build
 #   docker    builds all images and smoke-tests full-Docker mode (`make up` equivalent)
@@ -56,11 +56,8 @@ jobs:
 
       - name: Ruff (lint + format check)
         run: |
-          ruff check backend scripts
-          ruff format --check backend scripts
-
-      - name: Tracker lines are well-formed
-        run: python scripts/progress.py --strict
+          ruff check backend
+          ruff format --check backend
 
       - name: Migrations apply cleanly
         working-directory: backend
@@ -69,9 +66,6 @@ jobs:
       - name: Backend tests
         working-directory: backend
         run: pytest
-
-      - name: Script tests
-        run: pytest scripts/tests -q
 
       - name: Export OpenAPI spec
         working-directory: backend

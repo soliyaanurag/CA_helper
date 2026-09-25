@@ -97,18 +97,15 @@ Every Python command runs inside the conda env through `conda run` (never an act
 | `make up` | full-Docker mode | `make gen-api && docker compose up -d --build --wait` |
 | `make down` | stop containers | `docker compose down` |
 | `make logs` | follow logs | `docker compose logs -f --tail=100` |
-| `make test` | all tests | the three below |
+| `make test` | all tests | the two below |
 | `make test-backend` | pytest (needs `make infra`) | `conda run --no-capture-output -n ca-helper --cwd backend pytest` |
-| `make test-scripts` | tracker script tests | `conda run --no-capture-output -n ca-helper pytest scripts/tests -q` |
 | `make test-frontend` | Vitest | `cd frontend && npm test` |
-| `make lint` | ruff + ESLint + Prettier + tsc | `conda run -n ca-helper ruff check backend scripts`, `conda run -n ca-helper ruff format --check backend scripts`, `cd frontend && npm run lint && npm run format:check && npm run typecheck` |
-| `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend scripts`, `conda run -n ca-helper ruff format backend scripts`, `cd frontend && npm run format` |
+| `make lint` | ruff + ESLint + Prettier + tsc | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `cd frontend && npm run lint && npm run format:check && npm run typecheck` |
+| `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend`, `conda run -n ca-helper ruff format backend`, `cd frontend && npm run format` |
 | `make migrate` | apply migrations | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db upgrade` |
 | `make migration name="onboarding: add businesses"` | new migration | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db migrate -m "onboarding: add businesses"` |
 | `make seed` | dev seed data | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed` |
 | `make gen-api` | OpenAPI → TypeScript types | `conda run -n ca-helper --cwd backend flask --app app openapi write --format=json ../openapi.json && cd frontend && npm run gen:api` |
-| `make progress` | task progress summary | `conda run -n ca-helper python scripts/progress.py` |
-| `make progress-md` | same, as Markdown tables | `conda run -n ca-helper python scripts/progress.py --markdown` |
 
 ## VS Code
 

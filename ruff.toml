@@ -1,10 +1,10 @@
-# Ruff (Python linter + formatter) settings for the whole repo: backend/ and scripts/.
+# Ruff (Python linter + formatter) settings for the whole repo (all Python lives in backend/).
 # Run via `make lint` / `make format`; also runs as a pre-commit hook.
 
 line-length = 100
 target-version = "py312"
-# Folders holding our own importable code (app, worker, progress) for import sorting.
-src = ["backend", "scripts"]
+# Folder holding our own importable code (app, worker) for import sorting.
+src = ["backend"]
 # Alembic files are generated; keep them exactly as generated.
 extend-exclude = ["backend/migrations"]
 
