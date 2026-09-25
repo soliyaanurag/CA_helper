@@ -1,0 +1,7 @@
+# Development and CI dependencies. Installs everything in requirements.txt too.
+-r requirements.txt
+
+pytest==9.1.1
+Faker==40.39.0
+ruff==0.16.9
+pre-commit==4.6.2

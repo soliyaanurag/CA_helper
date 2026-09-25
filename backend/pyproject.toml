@@ -1,0 +1,12 @@
+# pytest configuration for the backend. (Ruff settings live in the root ruff.toml.)
+# Dependencies are NOT declared here: they live in requirements.txt and
+# requirements-dev.txt, the single source used by conda, Docker and CI.
+
+[tool.pytest.ini_options]
+# Tests live in tests/ (cross-cutting) and app/modules/<module>/tests/.
+testpaths = ["tests", "app"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+    "requires_tesseract: needs the Tesseract OCR binary; skipped with a message if it is missing",
+]

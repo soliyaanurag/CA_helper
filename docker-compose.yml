@@ -1,0 +1,95 @@
+# CA Helper services.
+#
+#   Hybrid mode (daily dev):  `make infra` starts only db + mailpit.
+#                             Flask, the worker and Vite run on your machine.
+#   Full-Docker mode:         `make up` starts all five services.
+#
+# Every service reads the root .env. For the backend and worker containers,
+# the `environment:` block below overrides the hostnames (localhost -> service
+# names), so the same .env works in both modes.
+name: ca-helper
+
+# Values shared by the backend and worker containers (a YAML anchor).
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  MAIL_SERVER: mailpit
+  MAIL_PORT: "1025"
+  UPLOAD_DIR: /data/uploads
+
+services:
+  # PostgreSQL 16 with the pgvector extension available.
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Local SMTP server that catches every email. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.31
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web UI
+
+  # Flask API served by gunicorn. The image's default command applies
+  # migrations (`flask db upgrade`) and then starts gunicorn on port 8000.
+  backend:
+    build: ./backend
+    env_file: .env
+    environment: *backend-environment
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Background worker (APScheduler). Same image as the backend, different command.
+  # It waits until the backend is healthy, which means migrations have been applied.
+  worker:
+    build: ./backend
+    command: ["python", "worker.py"]
+    env_file: .env
+    environment: *backend-environment
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Built React app served by nginx, which also proxies /api to the backend.
+  # Open http://localhost:8080
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:

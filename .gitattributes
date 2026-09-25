@@ -1,0 +1,21 @@
+# Force LF line endings in the repository and in every checkout.
+# (All members work in WSL2 or macOS; this also protects against Windows editors.)
+* text=auto eol=lf
+
+# Shell scripts must be LF or they break with "bad interpreter".
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Binary files: never touch line endings or try to diff them.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
+*.traineddata binary

@@ -1,0 +1,16 @@
+# Document checklist for CMP-08.
+# Status: TODO. Replace the example item with real ones.
+#
+# Used by: the checklist UI on the item page and OCR document-type checks.
+# Each item:
+#   key       stable snake_case id (never rename once used; ticks are stored against it)
+#   label     text shown to the user
+#   required  true if a CA normally cannot file without it
+#   help      optional one-line hint
+form: CMP-08
+status: TODO
+items:
+  - key: todo_example_document
+    label: "TODO: first document the user should have"
+    required: true
+    help: "TODO: where the user can find it"

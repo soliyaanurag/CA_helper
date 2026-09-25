@@ -1,0 +1,148 @@
+# Continuous integration: runs on every pull request and on pushes to main.
+#
+#   backend   ruff, migrations, pytest (with Postgres + Tesseract),
+#             then exports the OpenAPI spec for the frontend job
+#   frontend  generates API types from that spec, then lint, format, types, tests, build
+#   docker    builds all images and smoke-tests full-Docker mode (`make up` equivalent)
+#
+# CI installs Python packages with pip from backend/requirements-dev.txt, the same
+# file the conda env uses, so CI and laptops run the same versions.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ca_helper
+          POSTGRES_PASSWORD: ca_helper_ci
+          POSTGRES_DB: ca_helper
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ca_helper -d ca_helper"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://ca_helper:ca_helper_ci@localhost:5432/ca_helper
+      TEST_DATABASE_URL: postgresql+psycopg://ca_helper:ca_helper_ci@localhost:5432/ca_helper_test
+      SECRET_KEY: ci-only-secret-key
+      JWT_SECRET_KEY: ci-only-jwt-secret-key-long-enough
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Ruff (lint + format check)
+        run: |
+          ruff check backend
+          ruff format --check backend
+
+      - name: Migrations apply cleanly
+        working-directory: backend
+        run: flask --app app db upgrade
+
+      - name: Backend tests
+        working-directory: backend
+        run: pytest
+
+      - name: Export OpenAPI spec
+        working-directory: backend
+        run: flask --app app openapi write --format=json ../openapi.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openapi
+          path: openapi.json
+
+  frontend:
+    name: Frontend
+    needs: backend
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: openapi
+          path: ${{ github.workspace }}
+
+      - name: Generate API types
+        run: npm run gen:api
+
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: api-types
+          path: frontend/src/core/api/generated/
+
+  docker:
+    name: Docker images
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: api-types
+          path: frontend/src/core/api/generated/
+
+      - name: Create .env from the example
+        run: cp .env.example .env
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Start full-Docker mode and wait until healthy
+        run: docker compose up -d --wait
+
+      - name: Smoke test through nginx
+        run: |
+          curl --fail --silent http://localhost:8080/ | grep -q '<div id="root">'
+          curl --fail --silent http://localhost:8080/api/health | grep -q '"status": *"ok"'
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,29 @@
+{
+  // Python interpreter: the shared `ca-helper` conda env. `make setup` creates
+  // the gitignored `.conda-env` link pointing at it, wherever your conda lives.
+  // If VS Code does not pick it up: Ctrl/Cmd+Shift+P > "Python: Select Interpreter"
+  // > choose "ca-helper" (see README).
+  "python.defaultInterpreterPath": "${workspaceFolder}/.conda-env/bin/python",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}/backend",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.organizeImports": "explicit" }
+  },
+
+  // Frontend: ESLint + Prettier from frontend/node_modules.
+  "eslint.workingDirectories": ["./frontend"],
+  "prettier.prettierPath": "./frontend/node_modules/prettier",
+  "typescript.tsdk": "frontend/node_modules/typescript/lib",
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": true },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": true },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+  // Same line endings and whitespace rules as .editorconfig.
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true
+}
