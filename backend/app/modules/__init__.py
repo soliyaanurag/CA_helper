@@ -8,6 +8,7 @@ A module's `__init__.py` exposes:
     blp            flask-smorest Blueprint (required), registered on the API under
                    API_PREFIX (/api/v1); the blueprint itself sets no url_prefix
     seed()         optional; inserts dev seed data (idempotent), run by `flask seed`
+                   after the core seeds (demo users, app/core/auth/seed.py)
     SEED_ORDER     optional int, default 100; lower numbers are seeded first
     register_jobs(scheduler)
                    optional; adds scheduled jobs; called ONLY by worker.py
@@ -60,15 +61,18 @@ def register_all_jobs(scheduler) -> list[str]:
 
 
 def run_all_seeds() -> list[str]:
-    """Run each module's `seed()` in SEED_ORDER, then commit once.
+    """Run the core seeds, then each module's `seed()` in SEED_ORDER, then commit once.
 
     Seeding is one unit of work: a seed() adds rows but does not commit.
+    Core seeds (demo users) run first because modules' seed data may refer to users.
     """
+    from app.core.auth.seed import seed as seed_users
     from app.extensions import db
 
+    seed_users()
     modules = [m for m in discover_modules() if getattr(m, "seed", None) is not None]
     modules.sort(key=lambda m: (getattr(m, "SEED_ORDER", DEFAULT_SEED_ORDER), module_name(m)))
     for module in modules:
         module.seed()
     db.session.commit()
-    return [module_name(m) for m in modules]
+    return ["core.auth"] + [module_name(m) for m in modules]

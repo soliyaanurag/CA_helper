@@ -1,9 +1,14 @@
-"""Authentication. Not built yet.
+"""Authentication: users, login and JWT access tokens.
 
-Planned:
-- signup/login for businesses and CAs; seeded admin account
-- JWT access + refresh tokens carrying a `role` claim (business | ca | admin)
-- loading the current user from the token
-- email OTP verification and password reset
-- JWT error callbacks returning the standard error format (app/core/errors.py)
+    models.py    User (the `users` table)
+    services.py  authenticate(), get_active_user(), normalize_email()
+    tokens.py    access-token contents and JWT error responses
+    routes.py    POST /api/v1/auth/login, GET /api/v1/auth/me
+    schemas.py   request/response shapes
+    seed.py      demo users (one per role) from DEMO_* variables
+
+Role checks for endpoints live in app/core/permissions.py.
+Context and contracts: docs/modules/core-auth.md
+
+Planned: signup, email OTP verification, password reset, refresh tokens.
 """

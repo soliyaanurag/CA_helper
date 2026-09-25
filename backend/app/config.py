@@ -9,6 +9,7 @@ from the root .env file (see .env.example for what each one means).
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -36,6 +37,12 @@ class BaseConfig:
 
     SECRET_KEY = os.getenv("SECRET_KEY")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    # Access tokens only for now (no refresh token yet); lifetime in minutes.
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "60")))
+
+    # Debugger and auto-reload for `python main.py` (the manual dev server) only.
+    # `make dev-backend` passes --debug itself; gunicorn (Docker) never uses it.
+    DEV_SERVER_DEBUG = False
 
     # --- Database ---
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
@@ -98,6 +105,9 @@ class BaseConfig:
                 "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
             }
         },
+        # Every endpoint needs a token unless it opts out with @blp.doc(security=[])
+        # (health, login). Enforcement is done by app/core/permissions.py.
+        "security": [{"bearerAuth": []}],
     }
 
 
@@ -109,6 +119,7 @@ class DevelopmentConfig(BaseConfig):
     # writes real random values into .env, so these are normally unused.
     SECRET_KEY = BaseConfig.SECRET_KEY or "dev-only-insecure-secret-key"
     JWT_SECRET_KEY = BaseConfig.JWT_SECRET_KEY or "dev-only-insecure-jwt-key-set-a-real-one"
+    DEV_SERVER_DEBUG = True
 
 
 class TestingConfig(BaseConfig):
@@ -117,7 +128,10 @@ class TestingConfig(BaseConfig):
     SECRET_KEY = "test-secret-key"
     JWT_SECRET_KEY = "test-jwt-secret-key-that-is-long-enough"
     SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL")
-    RATELIMIT_ENABLED = False
+    # Rate limiting stays ON so the login limit is tested; backend/conftest.py
+    # clears the in-memory counters before every test.
+    RATELIMIT_STORAGE_URI = "memory://"
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=60)
     # Fixed here so a developer's .env cannot change test behaviour.
     LOG_FORMAT = "text"
     LOG_LEVEL = "INFO"

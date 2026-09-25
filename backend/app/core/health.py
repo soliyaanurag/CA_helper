@@ -23,6 +23,7 @@ class HealthSchema(Schema):
 
 
 @blp.route("/health")
+@blp.doc(security=[])  # public: no token needed
 @blp.response(200, HealthSchema)
 @blp.alt_response(503, schema=HealthSchema, description="The database is unreachable")
 def health():
