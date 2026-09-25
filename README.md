@@ -4,8 +4,8 @@ A two-sided web platform that tells Indian MSMEs, gig workers and small business
 them and when, guides them to file themselves, or connects them with a fairly priced (or pro-bono) Chartered
 Accountant, and keeps verifiable proof of what was filed. MTech CSE lab project, IIT Bombay.
 
-- Product scope: [docs/SCOPE.md](docs/SCOPE.md) · Who owns what: [docs/OWNERSHIP.md](docs/OWNERSHIP.md) ·
-  Phases: [docs/PHASES.md](docs/PHASES.md) · Workflow: [docs/WORKFLOW.md](docs/WORKFLOW.md)
+- Product scope: [docs/SCOPE.md](docs/SCOPE.md) · Workflow: [docs/WORKFLOW.md](docs/WORKFLOW.md) ·
+  Module context: [docs/modules/](docs/modules/)
 - Stack: Flask 3 + flask-smorest + SQLAlchemy 2 + Postgres/pgvector (backend), React + Vite + TypeScript +
   Tailwind/shadcn (frontend), APScheduler worker, Docker Compose, GitHub Actions.
 
@@ -35,18 +35,9 @@ and prints a ✅/⚠️ checklist. If it installed Miniforge, restart your termi
 
 Then:
 
-1. Put your own Gemini key in `.env` (`GEMINI_API_KEY=`, from https://aistudio.google.com/apikey). Needed from Phase 1.
-2. Create your personal identity file for Claude Code (never committed). Root `CLAUDE.md` imports it:
-
-   ```markdown
-   <!-- ~/.claude/ca-helper-member.md -->
-   # Who I am on the CA Helper team
-   I am **Member B** (<your name>): Infrastructure, documents & AI.
-   I own: core/db, core/security, core/email, core/notifications, core/ai, core/ocr, worker;
-   modules alerts, documents, assistant, regulatory; form content GSTR-1, GSTR-3B.
-   My branch prefix is `b/`. Tracker lines with owner `B` are mine.
-   ```
-3. Start developing (next section).
+1. Put your own Gemini key in `.env` (`GEMINI_API_KEY=`, from https://aistudio.google.com/apikey). Needed for the
+   AI features (NIC suggestions, assistant, regulatory monitor).
+2. Start developing (next section).
 
 ## Daily development: hybrid mode (default)
 

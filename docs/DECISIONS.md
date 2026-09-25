@@ -3,7 +3,29 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
-## 2026-09-25: Phase 0 bootstrap (Builder)
+## 2026-09-25: No in-repo ownership or task tracking
+
+**What**
+- Tasks are assigned and split among the team outside the repo. The repo no longer records who owns which
+  module, which phase we are in, or which tasks are open.
+- Removed: `docs/OWNERSHIP.md`, `docs/PHASES.md`, `docs/prompts/`, `docs/modules/content.md` and `finish.md`,
+  `scripts/progress.py` and its tests, `make progress` / `progress-md` / `test-scripts`, the two CI steps that ran
+  them, the `~/.claude/ca-helper-member.md` import in `CLAUDE.md`, and member letters, task IDs and owner fields in
+  docs, `content/` front matter, `eval/` READMEs and code comments.
+- Module docs have eight sections: Purpose · What exists now · Tables · Endpoints · Service functions other modules
+  call · Depends on · Contracts (don't change without telling the team) · Known issues.
+- Compliance item and engagement status values now live in `docs/DATA_MODEL.md` ("Status values"), their one
+  authoritative home.
+- Branches are named `<name>/<module>-<short-task>`. Anyone may change any file; a PR that touches `core/`, shared
+  config or another module, or changes a contract, says so clearly.
+- The frontend `ModulePlaceholder` no longer shows an owner or task IDs.
+- Supersedes two points of the bootstrap entry below: CI no longer checks tracker lines, and ruff covers
+  `backend/` only (no Python is left in `scripts/`).
+
+**Why:** the team splits work in person, so an in-repo tracker and ownership rules were a second source of truth
+to keep in sync. Everything technical (stack, rules, conventions, run modes) is unchanged.
+
+## 2026-09-25: Initial bootstrap
 
 **Stack and versions**
 - **Stack as specified in the bootstrap prompt**; direct dependencies pinned exactly in
@@ -63,5 +85,5 @@ in the same PR.
 - **CI** has three jobs: backend (ruff, tracker `--strict`, migrations, pytest with Postgres + Tesseract, OpenAPI
   export) → frontend (gen types, lint, format, typecheck, test, build) → docker (build all images, start
   full-Docker mode, smoke-test through nginx).
-- **Git history** starts with one empty root commit on `main` (the GitHub repo was empty), so Phase 0 can be a
+- **Git history** starts with one empty root commit on `main` (the GitHub repo was empty), so the bootstrap can be a
   normal PR from `chore/phase-0-bootstrap`.

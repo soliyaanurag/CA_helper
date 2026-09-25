@@ -7,9 +7,6 @@ It never files returns itself (no government API): it tracks, guides, connects a
 Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainable in a viva, so keep it boring.
 
 @docs/SCOPE.md
-@docs/OWNERSHIP.md
-@docs/PHASES.md
-@~/.claude/ca-helper-member.md
 
 ## Stack and run modes
 - Backend: Python 3.12 (conda env `ca-helper`), Flask 3 app factory, flask-smorest (OpenAPI, Swagger at `/api/docs`),
@@ -25,17 +22,17 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 ## Folder map
 ```
 backend/app/__init__.py      create_app(); config.py, extensions.py, cli.py (`flask seed`)
-backend/app/core/            auth/ permissions.py (A) · db/ security/ storage/ email/ notifications/ ai/ ocr/ errors.py health.py (B)
+backend/app/core/            auth/ permissions.py db/ security/ storage/ email/ notifications/ ai/ ocr/ errors.py health.py
 backend/app/modules/<m>/     __init__.py (blp, seed, register_jobs) routes.py models.py schemas.py services.py seed.py tests/
 backend/worker.py            APScheduler entrypoint (collects each module's register_jobs)
 backend/migrations/          single Alembic dir · backend/conftest.py shared pytest fixtures
-frontend/src/core/           api/ (client.ts, generated/ gitignored) auth/ layout/ components/ui/ routes.tsx (C)
+frontend/src/core/           api/ (client.ts, generated/ gitignored) auth/ layout/ components/ui/ routes.tsx
 frontend/src/features/<m>/   routes.tsx pages/ components/ hooks/ api.ts admin/
-content/forms/<FORM>/        explanation.md instructions.md checklist.yaml (per-form owner)
-docs/                        project docs · docs/modules/<m>.md = module context + tracker
-eval/                        evaluation datasets (never real personal data) · scripts/ setup + progress
+content/forms/<FORM>/        explanation.md instructions.md checklist.yaml
+docs/                        project docs · docs/modules/<m>.md = module context (what exists, contracts)
+eval/                        evaluation datasets (never real personal data) · scripts/ setup_dev.sh
 ```
-Modules: onboarding, compliance (A) · alerts, documents, assistant, regulatory (B) · marketplace, ca_workspace, admin (C).
+Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marketplace, ca_workspace, admin.
 
 ## Conda rules
 1. Miniforge / conda-forge only: `environment.yml` uses `channels: [conda-forge, nodefaults]`.
@@ -67,33 +64,27 @@ Modules: onboarding, compliance (A) · alerts, documents, assistant, regulatory 
 8. **Secrets only in `.env`** (gitignored). Every new variable goes into `.env.example` with a comment.
 9. **Cross-module reads go through service functions**, never direct imports of another module's models in routes.
 
-## Phase rule
-Nobody starts a task from a later phase while any of their own earlier-phase tasks are open, unless the team
-agrees in the sync. The current phase is shown by `make progress`. Phase 0 and 1 are done by the Builder
-(ownership exception); from Phase 2 ownership rules apply strictly.
-
 ## Key commands
 `make setup` · `make env-update` · `make infra` / `infra-down` · `make dev-backend` / `dev-worker` / `dev-frontend` ·
-`make up` / `down` / `logs` · `make test` (`test-backend`, `test-scripts`, `test-frontend`) · `make lint` / `format` ·
-`make migrate` · `make migration name="<module>: <msg>"` · `make seed` · `make gen-api` · `make progress` / `progress-md`
+`make up` / `down` / `logs` · `make test` (`test-backend`, `test-frontend`) · `make lint` / `format` ·
+`make migrate` · `make migration name="<module>: <msg>"` · `make seed` · `make gen-api`
 
 ## Session checklist (details: docs/WORKFLOW.md)
 **Start**
 1. `git status`: if there are uncommitted changes you didn't make in this task, **stop and ask**.
 2. `git fetch origin`, then `git switch main && git pull --ff-only`.
-3. New task: `git switch -c <member-letter>/<module>-<short-task>`. Continuing: switch, then `git rebase origin/main`.
-   A conflict in files owned by someone else → **stop and ask**.
-4. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`; run `make progress`.
+3. New task: `git switch -c <name>/<module>-<short-task>`. Continuing: switch, then `git rebase origin/main`.
+   A conflict in files you didn't change in this task → **stop and ask**.
+4. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`.
 5. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, `backend/app/core/`,
    `frontend/src/core/`, modules under "Depends on").
 6. Env check: env `ca-helper` exists (else tell the user to run `make setup`); `environment.yml`/`requirements*`
    changed → `make env-update`; `frontend/package*.json` changed → `npm ci` in `frontend/`; `make infra` running;
    `make migrate`, `make gen-api` and `make test` pass **before** changing anything.
-7. Mark the task `[~]` in its module doc.
 
 **While working**
-- Stay in your own module folders; for anything else stop, explain and propose a separate small `core` /
-  `cross-module` PR. Follow `docs/PATTERNS.md`; copy the closest existing example.
+- Keep changes scoped to the task; if a change touches `core/`, shared config, or another module, say so clearly
+  in the PR. Follow `docs/PATTERNS.md`; copy the closest existing example.
 - **The repo is the single source of truth:** anything decided in chat that affects others goes into `docs/`
   (module doc, `DECISIONS.md`, `DATA_MODEL.md` or `API_CONVENTIONS.md`) in the same PR.
 - Small Conventional Commits (`feat(documents): ...`); stage specific files, never `git add -A` blindly.
@@ -105,8 +96,8 @@ agrees in the sync. The current phase is shown by `make progress`. Phase 0 and 1
 
 **End / before a PR**
 - `make lint` and `make test` pass and the frontend builds. Never leave the branch red.
-- Update the module doc: tracker boxes, contracts, known issues, session log entry. Data model or conventions
-  changed → `docs/DATA_MODEL.md` / `docs/DECISIONS.md`.
+- Update the module doc: "What exists now", tables, endpoints, contracts, known issues. Data model or
+  conventions changed → `docs/DATA_MODEL.md` / `docs/DECISIONS.md`.
 - Show a summary and **ask before `git push`**; draft the PR from `.github/pull_request_template.md`.
 
 **Never:** commit to main · force-push main · rewrite a branch someone else uses · `git reset --hard` or delete
@@ -114,5 +105,5 @@ branches without asking · commit secrets or generated files (`.env`, `openapi.j
 
 ## Other docs (read when relevant)
 `docs/WORKFLOW.md` (git + sessions) · `docs/PATTERNS.md` (how to add a feature) · `docs/API_CONVENTIONS.md`
-(URLs, auth, errors, pagination) · `docs/DATA_MODEL.md` (tables + owners) · `docs/DECISIONS.md` (decision log) ·
-`docs/TODO_VERIFY.md` (unverified legal values) · `docs/modules/_TEMPLATE.md` · `docs/prompts/` · `README.md` (setup)
+(URLs, auth, errors, pagination) · `docs/DATA_MODEL.md` (tables, status values) · `docs/DECISIONS.md` (decision log) ·
+`docs/TODO_VERIFY.md` (unverified legal values) · `docs/modules/_TEMPLATE.md` · `README.md` (setup)
