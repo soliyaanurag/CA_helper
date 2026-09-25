@@ -1,5 +1,5 @@
 # Backend image, used by two services in docker-compose.yml:
-#   backend: default command below (migrations, then gunicorn)
+#   backend: default command below (migrations, then gunicorn via gunicorn.conf.py)
 #   worker:  overrides the command with `python worker.py`
 # Dependencies come from requirements.txt, the same file the conda env uses.
 
@@ -29,4 +29,5 @@ RUN useradd --create-home --uid 1000 app \
 USER app
 
 EXPOSE 8000
-CMD ["sh", "-c", "flask db upgrade && exec gunicorn --bind 0.0.0.0:8000 --workers 2 --access-logfile - 'app:create_app()'"]
+# gunicorn reads gunicorn.conf.py (bind, workers, logging) from the working directory.
+CMD ["sh", "-c", "flask db upgrade && exec gunicorn 'app:create_app()'"]
