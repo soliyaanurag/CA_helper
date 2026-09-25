@@ -1,4 +1,4 @@
-# Assistant evaluation set (AST-06)
+# Assistant evaluation set
 
 ~50 questions a business owner or CA might ask, with the points a correct answer must contain and the sources it
 should cite.

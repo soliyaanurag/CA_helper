@@ -9,7 +9,7 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
   `/api/compliance/items`, `/api/compliance/items/{item_id}`, `/api/ca-workspace/clients`.
 - Actions that are not plain CRUD use a verb sub-path: `POST /api/compliance/items/{item_id}/mark-filed`.
 - Admin endpoints for a module's configuration: `/api/admin/<module>/...`, in that module's blueprint.
-- Core endpoints: `/api/health`, `/api/auth/...` (AUTH-01), `/api/notifications/...` (INF-05).
+- Core endpoints: `/api/health` (exists), `/api/auth/...` and `/api/notifications/...` (planned).
 - No `/v1` in URLs. There is one version, and the spec plus generated types keep both sides in sync.
 
 ## JSON
@@ -19,11 +19,11 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
 - **Money:** rupees as a decimal **string** with 2 places, e.g. `"1250.00"`
   (`fields.Decimal(as_string=True, places=2)`), never a float.
 - **Financial year:** a string like `"2026-27"` (April–March).
-- Enums are lowercase strings (`"business"`, `"ca"`, `"admin"`). Compliance statuses use the exact labels in `docs/SCOPE.md`.
+- Enums are lowercase strings (`"business"`, `"ca"`, `"admin"`). Compliance and engagement statuses use the exact values in `docs/DATA_MODEL.md` ("Status values").
 
 ## Authentication
 - `Authorization: Bearer <access_token>` (JWT). The token carries a `role` claim: `business` | `ca` | `admin`.
-- Refresh tokens get new access tokens via the refresh endpoint (details fixed in AUTH-01).
+- Refresh tokens get new access tokens via the refresh endpoint (details fixed when auth is built).
 - Every endpoint except health, docs, signup/login/OTP is protected by a role decorator from `core/permissions.py`.
 - A CA reads business data only via `ca_has_active_access(ca_id, business_id)`.
 
@@ -67,7 +67,7 @@ List endpoints that can grow take `?page=1&page_size=20` (`page` starts at 1; `p
 ```json
 {"items": [...], "page": 1, "page_size": 20, "total": 57}
 ```
-A shared schema/helper for this is added with the first paginated endpoint (Phase 1).
+A shared schema/helper for this is added with the first paginated endpoint.
 
 ## Filtering and sorting
 Plain query parameters named after fields: `?status=overdue&form_code=GSTR-3B&sort=due_date` (`-due_date` for descending).

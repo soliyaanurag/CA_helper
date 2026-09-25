@@ -6,10 +6,10 @@ gets `TODO_VERIFY` in its `source_reference` **and a row in this file**. When a 
 value, the official source (URL + notification/circular number + date), who verified it and when, then remove
 `TODO_VERIFY` from the config row.
 
-Owner of this file: Member A (CNT-01). Anyone may add rows for values their module needs.
+Anyone may add rows for values their module needs.
 
-**Status in Phase 0:** no legal values exist in the code yet. The rows below list what needs to be verified before
-the rule engine (ONB-02/04), due-date rules (COM-01/05) and penalty estimator (ALR-04) can use real values.
+**Current status:** no legal values exist in the code yet. The rows below list what needs to be verified before
+the rule engine (onboarding), due-date rules (compliance) and penalty estimator (alerts) can use real values.
 **Values are intentionally blank.** Section names and descriptions in the "What" columns are pointers for the
 verifier and must be confirmed too.
 

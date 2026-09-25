@@ -1,13 +1,11 @@
 ---
 form: 24Q
-owner: Member C
-task: CNT-07
 status: TODO
 ---
 
 # 24Q: what it is and why it matters
 
-<!-- TODO (Member C, CNT-07): write this page in plain language for a small-business owner. -->
+<!-- TODO: write this page in plain language for a small-business owner. -->
 
 > **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
 > (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app

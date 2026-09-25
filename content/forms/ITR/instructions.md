@@ -1,13 +1,11 @@
 ---
 form: ITR
-owner: Member A
-task: CNT-02
 status: TODO
 ---
 
 # How to file ITR yourself
 
-<!-- TODO (Member A, CNT-02): step-by-step self-filing guide. Shown on the item page (COM-07). -->
+<!-- TODO: step-by-step self-filing guide. Shown on the item page. -->
 
 > **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
 > (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app

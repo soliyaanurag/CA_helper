@@ -1,13 +1,11 @@
 ---
 form: GSTR-3B
-owner: Member B
-task: CNT-04
 status: TODO
 ---
 
 # How to file GSTR-3B yourself
 
-<!-- TODO (Member B, CNT-04): step-by-step self-filing guide. Shown on the item page (COM-07). -->
+<!-- TODO: step-by-step self-filing guide. Shown on the item page. -->
 
 > **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
 > (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app

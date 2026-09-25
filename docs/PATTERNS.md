@@ -1,8 +1,8 @@
 # Patterns: how to add a feature
 
-> **Status: skeleton (Phase 0).** The recipes below follow the conventions already in the code. Phase 1 adds one
-> real working example of every building block and replaces each "Phase 1 example" note with a link to it.
-> Always copy the closest existing example instead of inventing a new pattern.
+> **Status: skeleton.** The recipes below follow the conventions already in the code. Several building blocks
+> have no working example yet (marked "no example yet"); when the first one lands, replace the note with a link
+> to it. Always copy the closest existing example instead of inventing a new pattern.
 
 The running example is a made-up `widgets` resource in module `<module>`.
 
@@ -33,7 +33,7 @@ class Widgets(MethodView):
 ```
 
 - Routes are thin: validate input (schemas), call `services.py`, return data. No queries in routes.
-- Protect **every** endpoint with the shared role decorators from `app/core/permissions.py` (AUTH-03, Phase 1 example).
+- Protect **every** endpoint with the shared role decorators from `app/core/permissions.py` (no example yet).
 - Expected errors: `raise ApiError(409, "DUPLICATE_WIDGET", "A widget with this name exists.")`
   (`app/core/errors.py`). Never return ad-hoc error JSON.
 - Admin endpoints for this module's config: `/api/admin/<module>/...` in the same blueprint.
@@ -45,7 +45,7 @@ Timestamps: `fields.DateTime()` (UTC). Dates: `fields.Date()`. See `docs/API_CON
 
 ## 3. Service functions
 `services.py` holds business logic and all DB access for the module. Functions listed under
-"Service functions others may call" in the module doc are the module's public interface; other modules import
+"Service functions other modules call" in the module doc are the module's public interface; other modules import
 **those functions**, never this module's models.
 
 ## 4. Model + migration
@@ -61,8 +61,8 @@ class Widget(db.Model):
     name: Mapped[str] = mapped_column(db.String(200))
     price: Mapped[Decimal] = mapped_column(db.Numeric(12, 2))  # rupees
 ```
-- Soft delete only (`is_active` / `deleted_at`); shared mixins arrive in Phase 1 (core/db).
-- PAN, GSTIN, TAN, phone use `EncryptedString` + blind index (INF-04, Phase 1 example).
+- Soft delete only (`is_active` / `deleted_at`); shared mixins are planned in core/db (not built yet).
+- PAN, GSTIN, TAN, phone use `EncryptedString` + blind index from core/security (no example yet).
 - Timestamps are timezone-aware UTC; display in Asia/Kolkata. Financial year = April–March.
 - Then: `git pull` on main → `make migration name="<module>: add widgets"` → review the generated file →
   `make migrate`. One migration per PR. Add the table to `docs/DATA_MODEL.md` and your module doc.
@@ -115,17 +115,18 @@ export function useWidgets() {
 ```
 Types come from the generated OpenAPI types. Never hand-write API types. Forms: React Hook Form + Zod.
 
-## 10. Admin screen for your own config
-Backend under `/api/admin/<module>/...`; frontend page in `features/<module>/admin/`, registered under the
-`admin` key of your `routes.tsx` (example: `features/regulatory/routes.tsx`).
+## 10. Admin screen for a module's config
+The module that holds the data also holds its admin screen. Backend under `/api/admin/<module>/...`; frontend
+page in `features/<module>/admin/`, registered under the `admin` key of the module's `routes.tsx` (example:
+`features/regulatory/routes.tsx`).
 
 ## 11. Calling Gemini or OCR
 Only through `app/core/ai/gemini_client.py` (PII scrubbed) and `app/core/ocr/` (local only).
-Phase 1 examples: INF-07, INF-08.
+No example yet: neither the Gemini client nor the OCR helpers exist so far.
 
 ## Checklist for a new feature
 - [ ] route + schema + service + tests
 - [ ] access control decorator on every endpoint
 - [ ] model + one migration + seed data (if a table was added)
 - [ ] `make gen-api`, frontend page + route + api hook + test
-- [ ] module doc updated (tasks, endpoints, services, contracts, session log)
+- [ ] module doc updated (what exists now, tables, endpoints, services, contracts)

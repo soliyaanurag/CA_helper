@@ -1,13 +1,11 @@
 ---
 form: CMP-08
-owner: Member C
-task: CNT-05
 status: TODO
 ---
 
 # CMP-08: what it is and why it matters
 
-<!-- TODO (Member C, CNT-05): write this page in plain language for a small-business owner. -->
+<!-- TODO: write this page in plain language for a small-business owner. -->
 
 > **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
 > (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
