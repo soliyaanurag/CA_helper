@@ -10,7 +10,7 @@
 
 - [ ] `make lint`
 - [ ] `make test`
-- [ ] Frontend builds (`cd frontend && npm run build`)
+- [ ] Frontend builds (`conda run -n ca-helper --cwd frontend npm run build`)
 - [ ] Tried it by hand (hybrid mode or `make up`)
 
 ## Checklist

@@ -1,7 +1,7 @@
 # CA Helper developer commands. Run `make` or `make help` to list them.
 #
-# Every Python command runs inside the shared conda env through `conda run`
-# (never the terminal's activated env, never system Python). See CLAUDE.md.
+# Every Python and Node command runs inside the shared conda env through `conda run`
+# (never the terminal's activated env, never system Python or a system Node). See CLAUDE.md.
 # Works with the old GNU Make 3.81 that ships with macOS.
 
 SHELL := /bin/bash
@@ -14,6 +14,8 @@ PY := $(CONDA) run --no-capture-output -n $(ENV_NAME)
 # Same, but running inside backend/ (where the `app` package and pyproject.toml live).
 BACKEND := $(PY) --cwd backend
 FLASK := $(BACKEND) flask --app app
+# npm from the conda env (Node 22), running inside frontend/.
+NPM := $(PY) --cwd frontend npm
 
 .PHONY: help setup env-update infra infra-down dev-backend dev-worker dev-frontend \
 	up down logs test test-backend test-frontend lint format \
@@ -57,7 +59,7 @@ dev-worker: .env ## Background worker (APScheduler) in the foreground
 	$(BACKEND) python worker.py
 
 dev-frontend: gen-api ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
-	cd frontend && npm run dev
+	$(NPM) run dev
 
 # ----------------------------------------------------------------------------
 # Full-Docker mode (all five services in containers)
@@ -81,17 +83,20 @@ test-backend: ## Backend tests (pytest)
 	$(BACKEND) pytest
 
 test-frontend: gen-api ## Frontend tests (Vitest)
-	cd frontend && npm test
+	$(NPM) test
 
-lint: gen-api ## Lint + format check: ruff (Python), ESLint + Prettier + tsc (frontend)
+lint: gen-api ## Lint + format + types: ruff + mypy (Python), ESLint + Prettier + tsc (frontend)
 	$(PY) ruff check backend
 	$(PY) ruff format --check backend
-	cd frontend && npm run lint && npm run format:check && npm run typecheck
+	$(BACKEND) mypy
+	$(NPM) run lint
+	$(NPM) run format:check
+	$(NPM) run typecheck
 
 format: ## Auto-format and auto-fix Python and frontend code
 	$(PY) ruff check --fix backend
 	$(PY) ruff format backend
-	cd frontend && npm run format
+	$(NPM) run format
 
 # ----------------------------------------------------------------------------
 # Database
@@ -111,4 +116,4 @@ seed: .env ## Insert development seed data from every module (safe to re-run)
 # ----------------------------------------------------------------------------
 gen-api: ## Export OpenAPI spec (openapi.json) and generate frontend TypeScript types
 	$(FLASK) openapi write --format=json ../openapi.json
-	cd frontend && npm run gen:api
+	$(NPM) run gen:api
