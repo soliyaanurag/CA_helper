@@ -16,16 +16,16 @@ None yet. Planned:
 - `checklist_ticks`: per item, which checklist entries the user has
 
 ## Endpoints
-None yet. Planned: `/api/compliance/...` (calendar, items, dashboard); admin editors at `/api/admin/compliance/...`.
+None yet. Planned: `/api/v1/compliance/...` (calendar, items, dashboard); admin editors at `/api/v1/admin/compliance/...`.
 
 ## Service functions other modules call
 None yet. Planned: `list_items(business_id, ...)`, `get_item(item_id)`, `mark_filed(item_id, ...)`, `upcoming_items(days)` (used by alerts, ca_workspace, marketplace).
 
 ## Depends on
-onboarding (regulatory profile), documents (acknowledgement upload), marketplace ("With CA" status from engagements).
+onboarding (regulatory profile), documents (acknowledgement upload), marketplace (`with_ca` status from engagements).
 
 ## Contracts (don't change without telling the team)
-- Status values: `Upcoming → Docs pending → Ready → With CA → Filed → Filed–verified`, plus `Overdue` from any pre-filed state (authoritative list: `docs/DATA_MODEL.md`, "Status values")
+- Status codes: `upcoming → docs_pending → ready → with_ca → filed → filed_verified`, plus `overdue` from any pre-filed state (codes and labels: `docs/DATA_MODEL.md`, "Status values")
 - Form codes: `ITR`, `GSTR-1`, `GSTR-3B`, `CMP-08`, `GSTR-4`, `24Q`, `26Q` (same as `content/forms/<code>/`)
 
 ## Known issues

@@ -16,7 +16,7 @@ None yet. Planned:
 - `ratings`, `client_invites`
 
 ## Endpoints
-None yet. Planned: `/api/marketplace/...`; service catalog admin at `/api/admin/marketplace/...`.
+None yet. Planned: `/api/v1/marketplace/...`; service catalog admin at `/api/v1/admin/marketplace/...`.
 
 ## Service functions other modules call
 None yet. Planned: `has_active_engagement(ca_id, business_id)` (used by `ca_has_active_access`), `engagement_status_for(item_id)` (used by compliance).
@@ -26,7 +26,7 @@ core-auth (users, roles), compliance (form codes, items), documents (CoP upload)
 
 ## Contracts (don't change without telling the team)
 - Unverified CAs never appear in listings
-- Engagement statuses: `Requested → Accepted/Quoted → Active → Completed` (plus Declined/Expired) (authoritative list: `docs/DATA_MODEL.md`, "Status values")
+- Engagement status codes: `requested → accepted/quoted → active → completed` (plus `declined`/`expired`) (codes and labels: `docs/DATA_MODEL.md`, "Status values")
 
 ## Known issues
 None yet.

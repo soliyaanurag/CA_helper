@@ -15,7 +15,7 @@ None yet. Planned:
 - `penalty_rules` (config): late fee/interest per form with `source_reference`, `effective_from/to`
 
 ## Endpoints
-None yet. Planned: `/api/alerts/...` (settings, penalty estimate).
+None yet. Planned: `/api/v1/alerts/...` (settings, penalty estimate).
 
 ## Service functions other modules call
 None yet. Planned: `estimate_penalty(item_id)` (used by compliance).

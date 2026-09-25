@@ -5,8 +5,14 @@
 > decides details.
 
 ## Global rules (from CLAUDE.md)
-- Soft delete only: `is_active` + `deleted_at` on user-facing entities.
-- Timestamps: timezone-aware UTC (`created_at`, `updated_at`); display in Asia/Kolkata.
+- Every model subclasses `BaseModel` (`backend/app/core/db/models.py`): primary key `id` is a **UUID** (uuid4,
+  generated in Python, Postgres `uuid` type); foreign keys are therefore UUID columns too.
+- Timestamps: every table has `created_at` and `updated_at` (`TimestampMixin`), timezone-aware UTC, with a
+  database default `now()`; display in Asia/Kolkata.
+- Soft delete only: user-facing entities add `SoftDeleteMixin` (`is_active` default true + `deleted_at`).
+- Enums: Python `StrEnum` with lowercase snake_case values, stored as text with a CHECK constraint via
+  `str_enum()` (`backend/app/core/db/enums.py`). Constraint name: `ck_<table>_<enum_name_in_snake_case>`.
+  Adding a value needs a hand-written migration that replaces the CHECK constraint.
 - Money: `Numeric(12, 2)` rupees ↔ Python `Decimal`.
 - Financial year: April–March, stored as a string like `2026-27`.
 - Sensitive fields (PAN, GSTIN, TAN, phone) use `EncryptedString` plus a `<field>_bidx` blind index (HMAC-SHA256)
@@ -53,36 +59,39 @@
 ## Status values
 
 This section is the one authoritative list of these values. Module docs and code refer here; changing a value
-means telling the team (it is a contract). Stored codes are fixed by the migration that creates the column and
-are recorded here in the same PR.
+means telling the team (it is a contract). The **code** is what the database stores and the API sends
+(lowercase snake_case, via `str_enum()`); the **label** is display text only, shown by the frontend through
+`frontend/src/core/labels.ts`, which must match these tables. The migration that creates each column fixes its
+CHECK constraint to exactly these codes.
 
 **`compliance_items.status`** (compliance)
 
-| Value | Notes |
-|---|---|
-| `Upcoming` | initial state |
-| `Docs pending` | |
-| `Ready` | |
-| `With CA` | set from marketplace engagements |
-| `Filed` | |
-| `Filed–verified` | acknowledgement verified (OCR) |
-| `Overdue` | reachable from any pre-filed state |
+| Code | Label | Notes |
+|---|---|---|
+| `upcoming` | Upcoming | initial state |
+| `docs_pending` | Docs pending | |
+| `ready` | Ready | |
+| `with_ca` | With CA | set from marketplace engagements |
+| `filed` | Filed | |
+| `filed_verified` | Filed–verified | acknowledgement verified (OCR) |
+| `overdue` | Overdue | reachable from any pre-filed state |
 
-Lifecycle: `Upcoming → Docs pending → Ready → With CA → Filed → Filed–verified`, plus `Overdue` from any pre-filed state.
+Lifecycle: `upcoming → docs_pending → ready → with_ca → filed → filed_verified`, plus `overdue` from any pre-filed
+state.
 
 **`engagements.status`** (marketplace)
 
-| Value | Notes |
-|---|---|
-| `Requested` | initial state |
-| `Accepted` | |
-| `Quoted` | revised quote sent (reason required) |
-| `Active` | |
-| `Completed` | |
-| `Declined` | the CA declined the request |
-| `Expired` | the request auto-expired after 48 hours; the business is re-matched |
+| Code | Label | Notes |
+|---|---|---|
+| `requested` | Requested | initial state |
+| `accepted` | Accepted | |
+| `quoted` | Quoted | revised quote sent (reason required) |
+| `active` | Active | |
+| `completed` | Completed | |
+| `declined` | Declined | the CA declined the request |
+| `expired` | Expired | the request auto-expired after 48 hours; the business is re-matched |
 
-Lifecycle: `Requested → Accepted/Quoted → Active → Completed`, plus `Declined` / `Expired`.
+Lifecycle: `requested → accepted/quoted → active → completed`, plus `declined` / `expired`.
 
 ## Cross-module dependencies to watch
 - `ca_has_active_access` (core/permissions) needs engagement status from marketplace → a marketplace

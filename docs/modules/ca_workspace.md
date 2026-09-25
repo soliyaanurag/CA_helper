@@ -14,7 +14,7 @@ None yet. Planned:
 - `ca_notes`: private notes per client
 
 ## Endpoints
-None yet. Planned: `/api/ca-workspace/...`.
+None yet. Planned: `/api/v1/ca-workspace/...`.
 
 ## Service functions other modules call
 None yet.

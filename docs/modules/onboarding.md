@@ -17,7 +17,7 @@ None yet. Planned:
 - `nic_codes`: reference data from the official NIC list
 
 ## Endpoints
-None yet. Planned: `/api/onboarding/...` (registration, profile, re-check); admin editors at `/api/admin/onboarding/...` (the rule-threshold editor is planned together with the compliance admin editors).
+None yet. Planned: `/api/v1/onboarding/...` (registration, profile, re-check); admin editors at `/api/v1/admin/onboarding/...` (the rule-threshold editor is planned together with the compliance admin editors).
 
 ## Service functions other modules call
 None yet. Planned: `get_business_profile(business_id)`, `get_regulatory_profile(business_id)` (used by compliance, marketplace, assistant, alerts).

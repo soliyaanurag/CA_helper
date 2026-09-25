@@ -14,7 +14,7 @@ go in the sections below, marked "Planned".
 - `table_name`: what one row means (details in docs/DATA_MODEL.md)
 
 ## Endpoints
-- `GET /api/<module>/...`: what it returns
+- `GET /api/v1/<module>/...`: what it returns
 
 ## Service functions other modules call
 - `function_name(args) -> result`: what it guarantees

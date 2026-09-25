@@ -3,6 +3,86 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-25: Node.js comes from the conda env
+
+**What:** `environment.yml` installs `nodejs=22` (conda-forge) next to Python and Tesseract. Every node/npm command
+runs through `conda run -n ca-helper` (Makefile `NPM` variable, pre-commit ESLint/Prettier hooks, `make setup`).
+`.nvmrc` and all nvm instructions are removed. CI uses `actions/setup-node` with `node-version: "22"` (as it uses
+pip, not conda, for Python) and the frontend Docker image stays on `node:22-alpine`. `package.json` `engines`
+(`>=22.22`) with `engine-strict=true` remains the floor. Supersedes the `.nvmrc` point of the bootstrap entry.
+
+**Why:** one tool (conda) now provides every runtime, so a fresh laptop needs only conda, Docker, git and make, and
+everyone runs the same Node version without per-user nvm setups.
+
+## 2026-09-25: JSON logs and request IDs
+
+**What:** every request gets an ID: a valid incoming `X-Request-ID` (1–128 chars of `A-Za-z0-9._-`) is reused,
+otherwise a UUID hex is generated (`app/core/request_id.py`). It is returned in the `X-Request-ID` header, added to
+every log line and to every error body (`error.request_id`). The API logs one access line per request itself
+(Werkzeug's and gunicorn's access lines are off). Logs are readable text by default and one JSON object per line
+when `LOG_FORMAT=json` (set in docker-compose); the formatter is hand-written (`app/core/logging_config.py`), no
+new dependency. gunicorn uses the same config (`backend/gunicorn.conf.py`). Worker log lines carry the job id in a
+`job` field. `LOG_LEVEL` sets the level.
+
+**Why:** a user or teammate can quote the request ID from an error and find every related log line; JSON lines
+in Docker are searchable with `jq`, while text stays readable in a hybrid-mode terminal.
+
+## 2026-09-25: Service-level transactions
+
+**What:** routes parse input, call one service function and serialize the result; they never touch `db.session`.
+Each public service function is one unit of work and commits once at its end; helpers composed by other service
+functions do not commit and say so. Models hold data only. Tests wrap each test in one outer transaction with
+SQLAlchemy 2.0 `join_transaction_mode="create_savepoint"`, so service commits only release savepoints and are
+rolled back after the test. Flask-SQLAlchemy 3.1's `Session.get_bind()` ignores a session-level bind, so the
+`database` fixture in `backend/conftest.py` (and only it) temporarily replaces `db.session` with a plain scoped
+session bound to the test connection. This replaces the old "delete all rows after each test" cleanup.
+
+**Why:** one obvious place where data is committed makes behaviour easy to reason about and explain; tests can
+call real services (which commit) and still stay isolated and fast.
+
+## 2026-09-25: mypy in lenient mode
+
+**What:** `mypy==2.3.1` (dev dependency) runs in `make lint` and CI over `app`, `tests`, `worker.py` and
+`conftest.py`. Lenient: only annotated functions are checked (`check_untyped_defs = false`) and missing third-party
+stubs are ignored (`ignore_missing_imports = true`); config in `backend/pyproject.toml`. Where mypy cannot see
+Flask-SQLAlchemy's runtime `db.Model`, `app/core/db/models.py` uses a `TYPE_CHECKING` alias to our `Base`.
+The frontend already has TypeScript `"strict": true` (both tsconfigs).
+
+**Why:** catches wrong types in the code we annotate without forcing annotations everywhere at once; it can be
+tightened per module later.
+
+## 2026-09-25: API routes under /api/v1
+
+**What:** every module route is under `/api/v1/...`, added centrally by `register_blueprints()` (module blueprints
+set no `url_prefix`). `/api/health`, `/api/docs` and `/api/openapi.json` stay unversioned for healthchecks and
+tooling. The Vite proxy and nginx already forward all of `/api/`. The frontend client keeps `baseUrl: ""` because
+the generated paths already contain `/api/v1`. Supersedes "No `/v1` in URLs" in the bootstrap conventions.
+
+**Why:** a later breaking change can live at `/api/v2` next to v1 without moving the infrastructure endpoints that
+Docker, CI and the status badge depend on.
+
+## 2026-09-25: Enums stored as text with a CHECK constraint
+
+**What:** Python `StrEnum`s with lowercase snake_case values, mapped with `str_enum()` (`app/core/db/enums.py`):
+SQLAlchemy `Enum(native_enum=False, create_constraint=True, values_callable=values, validate_strings=True,
+length=50)`. The database stores the value, never the member name, and a named CHECK constraint
+(`ck_<table>_<enum>`) rejects anything else. The API sends the same codes; display labels live only in
+`frontend/src/core/labels.ts` and the code → label tables in `docs/DATA_MODEL.md` ("Status values", rewritten
+from display strings to codes: e.g. `docs_pending` → "Docs pending").
+
+**Why:** Postgres ENUM types are awkward to change in migrations; text + CHECK gives the same safety with a
+simple constraint swap, and stable machine codes keep display wording out of the database and API.
+
+## 2026-09-25: UUID primary keys
+
+**What:** every model subclasses `BaseModel` (`app/core/db/models.py`): `id` is a UUID (uuid4 generated in
+Python, stored as Postgres `uuid`), plus `created_at`/`updated_at` (timezone-aware UTC, DB default `now()`).
+`SoftDeleteMixin` (`is_active`, `deleted_at`) is opt-in for user-facing rows. The existing MetaData naming
+convention (ix, uq, ck, fk, pk) stays, so Alembic gets stable constraint names.
+
+**Why:** IDs in URLs cannot be guessed or counted (e.g. how many businesses exist), rows can be created in seeds
+and tests without a DB round-trip for the key, and one base class gives every table the same key and timestamps.
+
 ## 2026-09-25: No in-repo ownership or task tracking
 
 **What**

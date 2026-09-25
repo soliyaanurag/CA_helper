@@ -15,7 +15,7 @@ None yet. Planned:
 - `email_otps`: user, purpose (verify/reset), code hash, expiry, attempts
 
 ## Endpoints
-None yet. Planned under `/api/auth/...`: signup, login, refresh, logout, verify-email (OTP), password reset.
+None yet. Planned under `/api/v1/auth/...`: signup, login, refresh, logout, verify-email (OTP), password reset.
 
 ## Service functions other modules call
 None yet. Planned: `@role_required(...)` decorators; `ca_has_active_access(ca_id, business_id)`; `get_current_user()`.

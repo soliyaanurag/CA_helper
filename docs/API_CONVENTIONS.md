@@ -4,22 +4,31 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
 `make gen-api` turns it into TypeScript types for the frontend.
 
 ## URLs
-- Everything is under `/api`.
-- Module resources: `/api/<module>/<resource>`, with kebab-case segments and plural nouns:
-  `/api/compliance/items`, `/api/compliance/items/{item_id}`, `/api/ca-workspace/clients`.
-- Actions that are not plain CRUD use a verb sub-path: `POST /api/compliance/items/{item_id}/mark-filed`.
-- Admin endpoints for a module's configuration: `/api/admin/<module>/...`, in that module's blueprint.
-- Core endpoints: `/api/health` (exists), `/api/auth/...` and `/api/notifications/...` (planned).
-- No `/v1` in URLs. There is one version, and the spec plus generated types keep both sides in sync.
+- **Every API route is under `/api/v1`.** `register_blueprints()` (`backend/app/modules/__init__.py`) adds the
+  prefix to every module blueprint, so blueprints set no `url_prefix` of their own.
+- **Unversioned (infrastructure only):** `/api/health` (Docker/CI healthchecks, the frontend status badge),
+  `/api/docs` (Swagger UI) and `/api/openapi.json`.
+- Module resources: `/api/v1/<module>/<resource>`, with kebab-case segments and plural nouns:
+  `/api/v1/compliance/items`, `/api/v1/compliance/items/{item_id}`, `/api/v1/ca-workspace/clients`.
+- Actions that are not plain CRUD use a verb sub-path: `POST /api/v1/compliance/items/{item_id}/mark-filed`.
+- Admin endpoints for a module's configuration: `/api/v1/admin/<module>/...`, in that module's blueprint.
+- Core endpoints: `/api/health` (exists), `/api/v1/auth/...` and `/api/v1/notifications/...` (planned).
+- A breaking change would get a new prefix (`/api/v2`) next to the old one; nothing needs that yet.
+- The Vite proxy (hybrid) and nginx (Docker) forward all of `/api/`, which covers both. The frontend client uses
+  `baseUrl: ""` because the generated paths already contain `/api/v1` (`frontend/src/core/api/client.ts`).
 
 ## JSON
 - Keys are `snake_case` (the same names as in Python and in the generated TypeScript types).
+- **IDs** are UUID strings, e.g. `"8c9e6679-7425-40de-944b-e07fc1f90ae7"` (`fields.UUID()`); path parameters
+  like `{item_id}` too.
 - **Timestamps:** ISO 8601 in UTC, e.g. `"2026-09-25T08:30:00Z"`. The frontend displays them in Asia/Kolkata.
 - **Dates** (due dates, periods): `"YYYY-MM-DD"`, no time zone.
 - **Money:** rupees as a decimal **string** with 2 places, e.g. `"1250.00"`
   (`fields.Decimal(as_string=True, places=2)`), never a float.
 - **Financial year:** a string like `"2026-27"` (April–March).
-- Enums are lowercase strings (`"business"`, `"ca"`, `"admin"`). Compliance and engagement statuses use the exact values in `docs/DATA_MODEL.md` ("Status values").
+- **Enums** are lowercase snake_case codes (`"business"`, `"docs_pending"`), the same values the database
+  stores. The codes and their display labels are listed in `docs/DATA_MODEL.md` ("Status values"). The API never
+  sends display text for an enum; the frontend maps codes to labels in `frontend/src/core/labels.ts`.
 
 ## Authentication
 - `Authorization: Bearer <access_token>` (JWT). The token carries a `role` claim: `business` | `ca` | `admin`.
@@ -35,7 +44,8 @@ Every error response has the same body (built in `backend/app/core/errors.py`):
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Some fields are invalid.",
-    "details": {"json": {"pan": ["Invalid PAN format."]}}
+    "details": {"json": {"pan": ["Invalid PAN format."]}},
+    "request_id": "3f2a9c1e0b7d4e5f8a6b2c1d0e9f8a7b"
   }
 }
 ```
@@ -44,7 +54,15 @@ Every error response has the same body (built in `backend/app/core/errors.py`):
   `VALIDATION_ERROR`. Domain errors use specific codes: `raise ApiError(409, "DUPLICATE_PAN", "...")`.
 - `message`: human-readable, safe to show.
 - `details`: optional; for 422 it maps location (`json`, `query`, ...) → field → messages.
+- `request_id`: the request's ID (see "Request IDs" below). Show it to users with unexpected errors ("quote this
+  ID") so the matching log lines can be found.
 - Never put PII or stack traces in error messages.
+
+## Request IDs
+- Every response has an `X-Request-ID` header. If the request carried a valid `X-Request-ID` (1–128 characters of
+  `A-Z a-z 0-9 . _ -`), the same value is returned; otherwise the API generates one (32 hex characters).
+- The same ID is in every log line written while handling the request and in every error body
+  (`backend/app/core/request_id.py`, `backend/app/core/logging_config.py`).
 
 ## Status codes
 | Code | When |

@@ -13,7 +13,7 @@ None yet. Planned:
 - `admin_audit_log`: admin, action, target, details, timestamp
 
 ## Endpoints
-None yet. Planned: `/api/admin/users/...`, `/api/admin/cas/...`.
+None yet. Planned: `/api/v1/admin/users/...`, `/api/v1/admin/cas/...`.
 
 ## Service functions other modules call
 None yet.

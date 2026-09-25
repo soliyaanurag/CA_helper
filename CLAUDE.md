@@ -16,17 +16,18 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
   openapi-typescript + openapi-fetch (types generated, never hand-written), FullCalendar, Recharts, Vitest + RTL.
 - **Hybrid mode (daily):** `make infra` (db + Mailpit in Docker) + `make dev-backend` / `dev-worker` / `dev-frontend`.
   **Full-Docker (`make up`):** all 5 services; must always work. Both read the same root `.env` (hostnames differ).
-- Ports: API 8000, Vite 5173, Docker frontend 8080, Postgres 5432, Mailpit UI 8025. Node 22 LTS (`.nvmrc`).
+- Ports: API 8000, Vite 5173, Docker frontend 8080, Postgres 5432, Mailpit UI 8025. Node 22 LTS from the conda env.
 - Ask before substituting any tool. Record decisions in `docs/DECISIONS.md`.
 
 ## Folder map
 ```
 backend/app/__init__.py      create_app(); config.py, extensions.py, cli.py (`flask seed`)
 backend/app/core/            auth/ permissions.py db/ security/ storage/ email/ notifications/ ai/ ocr/ errors.py health.py
+                             logging_config.py request_id.py · db/: base.py models.py (BaseModel, mixins) enums.py
 backend/app/modules/<m>/     __init__.py (blp, seed, register_jobs) routes.py models.py schemas.py services.py seed.py tests/
-backend/worker.py            APScheduler entrypoint (collects each module's register_jobs)
+backend/worker.py            APScheduler entrypoint (collects each module's register_jobs) · gunicorn.conf.py
 backend/migrations/          single Alembic dir · backend/conftest.py shared pytest fixtures
-frontend/src/core/           api/ (client.ts, generated/ gitignored) auth/ layout/ components/ui/ routes.tsx
+frontend/src/core/           api/ (client.ts, generated/ gitignored) auth/ layout/ components/ui/ routes.tsx labels.ts
 frontend/src/features/<m>/   routes.tsx pages/ components/ hooks/ api.ts admin/
 content/forms/<FORM>/        explanation.md instructions.md checklist.yaml
 docs/                        project docs · docs/modules/<m>.md = module context (what exists, contracts)
@@ -36,13 +37,14 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 
 ## Conda rules
 1. Miniforge / conda-forge only: `environment.yml` uses `channels: [conda-forge, nodefaults]`.
-2. Conda installs only `python=3.12`, `tesseract`, `pip`. **All Python packages come from pip via
+2. Conda installs only `python=3.12`, `tesseract`, `nodejs=22`, `pip`. **All Python packages come from pip via
    `backend/requirements.txt` / `requirements-dev.txt`** (Docker and CI use the same files). Never `conda install`
-   a Python library; never pip-install anything that isn't in a requirements file.
+   a Python library; never pip-install anything that isn't in a requirements file. npm packages come from
+   `frontend/package-lock.json`.
 3. One shared `environment.yml` (env `ca-helper`; its pip section installs `-r backend/requirements-dev.txt`).
    After dependency changes: `make env-update`.
-4. **Every Python command runs via `conda run -n ca-helper <cmd>`** (`--no-capture-output` for servers; `--cwd backend`
-   for backend commands). Never rely on an activated env; never use system Python or pip.
+4. **Every Python and Node command runs via `conda run -n ca-helper <cmd>`** (`--no-capture-output` for servers;
+   `--cwd backend` / `--cwd frontend`). Never rely on an activated env; never use system Python, pip, Node or nvm.
 5. `.vscode/settings.json` points at the env via the `.conda-env` link (no user paths); README covers manual selection.
 6. OCR tests use `@pytest.mark.requires_tesseract`, which skips with a clear message if Tesseract is missing.
 
@@ -63,6 +65,9 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
    Financial year = April–March.
 8. **Secrets only in `.env`** (gitignored). Every new variable goes into `.env.example` with a comment.
 9. **Cross-module reads go through service functions**, never direct imports of another module's models in routes.
+10. **Layering:** routes parse, call one service function, serialize; services hold the logic and each public one
+   commits once at its end; models (subclass `BaseModel`) hold data only. Module routes live under `/api/v1`.
+   Enums are `StrEnum` with lowercase snake_case values stored via `str_enum()`. See `docs/PATTERNS.md` "Foundations".
 
 ## Key commands
 `make setup` · `make env-update` · `make infra` / `infra-down` · `make dev-backend` / `dev-worker` / `dev-frontend` ·
@@ -79,7 +84,7 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 5. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, `backend/app/core/`,
    `frontend/src/core/`, modules under "Depends on").
 6. Env check: env `ca-helper` exists (else tell the user to run `make setup`); `environment.yml`/`requirements*`
-   changed → `make env-update`; `frontend/package*.json` changed → `npm ci` in `frontend/`; `make infra` running;
+   changed → `make env-update`; `frontend/package*.json` changed → `conda run -n ca-helper --cwd frontend npm ci`; `make infra` running;
    `make migrate`, `make gen-api` and `make test` pass **before** changing anything.
 
 **While working**
@@ -91,7 +96,7 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 - Migrations: pull main right before `make migration`; one per PR, message prefixed with the module; never edit a
   migration already on main; multiple heads → create a merge revision.
 - Route/schema change → `make gen-api` and fix type errors in your features.
-- New dependency: pin in `backend/requirements*.txt` + `make env-update`, or `npm install <pkg>` in `frontend/`;
+- New dependency: pin in `backend/requirements*.txt` + `make env-update`, or `conda run -n ca-helper --cwd frontend npm install <pkg>`;
   mention it in the PR. Every new service/route gets tests; every new table gets seed data.
 
 **End / before a PR**
