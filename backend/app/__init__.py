@@ -8,7 +8,7 @@
 - the test fixtures: `backend/conftest.py`
 """
 
-from flask import Flask
+from flask import Flask, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app import cli
@@ -60,6 +60,10 @@ def create_app(config_name: str | None = None) -> Flask:
     api.register_blueprint(health_blp)
     api.register_blueprint(auth_blp, url_prefix=API_PREFIX)
     register_blueprints(api)
+
+    # The API has no pages of its own, so its bare root opens the API docs instead of
+    # a 404. A plain Flask route: it stays out of the OpenAPI spec and generated types.
+    app.add_url_rule("/", "root", lambda: redirect("/api/docs"))
 
     register_error_handlers(app)
     cli.register_commands(app)
