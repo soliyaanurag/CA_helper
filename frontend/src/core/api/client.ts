@@ -10,7 +10,11 @@ import type { components, paths } from "./generated/schema";
  * Requests go to the same origin: in hybrid mode Vite proxies /api to Flask,
  * in Docker nginx does. Auth headers will be added via `api.use(...)` once auth exists.
  *
- * Usage: const { data, error } = await api.GET("/api/health");
+ * baseUrl is "" on purpose: module routes live under /api/v1, and the generated
+ * `paths` already contain that full prefix ("/api/v1/compliance/items"), so a
+ * baseUrl of "/api/v1" would double it. The unversioned "/api/health" works too.
+ *
+ * Usage: const { data, error } = await api.GET("/api/v1/<module>/<resource>");
  */
 export const api = createClient<paths>({ baseUrl: "" });
 

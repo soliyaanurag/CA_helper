@@ -5,7 +5,8 @@ Every sub-package of `app.modules` is a feature module (onboarding, compliance,
 
 A module's `__init__.py` exposes:
 
-    blp            flask-smorest Blueprint (required), registered on the API
+    blp            flask-smorest Blueprint (required), registered on the API under
+                   API_PREFIX (/api/v1); the blueprint itself sets no url_prefix
     seed()         optional; inserts dev seed data (idempotent), run by `flask seed`
     SEED_ORDER     optional int, default 100; lower numbers are seeded first
     register_jobs(scheduler)
@@ -19,6 +20,9 @@ import pkgutil
 from types import ModuleType
 
 DEFAULT_SEED_ORDER = 100
+# Every module route lives under this prefix (docs/API_CONVENTIONS.md).
+# Core infra endpoints (/api/health, /api/docs, /api/openapi.json) stay unversioned.
+API_PREFIX = "/api/v1"
 
 
 def discover_modules() -> list[ModuleType]:
@@ -36,12 +40,12 @@ def module_name(module: ModuleType) -> str:
 
 
 def register_blueprints(api) -> None:
-    """Register every module's `blp` on the flask-smorest Api."""
+    """Register every module's `blp` on the flask-smorest Api, under API_PREFIX."""
     for module in discover_modules():
         blp = getattr(module, "blp", None)
         if blp is None:
             raise RuntimeError(f"{module.__name__} must expose a flask-smorest Blueprint `blp`")
-        api.register_blueprint(blp)
+        api.register_blueprint(blp, url_prefix=API_PREFIX)
 
 
 def register_all_jobs(scheduler) -> list[str]:
@@ -56,7 +60,10 @@ def register_all_jobs(scheduler) -> list[str]:
 
 
 def run_all_seeds() -> list[str]:
-    """Run each module's `seed()` in SEED_ORDER, then commit once."""
+    """Run each module's `seed()` in SEED_ORDER, then commit once.
+
+    Seeding is one unit of work: a seed() adds rows but does not commit.
+    """
     from app.extensions import db
 
     modules = [m for m in discover_modules() if getattr(m, "seed", None) is not None]
