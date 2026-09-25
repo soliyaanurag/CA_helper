@@ -12,7 +12,10 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
   `/api/v1/compliance/items`, `/api/v1/compliance/items/{item_id}`, `/api/v1/ca-workspace/clients`.
 - Actions that are not plain CRUD use a verb sub-path: `POST /api/v1/compliance/items/{item_id}/mark-filed`.
 - Admin endpoints for a module's configuration: `/api/v1/admin/<module>/...`, in that module's blueprint.
-- Core endpoints: `/api/health` (exists), `/api/v1/auth/...` and `/api/v1/notifications/...` (planned).
+- Core endpoints: `/api/health`, `/api/v1/auth/login`, `/api/v1/auth/me` (exist); more of `/api/v1/auth/...` and
+  `/api/v1/notifications/...` (planned).
+- An area's home-page data is served by the module that owns that page, under its own segment:
+  `/api/v1/compliance/dashboard` (business), `/api/v1/ca-workspace/dashboard` (CA), `/api/v1/admin/dashboard`.
 - A breaking change would get a new prefix (`/api/v2`) next to the old one; nothing needs that yet.
 - The Vite proxy (hybrid) and nginx (Docker) forward all of `/api/`, which covers both. The frontend client uses
   `baseUrl: ""` because the generated paths already contain `/api/v1` (`frontend/src/core/api/client.ts`).
@@ -31,9 +34,15 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
   sends display text for an enum; the frontend maps codes to labels in `frontend/src/core/labels.ts`.
 
 ## Authentication
-- `Authorization: Bearer <access_token>` (JWT). The token carries a `role` claim: `business` | `ca` | `admin`.
-- Refresh tokens get new access tokens via the refresh endpoint (details fixed when auth is built).
-- Every endpoint except health, docs, signup/login/OTP is protected by a role decorator from `core/permissions.py`.
+- `POST /api/v1/auth/login` `{email, password}` → `{access_token, user}`; rate limited to 10 per minute per IP.
+- `Authorization: Bearer <access_token>` (JWT). `sub` is the user id; a `role` claim is `business` | `ca` |
+  `admin`; the lifetime is `JWT_ACCESS_TOKEN_MINUTES` (default 60). No refresh token yet (planned).
+- Every endpoint except health, docs, signup/login/OTP is protected by `@roles_required(...)` from
+  `app/core/permissions.py`, which checks the role stored in the database. In the OpenAPI spec bearer auth is the
+  global default; public endpoints declare `@blp.doc(security=[])`.
+- Auth error codes: 401 `AUTH_REQUIRED` (no token), `TOKEN_INVALID`, `TOKEN_EXPIRED`, `ACCOUNT_INACTIVE` (user
+  deactivated), `INVALID_CREDENTIALS` (login); 403 `FORBIDDEN` (wrong role), `ACCOUNT_INACTIVE` (login);
+  429 `TOO_MANY_REQUESTS`. The frontend logs out on any 401 to a request that carried a token.
 - A CA reads business data only via `ca_has_active_access(ca_id, business_id)`.
 
 ## Errors

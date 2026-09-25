@@ -39,6 +39,57 @@ Then:
    AI features (NIC suggestions, assistant, regulatory monitor).
 2. Start developing (next section).
 
+## Quick start (manual)
+
+The simplest way to run the app by hand: two terminals with the conda env activated.
+
+```bash
+make down                 # only if full-Docker mode (make up) is running: it uses port 8000
+make infra                # Postgres + Mailpit in Docker
+make migrate && make seed # first time, and after pulling new migrations/seed data
+```
+
+Terminal 1, the API (http://127.0.0.1:8000, Swagger at http://127.0.0.1:8000/api/docs):
+
+```bash
+conda activate ca-helper
+cd backend
+python main.py            # Flask dev server with debugger and auto-reload
+```
+
+Terminal 2, the frontend (http://localhost:5173, proxies `/api` to port 8000):
+
+```bash
+conda activate ca-helper
+cd frontend
+npm run dev
+```
+
+Log in at http://localhost:5173/login with a demo user from `.env` (`DEMO_*` variables, created by `make seed`):
+
+| Role | Email | Password |
+|---|---|---|
+| Business | `business@demo.local` | `DemoBusiness#2026` |
+| CA | `ca@demo.local` | `DemoCA#2026` |
+| Admin | `admin@demo.local` | `DemoAdmin#2026` |
+
+(These are the `.env.example` defaults; if your `.env` predates them, copy the `DEMO_*` block into it and run
+`make seed`.)
+
+**After changing backend routes or schemas, regenerate the frontend API types** (the frontend imports them from
+`frontend/src/core/api/generated/`, which is not committed):
+
+```bash
+make gen-api              # exports ../openapi.json from Flask, then runs `npm run gen:api`
+```
+
+With the env activated you can do the same by hand: `cd backend && flask --app app openapi write --format=json
+../openapi.json`, then `cd ../frontend && npm run gen:api` (this npm script only converts an existing
+`openapi.json`; it does not export a new one). `npm run dev` keeps working with stale types, but `npm run
+typecheck`, `npm run build` and your editor will report errors until you regenerate.
+
+`backend/main.py` is only for this manual mode. The Make targets, Docker (gunicorn) and CI do not use it.
+
 ## Daily development: hybrid mode (default)
 
 Postgres and Mailpit run in Docker. Flask, the worker and Vite run on your machine for fast reloads.
@@ -47,6 +98,7 @@ Use one terminal per long-running command.
 ```bash
 make infra          # Postgres + Mailpit in Docker (waits until healthy)
 make migrate        # apply database migrations
+make seed           # demo users, one per role (logins in "Quick start (manual)")
 make dev-backend    # Flask API with auto-reload  -> http://localhost:8000
 make dev-worker     # background jobs (APScheduler), separate process
 make dev-frontend   # Vite dev server             -> http://localhost:5173
@@ -75,8 +127,9 @@ Frontend: http://localhost:8080 (nginx, proxies `/api`) · API: http://localhost
 
 ## Command reference
 
-Every Python and Node command runs inside the conda env through `conda run` (never an activated env, system
-Python or a system Node).
+Every Make target runs Python and Node inside the conda env through `conda run`, so it works without
+activating anything, and never uses a system Python or Node. (Scripts, CI and Claude Code always go through
+these targets or `conda run`; an activated env is only for running things by hand, as in "Quick start (manual)".)
 
 | Make target | What it does | Raw command |
 |---|---|---|

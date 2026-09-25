@@ -4,9 +4,9 @@
 The CA's multi-client dashboard with urgency scores, the deadline batch view, and the client workspace (profile, calendar, vault, document requests, mark filed, private notes).
 
 ## What exists now
-Skeleton only; no features yet.
-- Backend (`backend/app/modules/ca_workspace/`): the `ca_workspace` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
-- Frontend (`frontend/src/features/ca_workspace/`): one placeholder page, "My clients" at `/ca/clients` (CA nav), built from `ModulePlaceholder`; `api.ts` is empty.
+Only the CA dashboard stub; no workspace features yet.
+- Backend (`backend/app/modules/ca_workspace/`): `GET /api/v1/ca-workspace/dashboard` (CA role only) returns a welcome message: route in `routes.py`, `CaDashboardSchema` in `schemas.py`, `get_dashboard(user)` in `services.py`, tests in `tests/test_dashboard.py`. No models; `seed()` does nothing.
+- Frontend (`frontend/src/features/ca_workspace/`): `CaDashboardPage` is the CA area home (`/ca`, index route, nav "Dashboard"), using `useCaDashboard()` from `api.ts`; placeholder "My clients" page at `/ca/clients`.
 
 ## Tables
 None yet. Planned:
@@ -14,7 +14,11 @@ None yet. Planned:
 - `ca_notes`: private notes per client
 
 ## Endpoints
-None yet. Planned: `/api/v1/ca-workspace/...`.
+| Method | Path | Who | Returns |
+|---|---|---|---|
+| GET | `/api/v1/ca-workspace/dashboard` | ca | `{message}` (welcome text; grows into the multi-client dashboard) |
+
+Planned: more of `/api/v1/ca-workspace/...`.
 
 ## Service functions other modules call
 None yet.

@@ -16,6 +16,8 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
   openapi-typescript + openapi-fetch (types generated, never hand-written), FullCalendar, Recharts, Vitest + RTL.
 - **Hybrid mode (daily):** `make infra` (db + Mailpit in Docker) + `make dev-backend` / `dev-worker` / `dev-frontend`.
   **Full-Docker (`make up`):** all 5 services; must always work. Both read the same root `.env` (hostnames differ).
+  **Manual (for people, not Claude):** `conda activate ca-helper` + `cd backend && python main.py` + `npm run dev` (README
+  "Quick start (manual)"). Claude itself always uses Make targets or `conda run`.
 - Ports: API 8000, Vite 5173, Docker frontend 8080, Postgres 5432, Mailpit UI 8025. Node 22 LTS from the conda env.
 - Ask before substituting any tool. Record decisions in `docs/DECISIONS.md`.
 

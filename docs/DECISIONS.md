@@ -3,6 +3,43 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-25: Basic login, role areas and manual run mode
+
+**What**
+- **Business area URL is `/business`** (was `/app`), so each role's area matches its name: `/business`, `/ca`,
+  `/admin`. `AREA_PREFIX.business` in `frontend/src/core/routing.ts`; supersedes "`business` /app" in the
+  bootstrap entry. Frontend contract change.
+- **Area home endpoints stay module-owned**: `GET /api/v1/compliance/dashboard` (business),
+  `/api/v1/ca-workspace/dashboard` (CA), `/api/v1/admin/dashboard` (admin), named for what they will become. No
+  exception to `/api/v1/<module>/...`. Frontend pages: `BusinessDashboardPage`, `CaDashboardPage`,
+  `AdminDashboardPage`, each registered as its area's `index` route by its module.
+- **Access token only, in localStorage**, for this prototype (TODO in `frontend/src/core/auth/session.ts`: move to
+  an httpOnly refresh-token cookie). Lifetime `JWT_ACCESS_TOKEN_MINUTES` (default 60).
+- **Roles are checked against the database** in `roles_required`, not only the JWT claim; the JWT user loader
+  rejects deactivated/deleted users on every request with **401 `ACCOUNT_INACTIVE`** (401, so the frontend logs
+  out). Login itself returns 403 `ACCOUNT_INACTIVE`, and only after a correct password.
+- **Unknown email and wrong password are indistinguishable**: same 401 `INVALID_CREDENTIALS`, and an unknown email
+  still costs one argon2 verify (against a cached dummy hash). Outdated argon2 hashes are rehashed on login.
+- **Bearer auth is the OpenAPI global default** (`API_SPEC_OPTIONS["security"]`); public endpoints opt out with
+  `@blp.doc(security=[])` (health, login).
+- **`users` and `UserRole` live in core** (`app/core/auth/`, `app/core/db/enums.py`); the demo-user seed is a core
+  seed that `run_all_seeds()` runs before the module seeds.
+- **Rate limiting stays on in tests**; `backend/conftest.py` resets the in-memory counters before each test.
+  (With `RATELIMIT_ENABLED=False` Flask-Limiter registers no hooks, so the limit could not be tested.)
+- **Login email is a plain string, not `fields.Email`**: the service trims and lowercases it, and a malformed
+  email simply matches no user (401). The frontend validates the format with Zod.
+- **Manual run mode:** `backend/main.py` (not `app.py`, which would shadow the `app` package) runs Flask's dev
+  server on 127.0.0.1:8000 with debugger/reload from `DEV_SERVER_DEBUG` (on only in development), for people
+  running `conda activate ca-helper && python main.py` by hand. Make targets, Docker and CI are unchanged, and
+  scripts/Claude still use `conda run` or Make.
+- **API client:** `baseUrl` is the page origin (no path) instead of `""`, and `fetch` is looked up per call, so
+  frontend tests running in Node can build requests and stub `fetch`. Browser behaviour is the same.
+- **shadcn `input` and `label`** added (no new npm packages).
+
+**Why:** a working login for all three roles is the base every later feature builds on; module-owned URLs keep
+the "grep the module segment" rule without exceptions; the DB role check and 401-on-deactivation make an admin's
+suspension take effect immediately; the manual mode is the simplest way to explain and demo the app.
+
 ## 2026-09-25: Node.js comes from the conda env
 
 **What:** `environment.yml` installs `nodejs=22` (conda-forge) next to Python and Tesseract. Every node/npm command
