@@ -1,11 +1,11 @@
-"""`flask seed` runs the core seeds and every module's seed() without errors."""
+"""`flask seed` inserts the demo users, once, without errors."""
 
 import pytest
 from sqlalchemy import func, select
 
-from app.core.auth.models import User
-from app.core.db.enums import UserRole
-from app.core.security.passwords import verify_password
+from app.models import User
+from app.models.enums import UserRole
+from app.utils.passwords import verify_password
 
 DEMO_ENV = {
     "DEMO_BUSINESS_EMAIL": " Business@Demo.local ",
@@ -29,10 +29,10 @@ def run_seed(app):
     return result
 
 
-def test_seed_command_runs_core_and_all_modules(app, database, demo_env):
+def test_seed_command_lists_what_it_seeded(app, database, demo_env):
     result = run_seed(app)
 
-    assert "Seeded 10 module(s): core.auth, " in result.output
+    assert "Seeded: demo users" in result.output
 
 
 def test_seed_creates_one_hashed_demo_user_per_role(app, database, demo_env):

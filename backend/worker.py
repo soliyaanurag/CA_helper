@@ -4,17 +4,11 @@ It runs as its OWN process, never inside the web server:
     hybrid mode:  make dev-worker
     Docker:       the `worker` service in docker-compose.yml
 
-Each feature module may define `register_jobs(scheduler)` in its __init__.py.
-This file collects them all. Every job runs inside the Flask app context, so
-jobs use db.session and service functions exactly like routes do. While a job
-runs, every log line carries its id in the `job` field.
+Every job is added in build_scheduler() below and calls a service function. Jobs
+run inside the Flask app context, so they use db.session and services exactly
+like routes do. While a job runs, every log line carries its id in the `job` field.
 
-Example, in app/modules/alerts/__init__.py:
-
-    def register_jobs(scheduler):
-        scheduler.add_job(send_due_reminders, "cron", hour=8, id="alerts.due_reminders")
-
-Health: the built-in `core.heartbeat` job touches HEARTBEAT_FILE every 30 seconds.
+Health: the built-in `worker.heartbeat` job touches HEARTBEAT_FILE every 30 seconds.
 `python worker.py --healthcheck` (the Docker healthcheck) exits 1 if that file is
 older than 90 seconds, i.e. the scheduler has stopped running jobs.
 """
@@ -31,8 +25,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
-from app.core.logging_config import job_var
-from app.modules import register_all_jobs
+from app.utils.logging_setup import job_var
 
 log = logging.getLogger("worker")
 
@@ -43,7 +36,7 @@ SCHEDULER_TIMEZONE = "Asia/Kolkata"
 HEARTBEAT_FILE = Path(tempfile.gettempdir()) / "ca-helper-worker.heartbeat"
 HEARTBEAT_INTERVAL_SECONDS = 30
 HEARTBEAT_MAX_AGE_SECONDS = 90
-HEARTBEAT_JOB_ID = "core.heartbeat"
+HEARTBEAT_JOB_ID = "worker.heartbeat"
 
 
 class AppScheduler(BlockingScheduler):
@@ -92,7 +85,7 @@ def heartbeat_is_fresh(max_age_seconds: float = HEARTBEAT_MAX_AGE_SECONDS) -> bo
 
 
 def build_scheduler(app: Flask) -> AppScheduler:
-    """Create the scheduler with the heartbeat job, then let every module register its jobs."""
+    """Create the scheduler with every job."""
     scheduler = AppScheduler(app)
     scheduler.add_job(
         write_heartbeat,
@@ -101,8 +94,8 @@ def build_scheduler(app: Flask) -> AppScheduler:
         id=HEARTBEAT_JOB_ID,
         next_run_time=datetime.now(UTC),  # first beat immediately at start
     )
-    modules = register_all_jobs(scheduler)
-    log.info("Modules with jobs: %s", ", ".join(modules) or "(none)")
+    # Feature jobs go here, each calling a service function. Cron times are IST, e.g.
+    #   scheduler.add_job(alerts_service.send_reminders, "cron", hour=8, id="alerts.reminders")
     return scheduler
 
 

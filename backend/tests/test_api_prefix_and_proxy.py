@@ -1,56 +1,53 @@
-"""Module routes live under /api/v1; health and docs stay unversioned; ProxyFix is opt-in."""
-
-from types import ModuleType
+"""Feature routes live under /api/v1; health and docs stay unversioned; ProxyFix is opt-in."""
 
 import pytest
 from flask import request
 from flask_smorest import Blueprint
 
-import app.modules
+import app.routes
 from app import create_app
 from app.config import TestingConfig
-from app.modules import API_PREFIX, discover_modules, register_blueprints
+from app.routes import API_PREFIX, BLUEPRINTS, register_routes
 
 
-def test_every_module_blueprint_is_registered_under_api_v1():
+def test_every_feature_blueprint_is_registered_under_api_v1():
     calls = []
 
     class RecordingApi:
         def register_blueprint(self, blp, **options):
             calls.append((blp.name, options))
 
-    register_blueprints(RecordingApi())
+    register_routes(RecordingApi())
 
-    assert len(calls) == len(discover_modules())
-    assert all(options == {"url_prefix": "/api/v1"} for _, options in calls)
+    assert calls[0] == ("health", {})
+    assert len(calls[1:]) == len(BLUEPRINTS)
+    assert all(options == {"url_prefix": "/api/v1"} for _, options in calls[1:])
     assert API_PREFIX == "/api/v1"
 
 
 @pytest.fixture()
-def app_with_demo_module(monkeypatch):
-    """A fresh app whose only module is a test-only one with a single route."""
-    blp = Blueprint("demo", __name__, description="Test-only module")
+def app_with_demo_blueprint(monkeypatch):
+    """A fresh app whose only feature blueprint is a test-only one with a single route."""
+    blp = Blueprint("demo", __name__, description="Test-only feature")
 
     @blp.route("/demo/ping")
     @blp.response(200)
     def ping():
         return {"pong": True}
 
-    demo = ModuleType("app.modules.demo")
-    demo.blp = blp
-    monkeypatch.setattr(app.modules, "discover_modules", lambda: [demo])
+    monkeypatch.setattr(app.routes, "BLUEPRINTS", [blp])
     return create_app("testing")
 
 
-def test_module_routes_are_served_under_api_v1(app_with_demo_module):
-    client = app_with_demo_module.test_client()
+def test_feature_routes_are_served_under_api_v1(app_with_demo_blueprint):
+    client = app_with_demo_blueprint.test_client()
 
     assert client.get("/api/v1/demo/ping").get_json() == {"pong": True}
     assert client.get("/api/demo/ping").status_code == 404
 
 
-def test_openapi_spec_lists_versioned_module_paths(app_with_demo_module):
-    paths = app_with_demo_module.test_client().get("/api/openapi.json").get_json()["paths"]
+def test_openapi_spec_lists_versioned_feature_paths(app_with_demo_blueprint):
+    paths = app_with_demo_blueprint.test_client().get("/api/openapi.json").get_json()["paths"]
 
     assert "/api/v1/demo/ping" in paths
     assert "/api/health" in paths

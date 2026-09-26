@@ -8,8 +8,8 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, StatementError
 
-from app.core.db.enums import str_enum
 from app.extensions import db
+from app.models.enums import str_enum
 from tests._models import Gadget, GadgetColour
 
 

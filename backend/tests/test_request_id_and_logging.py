@@ -8,7 +8,7 @@ import re
 import pytest
 
 from app import create_app
-from app.core.logging_config import TEXT_FORMAT, ContextFilter, JsonFormatter, job_var
+from app.utils.logging_setup import TEXT_FORMAT, ContextFilter, JsonFormatter, job_var
 
 GENERATED_ID = re.compile(r"^[0-9a-f]{32}$")
 

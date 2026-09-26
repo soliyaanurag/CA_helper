@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 from argon2 import PasswordHasher
 from flask_jwt_extended import decode_token
 
-from app.core.auth import services
-from app.core.db.enums import UserRole
-from conftest import TEST_PASSWORD
+from app.models.enums import UserRole
+from app.services import auth_service
+from tests.conftest import TEST_PASSWORD
 
 LOGIN_URL = "/api/v1/auth/login"
 
@@ -59,14 +59,14 @@ def test_wrong_password_and_unknown_email_get_the_same_error(client, make_user):
 def test_unknown_email_still_checks_a_password_hash(client, database, monkeypatch):
     # Guards the timing protection: an unknown email must cost one argon2 verify too.
     checked = []
-    real_verify = services.verify_password
+    real_verify = auth_service.verify_password
     monkeypatch.setattr(
-        services, "verify_password", lambda h, p: checked.append(h) or real_verify(h, p)
+        auth_service, "verify_password", lambda h, p: checked.append(h) or real_verify(h, p)
     )
 
     login(client, "nobody@example.com")
 
-    assert checked == [services._dummy_hash()]
+    assert checked == [auth_service._dummy_hash()]
 
 
 def test_inactive_user_is_rejected(client, make_user):
@@ -103,7 +103,7 @@ def test_outdated_hash_is_rehashed_on_login(client, make_user):
     assert login(client, "old@example.com").status_code == 200
 
     assert user.password_hash != weak_hash
-    assert not services.needs_rehash(user.password_hash)
+    assert not auth_service.needs_rehash(user.password_hash)
     assert login(client, "old@example.com").status_code == 200
 
 
