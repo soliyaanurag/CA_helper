@@ -6,7 +6,7 @@ It runs as its OWN process, never inside the web server:
 
 Every job is added in build_scheduler() below and calls a service function. Jobs
 run inside the Flask app context, so they use db.session and services exactly
-like routes do. While a job runs, every log line carries its id in the `job` field.
+like routes do. APScheduler logs each job's start, finish or failure by name.
 
 Health: the built-in `worker.heartbeat` job touches HEARTBEAT_FILE every 30 seconds.
 `python worker.py --healthcheck` (the Docker healthcheck) exits 1 if that file is
@@ -25,7 +25,6 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
-from app.utils.logging_setup import job_var
 
 log = logging.getLogger("worker")
 
@@ -47,25 +46,10 @@ class AppScheduler(BlockingScheduler):
         self.app = app
 
     def add_job(self, func, *args, **kwargs):
-        job_name = kwargs.get("id") or func.__qualname__
-        # The heartbeat runs every 30 s; its start/finish lines would drown the rest.
-        level = logging.DEBUG if job_name == HEARTBEAT_JOB_ID else logging.INFO
-
-        @functools.wraps(func)
+        @functools.wraps(func)  # keeps the function's name for APScheduler's log lines
         def run_in_app_context(*job_args, **job_kwargs):
-            token = job_var.set(job_name)
-            started = time.perf_counter()
-            try:
-                log.log(level, "Job started")
-                with self.app.app_context():
-                    result = func(*job_args, **job_kwargs)
-                log.log(level, "Job finished in %.0fms", (time.perf_counter() - started) * 1000)
-                return result
-            except Exception:
-                log.exception("Job failed")
-                raise
-            finally:
-                job_var.reset(token)
+            with self.app.app_context():
+                return func(*job_args, **job_kwargs)
 
         return super().add_job(run_in_app_context, *args, **kwargs)
 
@@ -100,7 +84,7 @@ def build_scheduler(app: Flask) -> AppScheduler:
 
 
 def main() -> None:
-    app = create_app()  # also configures logging (LOG_FORMAT / LOG_LEVEL)
+    app = create_app()  # also configures logging (LOG_LEVEL)
     scheduler = build_scheduler(app)
     job_ids = [job.id for job in scheduler.get_jobs()]
     log.info("Worker starting with %d job(s): %s", len(job_ids), ", ".join(job_ids))

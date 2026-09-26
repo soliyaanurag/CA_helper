@@ -11,8 +11,9 @@ Folders: models/ (tables), schemas/ (request/response shapes), routes/ (HTTP
 endpoints), services/ (business logic), utils/ (shared helpers).
 """
 
+import logging
+
 from flask import Flask, redirect
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import get_config
 from app.errors import register_error_handlers
@@ -20,7 +21,6 @@ from app.extensions import api, cors, db, jwt, limiter, migrate
 from app.routes import register_routes
 from app.seed import register_commands
 from app.utils.jwt_handlers import register_jwt_callbacks
-from app.utils.logging_setup import configure_logging, init_request_id
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -30,21 +30,13 @@ def create_app(config_name: str | None = None) -> Flask:
     If it is None, the APP_ENV environment variable decides.
     """
     config = get_config(config_name)
-    # Logging first, so every later message (including Flask's) uses our format.
-    configure_logging(config.LOG_FORMAT, config.LOG_LEVEL)
+    # Plain log lines on the terminal: time, level, logger name, message.
+    logging.basicConfig(
+        level=config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+    )
 
     app = Flask(__name__)
     app.config.from_object(config)
-
-    # Behind nginx (Docker), trust one proxy's X-Forwarded-For/-Proto/-Host headers.
-    if app.config["TRUST_PROXY"]:
-        # (mypy: Flask declares wsgi_app as a method; replacing it is the documented way.)
-        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
-            app.wsgi_app, x_for=1, x_proto=1, x_host=1
-        )
-
-    # X-Request-ID on every request, response, log line and error body.
-    init_request_id(app)
 
     # Bind the extension objects (created once in extensions.py) to this app.
     db.init_app(app)

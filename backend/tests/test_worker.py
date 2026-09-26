@@ -1,7 +1,5 @@
-"""worker.py: jobs run in the app context, job names in logs, and the heartbeat healthcheck."""
+"""worker.py: jobs run in the app context, and the heartbeat healthcheck."""
 
-import io
-import logging
 import os
 import threading
 import time
@@ -10,7 +8,6 @@ import pytest
 from flask import current_app
 
 import worker
-from app.utils.logging_setup import TEXT_FORMAT, ContextFilter
 from worker import HEARTBEAT_JOB_ID, AppScheduler, build_scheduler
 
 
@@ -31,28 +28,6 @@ def test_jobs_run_inside_app_context(app):
     thread.join()
 
     assert result["name"] == app.name
-
-
-def test_log_lines_inside_a_job_carry_the_job_name(app):
-    stream = io.StringIO()
-    handler = logging.StreamHandler(stream)
-    handler.addFilter(ContextFilter())
-    handler.setFormatter(logging.Formatter(TEXT_FORMAT))
-    logging.getLogger().addHandler(handler)
-    scheduler = AppScheduler(app)
-    job = scheduler.add_job(
-        lambda: logging.getLogger("app.test").info("working"), "interval", hours=1, id="demo.job"
-    )
-    try:
-        job.func()
-        logging.getLogger("app.test").info("after the job")
-    finally:
-        logging.getLogger().removeHandler(handler)
-
-    lines = stream.getvalue().splitlines()
-    assert any("job=demo.job working" in line for line in lines)
-    assert any("job=demo.job Job finished in" in line for line in lines)
-    assert lines[-1].endswith("job=- after the job")
 
 
 @pytest.fixture()

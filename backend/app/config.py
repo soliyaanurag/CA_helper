@@ -75,16 +75,8 @@ class BaseConfig:
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = True
 
-    # --- Logging (app/utils/logging_setup.py) ---
-    # "json" in Docker (one JSON object per line), "text" otherwise.
-    LOG_FORMAT = os.getenv("LOG_FORMAT", "text").strip().lower()
+    # --- Logging: DEBUG | INFO | WARNING | ERROR ---
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
-
-    # --- Reverse proxy ---
-    # True only behind a proxy we control (nginx in Docker): then ProxyFix trusts
-    # its X-Forwarded-* headers, so request.remote_addr (rate limits) and URL
-    # scheme/host are the client's. Off in hybrid mode, where no proxy sets them.
-    TRUST_PROXY = _env_bool("TRUST_PROXY")
 
     # --- Dates: stored in UTC, displayed in this timezone ---
     DISPLAY_TIMEZONE = "Asia/Kolkata"
@@ -133,9 +125,7 @@ class TestingConfig(BaseConfig):
     RATELIMIT_STORAGE_URI = "memory://"
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=60)
     # Fixed here so a developer's .env cannot change test behaviour.
-    LOG_FORMAT = "text"
     LOG_LEVEL = "INFO"
-    TRUST_PROXY = False
 
 
 class ProductionConfig(BaseConfig):
