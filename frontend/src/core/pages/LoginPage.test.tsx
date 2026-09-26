@@ -19,7 +19,7 @@ async function submitLogin(email = "someone@demo.local", password = "secret") {
 }
 
 function apiError(status: number, code: string) {
-  return [status, { error: { code, message: code, request_id: "req-1" } }] as [number, unknown];
+  return [status, { error: { code, message: code } }] as [number, unknown];
 }
 
 describe("login form", () => {
