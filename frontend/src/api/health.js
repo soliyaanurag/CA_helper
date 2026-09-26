@@ -1,19 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { api } from "./client";
-
 /**
  * GET /api/health: is the backend up, and can it reach its database?
- * 200 -> {status: "ok"}; 503 -> {status: "degraded", database: "unavailable"}
+ * 200 -> {status: "ok", database: "ok"}; 503 -> {status: "degraded", database: "unavailable"}
  * (the API answers, but the database is down). Only a failed request is an error.
+ * Plain fetch, not apiFetch(): the 503 body is data to show, not the standard error body.
  */
 export function useHealth() {
   return useQuery({
     queryKey: ["health"],
     queryFn: async () => {
-      const { data, error, response } = await api.GET("/api/health");
-      if (data) return data;
-      if (response.status === 503 && error && "database" in error) return error;
+      const response = await fetch("/api/health");
+      if (response.ok || response.status === 503) return response.json();
       throw new Error(`API returned HTTP ${response.status}`);
     },
     retry: false,

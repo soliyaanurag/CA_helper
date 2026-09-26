@@ -17,7 +17,7 @@ async function submitLogin(email = "someone@demo.local", password = "secret") {
 }
 
 function apiError(status, code) {
-  return [status, { error: { code, message: code, request_id: "req-1" } }];
+  return [status, { error: { code, message: code } }];
 }
 
 describe("login form", () => {
@@ -61,10 +61,8 @@ describe("login form", () => {
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/${role}`);
     // The dashboard request carried the new token.
-    const dashboardRequest = fetchMock.mock.calls
-      .map(([request]) => request)
-      .find((request) => request.url.endsWith(DASHBOARD_URL[role]));
-    expect(dashboardRequest?.headers.get("Authorization")).toBe("Bearer new-token");
+    const [, dashboardInit] = fetchMock.mock.calls.find(([path]) => path === DASHBOARD_URL[role]);
+    expect(dashboardInit.headers.Authorization).toBe("Bearer new-token");
   });
 
   it("returns to the page the guard sent the user from", async () => {

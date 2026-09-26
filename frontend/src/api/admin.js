@@ -1,15 +1,15 @@
 /**
  * API calls for the admin module: TanStack Query hooks around the API client.
- * Every call goes through unwrap(), so failures are ApiRequestError (code, message, requestId).
+ * Every call goes through apiFetch(), so failures are ApiRequestError (code, message).
  */
 import { useQuery } from "@tanstack/react-query";
 
-import { api, unwrap } from "@/api/client";
+import { apiFetch } from "@/api/client";
 
 /** GET /api/v1/admin/dashboard */
 export function useAdminDashboard() {
   return useQuery({
     queryKey: ["admin", "dashboard"],
-    queryFn: () => unwrap(api.GET("/api/v1/admin/dashboard")),
+    queryFn: () => apiFetch("/api/v1/admin/dashboard"),
   });
 }
