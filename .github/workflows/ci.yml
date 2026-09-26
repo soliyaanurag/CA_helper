@@ -66,12 +66,14 @@ jobs:
 
       - name: Export OpenAPI spec
         working-directory: backend
-        run: flask --app app openapi write --format=json ../openapi.json
+        run: |
+          mkdir -p ../frontend/src/core/api/generated
+          flask --app app openapi write --format=json ../frontend/src/core/api/generated/openapi.json
 
       - uses: actions/upload-artifact@v7
         with:
           name: openapi
-          path: openapi.json
+          path: frontend/src/core/api/generated/openapi.json
 
   frontend:
     name: Frontend
@@ -94,7 +96,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: openapi
-          path: ${{ github.workspace }}
+          path: frontend/src/core/api/generated
 
       - name: Generate API types
         run: npm run gen:api

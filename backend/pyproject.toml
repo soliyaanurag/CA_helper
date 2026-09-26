@@ -1,4 +1,4 @@
-# pytest configuration for the backend. (Ruff settings live in the root ruff.toml.)
+# pytest and Ruff configuration for the backend (all Python lives in backend/).
 # Dependencies are NOT declared here: they live in requirements.txt and
 # requirements-dev.txt, the single source used by conda and CI.
 
@@ -9,4 +9,25 @@ pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
     "requires_tesseract: needs the Tesseract OCR binary; skipped with a message if it is missing",
+]
+
+# Ruff (linter + formatter); run via `make lint` / `make format`.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Our own importable code (app, worker) for import sorting.
+src = ["."]
+# Alembic files are generated; keep them exactly as generated.
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # modern Python syntax
+    "B",   # common bugs
+    "SIM", # simplifications
+    "DTZ", # naive datetimes (we store UTC; see CLAUDE.md rule 7)
 ]

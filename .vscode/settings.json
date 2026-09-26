@@ -22,6 +22,14 @@
   "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
   "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
 
+  // Hide caches and build output in the explorer and search (tools recreate them; all gitignored).
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "frontend/dist": true
+  },
+
   // Same line endings and whitespace rules as .editorconfig.
   "files.eol": "\n",
   "files.insertFinalNewline": true,

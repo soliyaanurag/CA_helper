@@ -68,8 +68,9 @@ format: ## Auto-format and auto-fix Python and frontend code
 	$(PY) ruff format backend
 	$(NPM) run format
 
-gen-api: ## Export the OpenAPI spec (openapi.json) and generate frontend TypeScript types
-	$(FLASK) openapi write --format=json ../openapi.json
+gen-api: ## Export the OpenAPI spec and generate frontend TypeScript types (both gitignored)
+	@mkdir -p frontend/src/core/api/generated
+	$(FLASK) openapi write --format=json ../frontend/src/core/api/generated/openapi.json
 	$(NPM) run gen:api
 
 dev-backend: .env ## Flask dev server with auto-reload on http://localhost:8000
