@@ -13,6 +13,7 @@ import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { MarketplacePage } from "@/pages/business/MarketplacePage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
+import { CaProfilePage } from "@/pages/ca/CaProfilePage";
 import { CaWorkspacePage } from "@/pages/ca/CaWorkspacePage";
 import { ChangePasswordPage } from "@/pages/ChangePasswordPage";
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
@@ -41,6 +42,7 @@ export const NAV = {
   ],
   ca: [
     { label: "Dashboard", path: "/ca" },
+    { label: "My profile", path: "/ca/profile" },
     { label: "My clients", path: "/ca/clients" },
   ],
   admin: [
@@ -92,6 +94,7 @@ export const appRoutes = [
   ]),
   roleArea("ca", [
     { index: true, element: <CaDashboardPage /> },
+    { path: "profile", element: <CaProfilePage /> },
     { path: "clients", element: <CaWorkspacePage /> },
   ]),
   roleArea("admin", [
