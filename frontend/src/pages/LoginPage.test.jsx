@@ -35,6 +35,7 @@ describe("login form", () => {
   it.each([
     [401, "INVALID_CREDENTIALS", "Wrong email or password."],
     [403, "ACCOUNT_INACTIVE", "This account is inactive. Please contact support."],
+    [403, "EMAIL_NOT_VERIFIED", "Your email is not verified yet."],
     [429, "TOO_MANY_REQUESTS", "Too many login attempts. Wait a minute and try again."],
   ])("shows a clear message for %i %s", async (status, code, message) => {
     fakeApi({ "POST /api/v1/auth/login": apiError(status, code) });
@@ -74,5 +75,31 @@ describe("login form", () => {
     await submitLogin(user.email);
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/business/compliance"));
+  });
+
+  it("sends an unverified user to enter their code", async () => {
+    fakeApi({ "POST /api/v1/auth/login": apiError(403, "EMAIL_NOT_VERIFIED") });
+    const router = renderApp("/login");
+
+    await submitLogin("new@example.com");
+    await userEvent.setup().click(await screen.findByRole("link", { name: "Enter your code" }));
+
+    expect(await screen.findByRole("heading", { name: "Verify your email" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/verify-email");
+    expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
+  });
+
+  it("links to signup and to forgot password", async () => {
+    fakeApi({});
+    renderApp("/login");
+
+    expect(screen.getByRole("link", { name: "Create an account" })).toHaveAttribute(
+      "href",
+      "/signup",
+    );
+    expect(screen.getByRole("link", { name: "Forgot password?" })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
   });
 });

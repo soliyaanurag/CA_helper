@@ -13,7 +13,7 @@ const AUDIENCES = [
   { title: "Admins", text: "Users, CA verification and configuration." },
 ];
 
-/** Landing page: what the platform is, a login button, and the API health badge. */
+/** Landing page: what the platform is, log in / sign up buttons, and the API health badge. */
 export function HomePage() {
   const health = useHealth();
   const { user } = useAuth();
@@ -26,13 +26,20 @@ export function HomePage() {
           Know which filings apply to your business and when. File yourself or work with a fairly
           priced CA.
         </p>
-        <Button asChild>
-          {user ? (
+        {user ? (
+          <Button asChild>
             <Link to={ROLE_HOME[user.role]}>Go to your dashboard</Link>
-          ) : (
-            <Link to="/login">Log in</Link>
-          )}
-        </Button>
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button asChild>
+              <Link to="/login">Log in</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/signup">Create an account</Link>
+            </Button>
+          </div>
+        )}
         <p className="text-sm">
           API status:{" "}
           {health.isPending ? (

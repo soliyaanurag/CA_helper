@@ -1,6 +1,6 @@
 import { Link, Outlet } from "react-router";
 
-/** Layout for public pages (landing, login; signup comes later). */
+/** Layout for public pages: landing, login, signup, verify email, forgot/reset password. */
 export function PublicLayout() {
   return (
     <div className="min-h-screen bg-background text-foreground">

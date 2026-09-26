@@ -10,7 +10,8 @@ import { saveSession } from "@/lib/session";
 import { appRoutes } from "@/routes";
 
 /**
- * Replace fetch with a fake backend: routes maps "METHOD /path" to [status, body].
+ * Replace fetch with a fake backend: routes maps "METHOD /path" to [status, body]
+ * (use [204] for an answer without a body).
  * Returns the mock, so tests can inspect the requests it received: each call is
  * [path, init] as passed to fetch (e.g. init.headers.Authorization).
  */
@@ -18,7 +19,8 @@ export function fakeApi(routes) {
   const fetchMock = vi.fn(async (path, init = {}) => {
     const key = `${init.method ?? "GET"} ${path}`;
     const [status, body] = routes[key] ?? [404, { error: { code: "NOT_FOUND", message: key } }];
-    return new Response(JSON.stringify(body), {
+    // A 204 response has no body at all.
+    return new Response(status === 204 ? null : JSON.stringify(body), {
       status,
       headers: { "Content-Type": "application/json" },
     });
