@@ -3,6 +3,38 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-26: Signup, email OTP and passwords
+
+**What**
+- **Signup** creates only `business` and `ca` accounts. A new account starts with `users.email_verified_at` empty
+  and cannot log in (403 `EMAIL_NOT_VERIFIED`) until the user enters the 6-digit code we emailed. Verifying does
+  not log the user in: they log in with their password afterwards. The migration marks existing users verified;
+  seeded demo users are created verified.
+- **One-time codes** live in `email_otps`: 6 random digits stored only as an argon2 hash (the same
+  `hash_password()` as passwords), valid 10 minutes and 5 wrong guesses. Only the newest code per user and purpose
+  counts. At most one new code a minute per account; extra requests are ignored silently. A wrong guess is
+  committed before the 400 is raised, the one place a service commits before an error.
+- **Password rule:** 8 to 128 characters with at least one letter and one number (signup, reset, change), checked
+  in `backend/app/schemas/auth.py` and `frontend/src/lib/authRules.js`.
+- **No account enumeration where it is cheap:** resend and forgot-password always answer 204; verify and reset give
+  the same `OTP_INVALID` for an unknown email as for a wrong code. Signup still answers 409 `EMAIL_TAKEN`.
+- **Password reset** also verifies an unverified email (the code proves ownership). Reset and change both send a
+  "password was changed" email. A wrong current password is 400 `WRONG_PASSWORD`, not 401, because any 401 logs
+  the frontend out.
+- **Email:** `send_email()` in `app/utils/email.py` uses the standard library (`smtplib`, `EmailMessage`) and
+  Flask's Jinja `render_template` on plain-text files in `app/templates/email/`. No new package. It runs inside
+  the request (not the worker), logs a failure without the address and never raises. Tests set
+  `MAIL_SUPPRESS_SEND` and read `app.utils.email.outbox`. New `.env` variables: `MAIL_SERVER`, `MAIL_PORT`,
+  `MAIL_DEFAULT_SENDER`; no TLS or SMTP login yet (Mailpit needs neither).
+- **Frontend:** plain async functions in `api/auth.js` (no TanStack mutations; the forms use React Hook Form's
+  `isSubmitting`, like the login page). The email moves between pages in the router's location state, never in the
+  URL. `FormCard` and `FormField` components keep the six account forms short. Change password lives at
+  `<area>/change-password` in every role's area, linked from the sidebar.
+
+**Why:** the smallest flow that is safe enough to explain in the viva: codes rather than emailed links (no frontend
+URL setting, nothing to click in the wrong browser), no new dependencies, and every rule in one place in
+`auth_service.py`.
+
 ## 2026-09-26: Simplified for explainability
 
 **What**

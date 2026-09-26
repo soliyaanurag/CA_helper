@@ -87,6 +87,23 @@ def test_soft_deleted_user_is_rejected(client, make_user):
     assert response.get_json()["error"]["code"] == "ACCOUNT_INACTIVE"
 
 
+def test_unverified_email_is_rejected(client, make_user):
+    make_user(email="new@example.com", email_verified_at=None)
+
+    response = login(client, "new@example.com")
+
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
+
+
+def test_unverified_user_with_wrong_password_gets_invalid_credentials(client, make_user):
+    make_user(email="new@example.com", email_verified_at=None)
+
+    response = login(client, "new@example.com", "not-the-password")
+
+    assert response.status_code == 401
+
+
 def test_inactive_user_with_wrong_password_gets_invalid_credentials(client, make_user):
     # The account state is revealed only to someone who knows the password.
     make_user(email="gone@example.com", is_active=False)

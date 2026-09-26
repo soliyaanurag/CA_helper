@@ -44,6 +44,7 @@ def test_seed_creates_one_hashed_demo_user_per_role(app, database, demo_env):
     assert business.email == "business@demo.local"  # stored normalized
     assert business.password_hash != "business-pass"
     assert verify_password(business.password_hash, "business-pass")
+    assert all(user.email_verified_at is not None for user in users.values())  # can log in
 
 
 def test_seed_is_idempotent(app, database, demo_env):

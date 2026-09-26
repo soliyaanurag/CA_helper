@@ -27,8 +27,8 @@
 
 | Table | Module | One row is... | Key columns (indicative) |
 |---|---|---|---|
-| `users` **(implemented)** | core-auth | a login account | id, email (unique; stored trimmed + lowercased), password_hash (argon2), full_name, role (`user_role`), is_active, deleted_at, created_at, updated_at. Planned: email_verified (OTP task) |
-| `email_otps` | core-auth | a one-time code | user_id, purpose (verify/reset), code_hash, expires_at, attempts, used_at |
+| `users` **(implemented)** | core-auth | a login account | id, email (unique; stored trimmed + lowercased), password_hash (argon2), full_name, role (`user_role`), email_verified_at (null until the emailed code is entered), is_active, deleted_at, created_at, updated_at |
+| `email_otps` **(implemented)** | core-auth | a 6-digit code emailed to a user | id, user_id (FK users, indexed), purpose (`otp_purpose`), code_hash (argon2), expires_at, attempts (wrong guesses), used_at, created_at, updated_at. Never deleted; only the newest code per user and purpose counts |
 | `notifications` | core-infra | a tray entry | user_id, type, title, body, link, read_at, created_at |
 | `businesses` | onboarding | a registered business | user_id, legal_name, entity_type, state, description, turnover_range, investment_amount, pan (enc) + pan_bidx, gst_registered, gstin (enc) + gstin_bidx, tan (enc), deducts_tds, pays_salary_above_limit, cin_llpin, udyam_number, phone (enc), nic_code |
 | `regulatory_profiles` | onboarding | the computed profile of a business | business_id, msme_tier, gst_scheme, itr_form, presumptive_eligible, audit_applicable, tds_returns, explanations (JSON), rule_version, computed_at |
@@ -74,6 +74,15 @@ CHECK constraint to exactly these codes.
 | `admin` | Admin | home `/admin` |
 
 Also the `role` claim in the JWT.
+
+**`email_otps.purpose`** (core-auth; `OtpPurpose` in `backend/app/models/email_otp.py`; CHECK `ck_email_otps_otp_purpose`)
+
+| Code | Label | Notes |
+|---|---|---|
+| `verify_email` | Email verification | sent at signup and on resend |
+| `reset_password` | Password reset | sent by forgot-password |
+
+Never shown in the UI, so `labels.js` has no map for it.
 
 **`compliance_items.status`** (compliance)
 

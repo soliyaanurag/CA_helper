@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Layout for the logged-in areas (/business, /ca, /admin): sidebar with the
- * role's links, user name + logout, and the current page (<Outlet />).
+ * role's links, user name, change password + logout, and the current page (<Outlet />).
  * `nav` is a list of { label, path } links (NAV in routes.jsx).
  */
 export function AppShell({ role, nav }) {
@@ -42,6 +42,9 @@ export function AppShell({ role, nav }) {
         </nav>
         <div className="mt-auto space-y-2 border-t pt-4">
           <p className="truncate text-sm">{user?.full_name}</p>
+          <Button asChild variant="ghost" size="sm" className="w-full">
+            <Link to={`${home}/change-password`}>Change password</Link>
+          </Button>
           <Button variant="outline" size="sm" className="w-full" onClick={logout}>
             Log out
           </Button>

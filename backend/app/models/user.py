@@ -1,10 +1,8 @@
-"""The `users` table: one login account per person (business owner, CA or admin).
+"""The `users` table: one login account per person (business owner, CA or admin)."""
 
-Email verification (OTP) columns come with the signup task; add them with a new
-migration then.
-"""
+from datetime import datetime
 
-from sqlalchemy import String
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel, SoftDeleteMixin
@@ -21,3 +19,5 @@ class User(SoftDeleteMixin, BaseModel):
     password_hash: Mapped[str] = mapped_column(String(255))  # argon2, never the password
     full_name: Mapped[str] = mapped_column(String(200))
     role: Mapped[UserRole] = mapped_column(str_enum(UserRole))
+    # Set when the user enters the code we emailed them; login is refused while it is empty.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

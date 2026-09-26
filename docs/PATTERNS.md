@@ -38,6 +38,8 @@ A module that needs another module's data calls that module's **service function
 - Each public service function validates, changes rows and calls `db.session.commit()` **once, at its end**. For
   an expected problem it raises `ApiError` before committing; Flask-SQLAlchemy rolls back at the end of the request.
 - Helpers that other service functions compose do **not** commit; their docstrings say "Does not commit."
+- One exception: a state change that must survive the error it causes (a wrong one-time code counts as an attempt)
+  is committed right before the `ApiError` is raised (`_use_code()` in `backend/app/services/auth_service.py`).
 - `flask seed` follows the same rule: seed functions don't commit, `run_all_seeds()` commits once.
 - Tests: services really commit; the `database` fixture (`backend/tests/conftest.py`) deletes every row after
   each test.
@@ -190,6 +192,19 @@ export function useWidgets() {
 reacts to a specific error (example: `LOGIN_ERROR_TEXT` in `pages/LoginPage.jsx`). Field names are the API's
 snake_case names (Swagger at `/api/docs`). Forms: React Hook Form + Zod. A component used by several pages goes in
 `components/`; one used by a single page stays in that page's file.
+
+## 9. Sending an email
+Write the body as plain text in `backend/app/templates/email/<template>.txt` (Jinja: `{{ name }}`), then call
+`send_email()` from a service, **after** `db.session.commit()`:
+
+```python
+from app.utils.email import send_email
+
+send_email(user.email, "Your CA Helper verification code", "verify_email", name=user.full_name, code=code)
+```
+In development the mail lands in Mailpit (http://localhost:8025). A failure is logged and returns False; it never
+raises. In tests nothing is sent: read the messages from the `mailbox` fixture (`backend/tests/conftest.py`).
+Example: `_email_code()` in `backend/app/services/auth_service.py`, tested in `backend/tests/test_auth_signup.py`.
 
 ## Checklist for a new feature
 - [ ] route (thin, in `BLUEPRINTS`) + schema + service (commits once) + tests

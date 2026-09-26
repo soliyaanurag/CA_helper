@@ -14,9 +14,14 @@ import { MarketplacePage } from "@/pages/business/MarketplacePage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
 import { CaWorkspacePage } from "@/pages/ca/CaWorkspacePage";
+import { ChangePasswordPage } from "@/pages/ChangePasswordPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
+import { SignupPage } from "@/pages/SignupPage";
+import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 
 /**
  * Every page of the app. To add a page: create it in pages/<role>/, add its
@@ -49,6 +54,7 @@ export const NAV = {
  * One role's area: only that role may open it (RequireRole; the backend checks
  * again on every request), inside the sidebar layout. Child paths are relative
  * to the area, e.g. "documents" in the business area is /business/documents.
+ * Every area also gets "change-password" (linked from the sidebar by AppShell).
  */
 function roleArea(role, children) {
   return {
@@ -58,7 +64,7 @@ function roleArea(role, children) {
         <AppShell role={role} nav={NAV[role]} />
       </RequireRole>
     ),
-    children,
+    children: [...children, { path: "change-password", element: <ChangePasswordPage /> }],
   };
 }
 
@@ -69,6 +75,10 @@ export const appRoutes = [
     children: [
       { index: true, element: <HomePage /> },
       { path: "login", element: <LoginPage /> },
+      { path: "signup", element: <SignupPage /> },
+      { path: "verify-email", element: <VerifyEmailPage /> },
+      { path: "forgot-password", element: <ForgotPasswordPage /> },
+      { path: "reset-password", element: <ResetPasswordPage /> },
     ],
   },
   roleArea("business", [
