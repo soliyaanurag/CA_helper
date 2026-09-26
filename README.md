@@ -68,6 +68,9 @@ Log in at http://localhost:5173/login with a demo user from `.env` (`DEMO_*` var
 (These are the `.env.example` defaults; if your `.env` predates them, copy the `DEMO_*` block into it and run
 `make seed`.)
 
+To try signup, open http://localhost:5173/signup. The 6-digit verification code (and any password reset code)
+arrives in Mailpit at http://localhost:8025; no email leaves your machine. Demo users are already verified.
+
 ## Daily development
 
 Postgres and Mailpit run in Docker. Flask, the worker and Vite run on your machine for fast reloads.

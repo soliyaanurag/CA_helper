@@ -13,7 +13,8 @@ it is the reference for every request and response field the frontend uses.
   `/api/v1/compliance/items`, `/api/v1/compliance/items/{item_id}`, `/api/v1/ca-workspace/clients`.
 - Actions that are not plain CRUD use a verb sub-path: `POST /api/v1/compliance/items/{item_id}/mark-filed`.
 - Admin endpoints for a module's configuration: `/api/v1/admin/<module>/...`, in that module's blueprint.
-- Core endpoints: `/api/health`, `/api/v1/auth/login`, `/api/v1/auth/me` (exist); more of `/api/v1/auth/...` and
+- Core endpoints: `/api/health`; `/api/v1/auth/signup`, `verify-email`, `verify-email/resend`, `login`,
+  `forgot-password`, `reset-password`, `change-password`, `me` (exist; details in `docs/modules/core-auth.md`);
   `/api/v1/notifications/...` (planned).
 - An area's home-page data is served by the module that owns that page, under its own segment:
   `/api/v1/compliance/dashboard` (business), `/api/v1/ca-workspace/dashboard` (CA), `/api/v1/admin/dashboard`.
@@ -35,6 +36,8 @@ it is the reference for every request and response field the frontend uses.
   sends display text for an enum; the frontend maps codes to labels in `frontend/src/lib/labels.js`.
 
 ## Authentication
+- `POST /api/v1/auth/signup` creates a business or CA account with an unverified email and emails a 6-digit code;
+  `POST /api/v1/auth/verify-email` `{email, code}` verifies it. Login is refused until then.
 - `POST /api/v1/auth/login` `{email, password}` → `{access_token, user}`; rate limited to 10 per minute per IP.
 - `Authorization: Bearer <access_token>` (JWT). `sub` is the user id; a `role` claim is `business` | `ca` |
   `admin`; the lifetime is `JWT_ACCESS_TOKEN_MINUTES` (default 60). No refresh token yet (planned).
@@ -42,8 +45,10 @@ it is the reference for every request and response field the frontend uses.
   `app/utils/decorators.py`, which checks the role stored in the database. In the OpenAPI spec bearer auth is the
   global default; public endpoints declare `@blp.doc(security=[])`.
 - Auth error codes: 401 `AUTH_REQUIRED` (no token), `TOKEN_INVALID`, `TOKEN_EXPIRED`, `ACCOUNT_INACTIVE` (user
-  deactivated), `INVALID_CREDENTIALS` (login); 403 `FORBIDDEN` (wrong role), `ACCOUNT_INACTIVE` (login);
-  429 `TOO_MANY_REQUESTS`. The frontend logs out on any 401 to a request that carried a token.
+  deactivated), `INVALID_CREDENTIALS` (login); 403 `FORBIDDEN` (wrong role), `ACCOUNT_INACTIVE` and
+  `EMAIL_NOT_VERIFIED` (login); 400 `OTP_INVALID`, `OTP_EXPIRED` (codes), `WRONG_PASSWORD`, `SAME_PASSWORD`
+  (change password); 409 `EMAIL_TAKEN` (signup), `EMAIL_ALREADY_VERIFIED`; 429 `TOO_MANY_REQUESTS`. The frontend
+  logs out on any 401 to a request that carried a token, so a logged-in user's mistake is never a 401.
 - A CA reads business data only via `ca_has_active_access(ca_id, business_id)`.
 
 ## Errors

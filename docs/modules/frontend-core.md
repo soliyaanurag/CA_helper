@@ -19,7 +19,11 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   (sidebar with the role's `NAV` links, the user's name and a Log out button, title from `USER_ROLE_LABELS`); each
   area's home is its `index: true` dashboard page; landing page with a Log in button and an API health badge;
   `/login` page (`pages/LoginPage.jsx`: React Hook Form + Zod, a clear message per API error code, redirect by role
-  or back to the page the guard came from); auth (`AuthProvider`, `useAuth()`, `RequireRole`, `ROLE_HOME`; token in
+  or back to the page the guard came from); the account pages from core-auth (`/signup`, `/verify-email`,
+  `/forgot-password`, `/reset-password` in the public area, `<area>/change-password` added to every area by
+  `roleArea()` and linked from the `AppShell` sidebar); `FormCard` (a small centred card holding one form) and
+  `FormField` (label + input + validation message or hint, for React Hook Form) in `components/`; the shared Zod
+  rules `newPasswordSchema`, `codeSchema`, `emailSchema`, `passwordsMatch` in `lib/authRules.js`; auth (`AuthProvider`, `useAuth()`, `RequireRole`, `ROLE_HOME`; token in
   localStorage for now); 404 page; TanStack Query client (`lib/queryClient.js`); the API client `apiFetch(path,
   {method, body})` in `api/client.js` (full `/api/...` paths on the page's own origin, Vite forwards them to
   Flask; adds the Bearer token that `AuthProvider` hands over with `setAuth()`; parses JSON; throws
@@ -37,14 +41,17 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   /login; logout on 401 and with the button); `src/api/client.test.js` (JSON in and out, Bearer header, standard
   and non-standard error bodies, logout on 401 only when a token was sent, network message);
   `src/pages/HomePage.test.jsx` (health badge ok vs database down). Test helpers in `src/test/utils.jsx`:
-  `fakeApi({"GET /api/v1/...": [status, body]})` stubs fetch, `loginAs(role)`, `renderApp(path)`.
-- **Not built yet:** signup, refresh-token cookie, notification tray, floating assistant widget.
+  `fakeApi({"GET /api/v1/...": [status, body]})` stubs fetch (`[204]` for an empty answer), `loginAs(role)`,
+  `renderApp(path)` (`path` may be `{pathname, state}` to start with a location state). Account page tests: see
+  `docs/modules/core-auth.md`.
+- **Not built yet:** refresh-token cookie, notification tray, floating assistant widget.
 
 ## Tables
 None (frontend).
 
 ## Endpoints
-None (frontend). Calls `GET /api/health` on the landing page and `POST /api/v1/auth/login` from the login page.
+None (frontend). Calls `GET /api/health` on the landing page, `POST /api/v1/auth/login` from the login page, and the
+other `/api/v1/auth/...` endpoints from the account pages (`api/auth.js`).
 
 ## Service functions other modules call
 Frontend exports other features use:
@@ -52,6 +59,8 @@ Frontend exports other features use:
   `apiFetch("/api/v1/...")`; show failures with `errorMessage(error)`; switch on `error.code` where a page needs to
 - `NAV` and `appRoutes` in `@/routes`: add every new page and sidebar link there
 - `AppShell` from `@/components/AppShell`; `Placeholder` from `@/components/Placeholder`
+- `FormCard` and `FormField` from `@/components/...` for small forms; `newPasswordSchema` and friends from
+  `@/lib/authRules`
 - `useAuth()` (`user`, `login`, `logout`) from `@/hooks/useAuth`; `RequireRole` from `@/components/RequireRole`;
   `ROLE_HOME` from `@/lib/session`; test helpers from `@/test/utils`
 - `label()` and the `*_LABELS` maps from `@/lib/labels`: display text for enum codes (must match
