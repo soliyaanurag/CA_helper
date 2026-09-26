@@ -2,7 +2,12 @@
 
 from marshmallow import Schema, ValidationError, fields, post_load, validate
 
-from app.models.marketplace import CA_LANGUAGES, CA_SPECIALIZATIONS, CaVerificationStatus
+from app.models.marketplace import (
+    CA_LANGUAGES,
+    CA_SPECIALIZATIONS,
+    CaVerificationStatus,
+    ServiceUnit,
+)
 from app.schemas.pagination import PageArgsSchema, PageSchema
 
 
@@ -69,20 +74,85 @@ class CaListArgsSchema(PageArgsSchema):
     specialization = fields.String(validate=validate.OneOf(CA_SPECIALIZATIONS))
     language = fields.String(validate=validate.OneOf(CA_LANGUAGES))
     city = fields.String(validate=validate.Length(max=100))
+    # A catalog service code, e.g. "gstr_3b": only CAs who offer it, with their price.
+    service = fields.String(validate=validate.Length(max=50))
 
 
 class CaListItemSchema(Schema):
     """A verified CA as businesses see them (no CoP number, no capacity)."""
 
     id = fields.UUID(required=True)
-    full_name = fields.String(required=True, attribute="user.full_name")
+    full_name = fields.String(required=True)
     membership_no = fields.String(required=True)
     city = fields.String(required=True)
     languages = fields.List(fields.String(), required=True)
     specializations = fields.List(fields.String(), required=True)
     years_experience = fields.Integer(required=True)
     about = fields.String(required=True)
+    # The CA's price for the `service` filter; null when no service is chosen.
+    price = fields.Decimal(as_string=True, places=2, allow_none=True)
 
 
 class CaListPageSchema(PageSchema):
     items = fields.List(fields.Nested(CaListItemSchema), required=True)
+
+
+# --- Service catalog and CA prices ------------------------------------------------
+
+MAX_PRICE = 1000000  # rupees; a higher price is almost certainly a typing mistake
+
+
+class CatalogServiceSchema(Schema):
+    """A catalog service and its typical price range across verified CAs.
+
+    The min / median / max prices are null until at least
+    marketplace_service.MIN_CAS_FOR_RANGE CAs offer the service.
+    """
+
+    id = fields.UUID(required=True)
+    code = fields.String(required=True)
+    name = fields.String(required=True)
+    description = fields.String(required=True)
+    unit = fields.Enum(ServiceUnit, by_value=True, required=True)
+    ca_count = fields.Integer(required=True, metadata={"description": "Verified CAs offering it"})
+    min_price = fields.Decimal(as_string=True, places=2, allow_none=True)
+    median_price = fields.Decimal(as_string=True, places=2, allow_none=True)
+    max_price = fields.Decimal(as_string=True, places=2, allow_none=True)
+
+
+class CaServicePriceSchema(Schema):
+    """One service the CA offers and their price for it."""
+
+    service_id = fields.UUID(required=True)
+    price = fields.Decimal(
+        as_string=True,
+        places=2,
+        required=True,
+        validate=validate.Range(min=1, max=MAX_PRICE, error="Enter a price from 1 to 10,00,000."),
+    )
+
+
+class CaServiceMenuSchema(Schema):
+    """The CA's whole price menu. Saving it replaces the old one."""
+
+    items = fields.List(fields.Nested(CaServicePriceSchema), required=True)
+
+
+class CaOfferedServiceSchema(CatalogServiceSchema):
+    """A catalog service a CA offers: the typical range plus this CA's price."""
+
+    price = fields.Decimal(as_string=True, places=2, required=True)
+
+
+class CaDetailSchema(Schema):
+    """One verified CA's public page (no CoP number, no capacity)."""
+
+    id = fields.UUID(required=True)
+    full_name = fields.String(required=True)
+    membership_no = fields.String(required=True)
+    city = fields.String(required=True)
+    languages = fields.List(fields.String(), required=True)
+    specializations = fields.List(fields.String(), required=True)
+    years_experience = fields.Integer(required=True)
+    about = fields.String(required=True)
+    services = fields.List(fields.Nested(CaOfferedServiceSchema), required=True)

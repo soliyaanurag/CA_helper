@@ -8,7 +8,9 @@ Demo users, one per role, come from DEMO_* variables in .env:
 
 A role whose variables are empty is skipped with a warning. The demo CA gets a
 verified practice profile, and four sample CAs (sample-ca-N@demo.local, random
-passwords nobody knows, so they cannot log in) fill the marketplace list.
+passwords nobody knows, so they cannot log in) fill the marketplace list. The
+service catalog is seeded here too (an admin editor comes later), and the four
+sample CAs get prices so some typical price ranges show up.
 
 Every seed function
 must be safe to re-run (it skips rows that already exist) and must not commit:
@@ -18,16 +20,17 @@ run_all_seeds() commits once at the end. Add a new table's seed function to SEED
 import logging
 import os
 import secrets
+from decimal import Decimal
 
 import click
 from flask import Flask
 from sqlalchemy import select
 
 from app.extensions import db
-from app.models import CaProfile, User
+from app.models import CaProfile, CaService, CatalogService, User
 from app.models.base import utcnow
 from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus
+from app.models.marketplace import CaVerificationStatus, ServiceUnit
 from app.services.auth_service import normalize_email
 from app.utils.passwords import hash_password
 
@@ -165,10 +168,153 @@ def seed_ca_profiles() -> None:
         _add_verified_profile(user.id, fields)
 
 
+# The standard services every CA prices against: (code, name, description, unit).
+# Listed in this order.
+SERVICE_CATALOG = [
+    (
+        "itr_presumptive",
+        "ITR filing: presumptive income (ITR-4)",
+        "Income tax return for a business or profession on presumptive income.",
+        ServiceUnit.PER_RETURN,
+    ),
+    (
+        "itr_business",
+        "ITR filing: business or profession (ITR-3)",
+        "Income tax return for a proprietor or professional with business income.",
+        ServiceUnit.PER_RETURN,
+    ),
+    (
+        "itr_firm_company",
+        "ITR filing: firm, LLP or company (ITR-5 / ITR-6)",
+        "Income tax return for a partnership firm, LLP or company.",
+        ServiceUnit.PER_RETURN,
+    ),
+    ("gstr_1", "GSTR-1 filing", "Return of outward supplies (sales).", ServiceUnit.PER_RETURN),
+    ("gstr_3b", "GSTR-3B filing", "Summary GST return with tax payment.", ServiceUnit.PER_RETURN),
+    (
+        "cmp_08",
+        "CMP-08 filing",
+        "Statement for composition-scheme taxpayers.",
+        ServiceUnit.PER_RETURN,
+    ),
+    (
+        "gstr_4",
+        "GSTR-4 filing",
+        "Annual return for composition-scheme taxpayers.",
+        ServiceUnit.PER_RETURN,
+    ),
+    (
+        "tds_24q",
+        "TDS return 24Q",
+        "TDS return for tax deducted on salaries.",
+        ServiceUnit.PER_RETURN,
+    ),
+    (
+        "tds_26q",
+        "TDS return 26Q",
+        "TDS return for tax deducted on other payments.",
+        ServiceUnit.PER_RETURN,
+    ),
+    (
+        "gst_registration",
+        "GST registration",
+        "Getting a new GST registration.",
+        ServiceUnit.ONE_TIME,
+    ),
+    (
+        "tax_audit",
+        "Tax audit",
+        "Tax audit of the accounts for one financial year.",
+        ServiceUnit.PER_YEAR,
+    ),
+    (
+        "bookkeeping",
+        "Bookkeeping",
+        "Keeping the books of accounts up to date.",
+        ServiceUnit.PER_MONTH,
+    ),
+    (
+        "income_tax_notice",
+        "Reply to an income-tax notice",
+        "Reading an income-tax notice and preparing the reply.",
+        ServiceUnit.PER_NOTICE,
+    ),
+]
+
+# Sample prices (rupees) of the sample CAs, by email and service code. Made up for
+# development, so some typical price ranges have data. The demo CA gets no prices:
+# set them yourself on /ca/services.
+SAMPLE_PRICES = {
+    "sample-ca-1@demo.local": {
+        "itr_presumptive": "1200",
+        "itr_business": "2500",
+        "tds_24q": "1500",
+        "tds_26q": "1500",
+        "income_tax_notice": "3000",
+    },
+    "sample-ca-2@demo.local": {
+        "itr_presumptive": "900",
+        "gstr_1": "500",
+        "gstr_3b": "600",
+        "cmp_08": "800",
+        "gstr_4": "2000",
+        "gst_registration": "1500",
+    },
+    "sample-ca-3@demo.local": {
+        "itr_presumptive": "1000",
+        "itr_business": "2000",
+        "gstr_3b": "700",
+        "bookkeeping": "2500",
+    },
+    "sample-ca-4@demo.local": {
+        "itr_business": "4000",
+        "itr_firm_company": "8000",
+        "gstr_3b": "1000",
+        "tax_audit": "30000",
+        "tds_26q": "2000",
+    },
+}
+
+
+def seed_service_catalog() -> None:
+    sort_order = 1
+    for code, name, description, unit in SERVICE_CATALOG:
+        exists = db.session.scalar(select(CatalogService.id).where(CatalogService.code == code))
+        if not exists:
+            db.session.add(
+                CatalogService(
+                    code=code, name=name, description=description, unit=unit, sort_order=sort_order
+                )
+            )
+        sort_order = sort_order + 1
+
+
+def seed_ca_prices() -> None:
+    for email, prices in SAMPLE_PRICES.items():
+        profile = db.session.scalar(
+            select(CaProfile).join(CaProfile.user).where(User.email == email)
+        )
+        if profile is None:
+            continue
+        for code, price in prices.items():
+            service = db.session.scalar(select(CatalogService).where(CatalogService.code == code))
+            exists = db.session.scalar(
+                select(CaService.id).where(
+                    CaService.ca_profile_id == profile.id, CaService.service_id == service.id
+                )
+            )
+            if not exists:
+                db.session.add(
+                    CaService(ca_profile_id=profile.id, service_id=service.id, price=Decimal(price))
+                )
+
+
 # (name, function) in dependency order: users first, other data may refer to them.
 SEEDS = [
     ("demo users", seed_demo_users),
     ("CA profiles", seed_ca_profiles),
+    ("service catalog", seed_service_catalog),
+    ("CA prices", seed_ca_prices),
 ]
 
 

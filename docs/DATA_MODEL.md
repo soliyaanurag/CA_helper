@@ -47,8 +47,8 @@
 | `news_articles` | regulatory | a scraped article | source_id, url, title, published_at, content_hash, fetched_at |
 | `regulatory_changes` | regulatory | an extracted change awaiting approval | article_id, change_type, forms, categories, dates (JSON), status, approved_by, approved_at |
 | `ca_profiles` **(implemented)** | marketplace | a CA's practice profile | id, user_id (FK users, unique: one per CA), membership_no (6 digits, unique), cop_number (typed by the CA; certificate upload later), city, languages (`varchar[]` of codes), specializations (`varchar[]` of codes, GIN index), capacity, years_experience, about, verification_status (`ca_verification_status`), is_active, deleted_at, created_at, updated_at. CHECKs `ck_ca_profiles_known_languages` / `ck_ca_profiles_known_specializations` accept only the codes below. Planned: pro_bono_pledge |
-| `service_catalog` | marketplace | a standard service | code, form_code, name, typical_min, typical_max |
-| `ca_services` | marketplace | a CA's price for a catalog service | ca_id, service_code, price |
+| `service_catalog` **(implemented)** | marketplace | a standard service every CA prices against | id, code (unique, e.g. `gstr_3b`), name, description, unit (`service_unit`), sort_order, is_active, deleted_at, created_at, updated_at. Seeded; admin editor later. No stored typical prices: the range is computed from `ca_services` |
+| `ca_services` **(implemented)** | marketplace | one CA's price for one catalog service | id, ca_profile_id (FK ca_profiles, indexed), service_id (FK service_catalog), price (`Numeric(12,2)` rupees, CHECK `ck_ca_services_positive_price` > 0), is_active, deleted_at, created_at, updated_at. Unique (ca_profile_id, service_id): unticking soft-deletes the row, ticking again reactivates it |
 | `engagements` | marketplace | a business–CA request/engagement | business_id, ca_id, form_code/item_id, status, quote_amount, quote_reason, expires_at |
 | `ratings` | marketplace | a review after completion | engagement_id, stars, review |
 | `client_invites` | marketplace | a CA's invite to an existing client | ca_id, email, token, status |
@@ -121,6 +121,17 @@ The first seven are the forms we track, so "CAs for this form" is a filter on on
 `urdu` Urdu
 
 Adding a code to either array list needs a hand-written migration that replaces its CHECK constraint.
+
+**`service_catalog.unit`** (marketplace; `ServiceUnit` in `backend/app/models/marketplace.py`; CHECK
+`ck_service_catalog_service_unit`)
+
+| Code | Label | Notes |
+|---|---|---|
+| `per_return` | per return | one filing (GSTR-1, GSTR-3B, ITR, TDS returns, …) |
+| `per_month` | per month | e.g. bookkeeping |
+| `per_year` | per year | e.g. tax audit |
+| `one_time` | one time | e.g. GST registration |
+| `per_notice` | per notice | replying to one income-tax notice |
 
 **`compliance_items.status`** (compliance)
 
