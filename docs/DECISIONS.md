@@ -3,6 +3,28 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-26: CA profiles: array columns for tags, CoP number instead of an upload (for now)
+
+**What**
+- `ca_profiles` (marketplace) holds a CA's practice profile and `verification_status` (`pending` / `verified` /
+  `rejected`). Only `verified` CAs are listed for businesses (`GET /api/v1/marketplace/cas`).
+- **Specializations and languages are Postgres arrays of codes** (`varchar[]`), not join tables. A CHECK
+  (`<@` "is contained in") accepts only the listed codes; "CAs for ITR" is `specializations @> ARRAY['itr']`, with
+  a GIN index. Specializations are the seven tracked forms plus six broader areas (`docs/DATA_MODEL.md`).
+- **The CA types the Certificate of Practice number**; the certificate upload (encrypted storage, OCR) comes later.
+- A new profile is `pending`. A verified or rejected CA who changes the membership or CoP number goes back to
+  `pending`; a rejected CA who saves again goes back to `pending`; other edits keep `verified`.
+- ICAI membership number: 6 digits, unique across CAs. The CoP number is free text (1–20 characters): we do not
+  assume a format.
+- The shared pagination shapes (`app/schemas/pagination.py`) arrived with the CA list.
+- `make seed` gives the demo CA a verified profile and adds four sample verified CAs
+  (`sample-ca-N@demo.local`, random passwords nobody knows, fictional membership numbers 900000–900004).
+
+**Why:** tags are plain codes with no data of their own, so an array column is one table, one filter and easy to
+explain; a join table is only worth it once a tag needs its own data. The upload was postponed to keep this task
+small; the admin verification screen is a separate task, so until then a CA is verified by `make seed` or by
+hand in the database.
+
 ## 2026-09-26: Workflow commands (make doctor / feature / sync / check / pr / merge)
 
 **What**

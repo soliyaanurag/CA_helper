@@ -46,7 +46,7 @@
 | `news_sources` | regulatory | a configured source | name, url, kind (rss/html), enabled |
 | `news_articles` | regulatory | a scraped article | source_id, url, title, published_at, content_hash, fetched_at |
 | `regulatory_changes` | regulatory | an extracted change awaiting approval | article_id, change_type, forms, categories, dates (JSON), status, approved_by, approved_at |
-| `ca_profiles` | marketplace | a CA's practice profile | user_id, membership_no, cop_number, verified, city, languages, specializations, capacity, pro_bono_pledge |
+| `ca_profiles` **(implemented)** | marketplace | a CA's practice profile | id, user_id (FK users, unique: one per CA), membership_no (6 digits, unique), cop_number (typed by the CA; certificate upload later), city, languages (`varchar[]` of codes), specializations (`varchar[]` of codes, GIN index), capacity, years_experience, about, verification_status (`ca_verification_status`), is_active, deleted_at, created_at, updated_at. CHECKs `ck_ca_profiles_known_languages` / `ck_ca_profiles_known_specializations` accept only the codes below. Planned: pro_bono_pledge |
 | `service_catalog` | marketplace | a standard service | code, form_code, name, typical_min, typical_max |
 | `ca_services` | marketplace | a CA's price for a catalog service | ca_id, service_code, price |
 | `engagements` | marketplace | a business–CA request/engagement | business_id, ca_id, form_code/item_id, status, quote_amount, quote_reason, expires_at |
@@ -61,7 +61,7 @@
 This section is the one authoritative list of these values. Module docs and code refer here; changing a value
 means telling the team (it is a contract). The **code** is what the database stores and the API sends
 (lowercase snake_case, via `str_enum()`); the **label** is display text only, shown by the frontend through
-`frontend/src/lib/labels.js`, which gets a map for each enum once it reaches the UI (today: `users.role`) and must
+`frontend/src/lib/labels.js`, which gets a map for each enum once it reaches the UI (today: `users.role` and the `ca_profiles` codes) and must
 match these tables. The migration that creates each column fixes its
 CHECK constraint to exactly these codes.
 
@@ -83,6 +83,44 @@ Also the `role` claim in the JWT.
 | `reset_password` | Password reset | sent by forgot-password |
 
 Never shown in the UI, so `labels.js` has no map for it.
+
+**`ca_profiles.verification_status`** (marketplace; `CaVerificationStatus` in `backend/app/models/marketplace.py`;
+CHECK `ck_ca_profiles_ca_verification_status`)
+
+| Code | Label | Notes |
+|---|---|---|
+| `pending` | Pending verification | a new profile; also after a verified/rejected CA changes the membership or CoP number, or a rejected CA saves again |
+| `verified` | Verified | set by an admin; only verified CAs are listed for businesses |
+| `rejected` | Rejected | set by an admin; the CA corrects the details and saves |
+
+**`ca_profiles.specializations`** (marketplace; `CA_SPECIALIZATIONS` in `backend/app/models/marketplace.py`; an
+array of these codes, at least one)
+
+| Code | Label |
+|---|---|
+| `itr` | Income tax return (ITR) |
+| `gstr_1` | GSTR-1 |
+| `gstr_3b` | GSTR-3B |
+| `cmp_08` | CMP-08 |
+| `gstr_4` | GSTR-4 |
+| `tds_24q` | TDS return 24Q (salaries) |
+| `tds_26q` | TDS return 26Q (other payments) |
+| `gst_registration` | GST registration |
+| `tax_audit` | Tax audit |
+| `accounting_bookkeeping` | Accounting & bookkeeping |
+| `income_tax_notices` | Income-tax notices |
+| `company_llp_compliance` | Company / LLP compliance |
+| `startup_msme_advisory` | Startup & MSME advisory |
+
+The first seven are the forms we track, so "CAs for this form" is a filter on one code.
+
+**`ca_profiles.languages`** (marketplace; `CA_LANGUAGES`; an array of these codes, at least one)
+
+`english` English · `hindi` Hindi · `bengali` Bengali · `gujarati` Gujarati · `kannada` Kannada ·
+`malayalam` Malayalam · `marathi` Marathi · `odia` Odia · `punjabi` Punjabi · `tamil` Tamil · `telugu` Telugu ·
+`urdu` Urdu
+
+Adding a code to either array list needs a hand-written migration that replaces its CHECK constraint.
 
 **`compliance_items.status`** (compliance)
 
