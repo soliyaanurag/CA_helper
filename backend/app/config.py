@@ -32,6 +32,13 @@ class BaseConfig:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
+    # --- Email (app/utils/email.py). Development: Mailpit from `make infra` ---
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "localhost")
+    MAIL_PORT = int(os.getenv("MAIL_PORT", "1025"))
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "CA Helper <no-reply@ca-helper.local>")
+    # True: nothing is sent; messages are kept in app.utils.email.outbox (tests).
+    MAIL_SUPPRESS_SEND = False
+
     # --- Rate limiting (Flask-Limiter): counters kept in memory, per process ---
     RATELIMIT_STORAGE_URI = "memory://"
     RATELIMIT_HEADERS_ENABLED = True
@@ -78,6 +85,8 @@ class TestingConfig(BaseConfig):
     # Rate limiting stays ON so the login limit is tested; tests/conftest.py
     # clears the in-memory counters before every test.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=60)
+    # Tests read emails from app.utils.email.outbox; nothing reaches Mailpit.
+    MAIL_SUPPRESS_SEND = True
     # Fixed here so a developer's .env cannot change test behaviour.
     LOG_LEVEL = "INFO"
 

@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.extensions import db
 from app.models import User
+from app.models.base import utcnow
 from app.models.enums import UserRole
 from app.services.auth_service import normalize_email
 from app.utils.passwords import hash_password
@@ -44,7 +45,13 @@ def seed_demo_users() -> None:
         if db.session.scalar(select(User.id).where(User.email == email)):
             continue
         db.session.add(
-            User(email=email, password_hash=hash_password(password), full_name=full_name, role=role)
+            User(
+                email=email,
+                password_hash=hash_password(password),
+                full_name=full_name,
+                role=role,
+                email_verified_at=utcnow(),  # demo users can log in without a code
+            )
         )
         log.info("Added demo %s user", role)
 
