@@ -1,5 +1,6 @@
 # Runtime dependencies for the backend and worker.
 # Used by: the conda env (via requirements-dev.txt) and CI.
+# Only what the code imports today; a feature adds its own packages when it lands.
 # Pin exact versions. After editing, run `make env-update` and mention the change in your PR.
 
 # --- Web framework and API ---
@@ -16,25 +17,9 @@ Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.0.54
 Flask-Migrate==4.1.0
 psycopg[binary]==3.3.6
-pgvector==0.5.0
 
 # --- Security ---
 argon2-cffi==25.1.0
-cryptography==50.0.1
 
 # --- Background jobs (worker process only) ---
 APScheduler==3.11.3
-
-# --- AI (Gemini; always via app/utils/gemini_client.py) ---
-google-genai==2.25.0
-
-# --- OCR and document extraction (local only) ---
-pytesseract==0.3.13
-PyMuPDF==1.28.2
-pdfplumber==0.11.10
-opencv-python-headless==5.0.0.93
-
-# --- Scraping (regulatory monitor) ---
-requests==2.34.2
-beautifulsoup4==4.15.0
-feedparser==6.0.14

@@ -7,6 +7,3 @@
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra --strict-markers"
-markers = [
-    "requires_tesseract: needs the Tesseract OCR binary; skipped with a message if it is missing",
-]

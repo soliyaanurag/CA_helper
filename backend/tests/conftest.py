@@ -16,8 +16,6 @@ The test database (TEST_DATABASE_URL, default `ca_helper_test`) is created
 automatically if it does not exist. It needs `make infra` to be running.
 """
 
-import shutil
-
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -129,12 +127,3 @@ def auth_headers(app):
         return {"Authorization": f"Bearer {issue_access_token(user)}"}
 
     return _auth_headers
-
-
-def pytest_runtest_setup(item):
-    """Skip `@pytest.mark.requires_tesseract` tests when Tesseract is not installed."""
-    if item.get_closest_marker("requires_tesseract") and shutil.which("tesseract") is None:
-        pytest.skip(
-            "Tesseract not found on PATH. Run tests via `make test-backend` (the conda env "
-            "provides it) or install tesseract-ocr."
-        )
