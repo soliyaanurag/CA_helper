@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from flask_jwt_extended import create_access_token
 
-from app.core.db.enums import UserRole
+from app.models.enums import UserRole
 
 ME_URL = "/api/v1/auth/me"
 

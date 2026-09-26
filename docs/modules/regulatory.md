@@ -5,8 +5,8 @@ Scrapes configured news/official sources, uses Gemini to extract structured dead
 
 ## What exists now
 Skeleton only; no features yet.
-- Backend (`backend/app/modules/regulatory/`): the `regulatory` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; no scheduled jobs; `tests/` is empty.
-- Frontend (`frontend/src/features/regulatory/`): one placeholder admin screen, "Regulatory news" at `/admin/regulatory` (admin nav, from `admin/`), built from `ModulePlaceholder`; `api.ts` is empty.
+- Backend: no code yet (no blueprint, models, schemas or services). Create `routes/regulatory.py`, `schemas/regulatory.py`, `services/regulatory_service.py` (and `models/regulatory.py`) when the first feature lands, and add the blueprint to `BLUEPRINTS` (docs/PATTERNS.md). No scheduled jobs yet.
+- Frontend: one placeholder page, "Regulatory news" at `/admin/regulatory` (admin nav), `frontend/src/pages/admin/RegulatoryAdminPage.jsx`, built from `Placeholder`; no API hooks yet.
 
 ## Tables
 None yet. Planned:

@@ -1,37 +1,22 @@
-"""The app factory wires up modules, OpenAPI docs and the JSON error format."""
+"""The app factory wires up the blueprints, OpenAPI docs and the JSON error format."""
 
-from app.core.errors import ApiError
-from app.modules import discover_modules, module_name
+from app.errors import ApiError
 
-EXPECTED_MODULES = {
-    "onboarding",
-    "compliance",
-    "alerts",
-    "documents",
-    "assistant",
-    "regulatory",
-    "marketplace",
-    "ca_workspace",
-    "admin",
-}
+EXPECTED_BLUEPRINTS = {"health", "auth", "compliance", "ca_workspace", "admin"}
 
 
-def test_all_modules_are_discovered():
-    assert {module_name(m) for m in discover_modules()} == EXPECTED_MODULES
+def test_every_blueprint_is_registered(app):
+    assert set(app.blueprints) >= EXPECTED_BLUEPRINTS
 
 
-def test_every_module_blueprint_is_registered(app):
-    assert set(app.blueprints) >= EXPECTED_MODULES
-
-
-def test_openapi_spec_lists_health_and_module_tags(client):
+def test_openapi_spec_lists_health_and_every_tag(client):
     response = client.get("/api/openapi.json")
 
     assert response.status_code == 200
     spec = response.get_json()
     assert spec["info"]["title"] == "CA Helper API"
     assert "/api/health" in spec["paths"]
-    assert {tag["name"] for tag in spec["tags"]} >= EXPECTED_MODULES
+    assert {tag["name"] for tag in spec["tags"]} >= EXPECTED_BLUEPRINTS
 
 
 def test_swagger_ui_is_served(client):

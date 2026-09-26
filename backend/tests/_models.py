@@ -9,8 +9,8 @@ from enum import StrEnum
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.enums import str_enum
-from app.core.db.models import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.enums import str_enum
 
 
 class GadgetColour(StrEnum):

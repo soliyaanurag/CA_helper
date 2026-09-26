@@ -5,8 +5,8 @@ Turns a regulatory profile into dated compliance items for the 7 forms, shows th
 
 ## What exists now
 Only the business dashboard stub; no compliance features yet.
-- Backend (`backend/app/modules/compliance/`): `GET /api/v1/compliance/dashboard` (business role only) returns a welcome message: route in `routes.py`, `ComplianceDashboardSchema` in `schemas.py`, `get_dashboard(user)` in `services.py`, tests in `tests/test_dashboard.py` (success, other roles 403, no token 401). No models; `seed()` does nothing.
-- Frontend (`frontend/src/features/compliance/`): `BusinessDashboardPage` is the business area home (`/business`, index route, nav "Dashboard"), using `useComplianceDashboard()` from `api.ts`; placeholder "Compliance calendar" page at `/business/compliance`.
+- Backend: `GET /api/v1/compliance/dashboard` (business role only) returns a welcome message: route in `app/routes/compliance.py`, `ComplianceDashboardSchema` in `app/schemas/compliance.py`, `get_dashboard(user)` in `app/services/compliance_service.py`, tests in `tests/test_compliance_dashboard.py` (success, other roles 403, no token 401). No models or seed data.
+- Frontend: `pages/business/BusinessDashboardPage.jsx` is the business area home (`/business`, index route, nav "Dashboard"), using `useComplianceDashboard()` from `api/compliance.js`; placeholder "Compliance calendar" page at `/business/compliance` (`pages/business/CompliancePage.jsx`).
 - Form content: `content/forms/<FORM>/` holds a TODO template (explanation, instructions, checklist) for each of the 7 forms; nothing reads it yet.
 
 ## Tables

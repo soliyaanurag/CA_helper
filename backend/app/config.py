@@ -66,7 +66,7 @@ class BaseConfig:
     # A relative path is resolved against backend/.
     UPLOAD_DIR = str(BACKEND_DIR / os.getenv("UPLOAD_DIR", "instance/uploads"))
 
-    # --- Gemini (used only through app/core/ai/gemini_client.py) ---
+    # --- Gemini (used only through app/utils/gemini_client.py) ---
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
     GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL")
@@ -75,7 +75,7 @@ class BaseConfig:
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = True
 
-    # --- Logging (app/core/logging_config.py) ---
+    # --- Logging (app/utils/logging_setup.py) ---
     # "json" in Docker (one JSON object per line), "text" otherwise.
     LOG_FORMAT = os.getenv("LOG_FORMAT", "text").strip().lower()
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
@@ -106,7 +106,7 @@ class BaseConfig:
             }
         },
         # Every endpoint needs a token unless it opts out with @blp.doc(security=[])
-        # (health, login). Enforcement is done by app/core/permissions.py.
+        # (health, login). Enforcement is done by app/utils/decorators.py.
         "security": [{"bearerAuth": []}],
     }
 
@@ -128,7 +128,7 @@ class TestingConfig(BaseConfig):
     SECRET_KEY = "test-secret-key"
     JWT_SECRET_KEY = "test-jwt-secret-key-that-is-long-enough"
     SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL")
-    # Rate limiting stays ON so the login limit is tested; backend/conftest.py
+    # Rate limiting stays ON so the login limit is tested; tests/conftest.py
     # clears the in-memory counters before every test.
     RATELIMIT_STORAGE_URI = "memory://"
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=60)

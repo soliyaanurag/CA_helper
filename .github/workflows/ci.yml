@@ -1,8 +1,8 @@
 # Continuous integration: runs on every pull request and on pushes to main.
 #
 #   backend   ruff, mypy, migrations, pytest (with Postgres + Tesseract),
-#             then exports the OpenAPI spec for the frontend job
-#   frontend  generates API types from that spec, then lint, format, types, tests, build
+#             then checks that the OpenAPI spec builds
+#   frontend  lint, format, tests, build
 #   docker    builds all images and smoke-tests full-Docker mode (`make up` equivalent)
 #
 # CI installs Python packages with pip from backend/requirements-dev.txt, the same
@@ -72,18 +72,12 @@ jobs:
         working-directory: backend
         run: pytest
 
-      - name: Export OpenAPI spec
+      - name: OpenAPI spec builds
         working-directory: backend
         run: flask --app app openapi write --format=json ../openapi.json
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: openapi
-          path: openapi.json
-
   frontend:
     name: Frontend
-    needs: backend
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -99,24 +93,10 @@ jobs:
 
       - run: npm ci
 
-      - uses: actions/download-artifact@v8
-        with:
-          name: openapi
-          path: ${{ github.workspace }}
-
-      - name: Generate API types
-        run: npm run gen:api
-
       - run: npm run lint
       - run: npm run format:check
-      - run: npm run typecheck
       - run: npm test
       - run: npm run build
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: api-types
-          path: frontend/src/core/api/generated/
 
   docker:
     name: Docker images
@@ -124,11 +104,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: api-types
-          path: frontend/src/core/api/generated/
 
       - name: Create .env from the example
         run: cp .env.example .env

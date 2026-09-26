@@ -19,7 +19,7 @@ NPM := $(PY) --cwd frontend npm
 
 .PHONY: help setup env-update infra infra-down dev-backend dev-worker dev-frontend \
 	up down logs test test-backend test-frontend lint format \
-	migrate migration seed gen-api
+	migrate migration seed
 
 help: ## List all targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -58,13 +58,13 @@ dev-backend: .env ## Flask dev server with auto-reload on http://localhost:8000
 dev-worker: .env ## Background worker (APScheduler) in the foreground
 	$(BACKEND) python worker.py
 
-dev-frontend: gen-api ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
+dev-frontend: ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
 	$(NPM) run dev
 
 # ----------------------------------------------------------------------------
 # Full-Docker mode (all five services in containers)
 # ----------------------------------------------------------------------------
-up: .env gen-api ## Build and start all services (frontend: http://localhost:8080)
+up: .env ## Build and start all services (frontend: http://localhost:8080)
 	docker compose up -d --build --wait
 	@echo "Frontend: http://localhost:8080   API: http://localhost:8000/api/docs   Mailpit: http://localhost:8025"
 
@@ -82,16 +82,15 @@ test: test-backend test-frontend ## Run all tests (backend needs `make infra`)
 test-backend: ## Backend tests (pytest)
 	$(BACKEND) pytest
 
-test-frontend: gen-api ## Frontend tests (Vitest)
+test-frontend: ## Frontend tests (Vitest)
 	$(NPM) test
 
-lint: gen-api ## Lint + format + types: ruff + mypy (Python), ESLint + Prettier + tsc (frontend)
+lint: ## Lint + format: ruff + mypy (Python), ESLint + Prettier (frontend)
 	$(PY) ruff check backend
 	$(PY) ruff format --check backend
 	$(BACKEND) mypy
 	$(NPM) run lint
 	$(NPM) run format:check
-	$(NPM) run typecheck
 
 format: ## Auto-format and auto-fix Python and frontend code
 	$(PY) ruff check --fix backend
@@ -110,10 +109,3 @@ migration: .env ## Create a migration: make migration name="onboarding: add busi
 
 seed: .env ## Insert development seed data from every module (safe to re-run)
 	$(FLASK) seed
-
-# ----------------------------------------------------------------------------
-# Other
-# ----------------------------------------------------------------------------
-gen-api: ## Export OpenAPI spec (openapi.json) and generate frontend TypeScript types
-	$(FLASK) openapi write --format=json ../openapi.json
-	$(NPM) run gen:api

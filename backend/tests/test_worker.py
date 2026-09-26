@@ -1,4 +1,4 @@
-"""worker.py: module jobs, app context, job names in logs, and the heartbeat healthcheck."""
+"""worker.py: jobs run in the app context, job names in logs, and the heartbeat healthcheck."""
 
 import io
 import logging
@@ -10,7 +10,7 @@ import pytest
 from flask import current_app
 
 import worker
-from app.core.logging_config import TEXT_FORMAT, ContextFilter
+from app.utils.logging_setup import TEXT_FORMAT, ContextFilter
 from worker import HEARTBEAT_JOB_ID, AppScheduler, build_scheduler
 
 

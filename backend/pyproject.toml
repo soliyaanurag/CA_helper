@@ -3,8 +3,8 @@
 # requirements-dev.txt, the single source used by conda, Docker and CI.
 
 [tool.pytest.ini_options]
-# Tests live in tests/ (cross-cutting) and app/modules/<module>/tests/.
-testpaths = ["tests", "app"]
+# All tests live in tests/ (shared fixtures: tests/conftest.py).
+testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
@@ -16,7 +16,7 @@ markers = [
 # Tighten it module by module later, never all at once.
 [tool.mypy]
 python_version = "3.12"
-files = ["app", "tests", "main.py", "worker.py", "conftest.py"]
+files = ["app", "tests", "main.py", "worker.py"]
 exclude = ["^migrations/"]
 ignore_missing_imports = true
 check_untyped_defs = false

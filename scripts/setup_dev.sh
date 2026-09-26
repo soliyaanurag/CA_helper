@@ -10,7 +10,7 @@
 #   1. detect OS / architecture            6. npm ci in frontend/ (env's Node)
 #   2. find conda (or offer Miniforge)     7. create .env with random dev secrets
 #   3. create / update the conda env       8. install git pre-commit hooks
-#   4. verify Python 3.12, Tesseract and   9. generate API types, print a checklist
+#   4. verify Python 3.12, Tesseract and   then print a checklist
 #      Node 22.22+ inside the env
 #   5. check Docker and git
 #
@@ -59,7 +59,7 @@ confirm() {
 # =============================================================================
 # 1. OS and architecture
 # =============================================================================
-step "1/9 Detecting operating system"
+step "1/8 Detecting operating system"
 OS_NAME="$(uname -s)"
 ARCH="$(uname -m)"
 IS_WSL=0
@@ -97,7 +97,7 @@ fi
 # =============================================================================
 # 2. conda (Miniforge / Miniconda / Anaconda)
 # =============================================================================
-step "2/9 Looking for conda"
+step "2/8 Looking for conda"
 CONDA_BIN=""
 find_conda() {
   if [ -n "${CONDA_EXE:-}" ] && [ -x "${CONDA_EXE}" ]; then CONDA_BIN="$CONDA_EXE"; return 0; fi
@@ -145,7 +145,7 @@ fi
 # =============================================================================
 # 3. Create or update the ca-helper env
 # =============================================================================
-step "3/9 Creating / updating conda env '$ENV_NAME' (first run takes a few minutes)"
+step "3/8 Creating / updating conda env '$ENV_NAME' (first run takes a few minutes)"
 if "$CONDA_BIN" env list | awk '{print $1}' | grep -qx "$ENV_NAME"; then
   info "Env exists; syncing it with environment.yml"
   "$CONDA_BIN" env update -n "$ENV_NAME" -f environment.yml --prune
@@ -157,7 +157,7 @@ if [ $? -eq 0 ]; then ok_item "conda env '$ENV_NAME' up to date"; else warn_item
 # =============================================================================
 # 4. Verify the env
 # =============================================================================
-step "4/9 Verifying the env (Python, Tesseract, Node)"
+step "4/8 Verifying the env (Python, Tesseract, Node)"
 PY_VERSION="$("$CONDA_BIN" run -n "$ENV_NAME" python --version 2>&1)"
 case "$PY_VERSION" in
   "Python 3.12."*) info "$PY_VERSION"; ok_item "Python: $PY_VERSION" ;;
@@ -197,7 +197,7 @@ fi
 # =============================================================================
 # 5. Docker, Node, git (never auto-installed)
 # =============================================================================
-step "5/9 Checking Docker and git"
+step "5/8 Checking Docker and git"
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   DOCKER_INFO="$(docker info 2>&1)"
   if [ $? -eq 0 ]; then
@@ -243,7 +243,7 @@ fi
 # =============================================================================
 # 6. Frontend packages
 # =============================================================================
-step "6/9 Installing frontend packages"
+step "6/8 Installing frontend packages"
 if [ "$NODE_OK" -eq 1 ]; then
   if [ -f frontend/package-lock.json ]; then
     "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" --cwd frontend npm ci
@@ -259,7 +259,7 @@ fi
 # =============================================================================
 # 7. .env
 # =============================================================================
-step "7/9 Checking .env"
+step "7/8 Checking .env"
 if [ -f .env ]; then
   info ".env already exists; leaving it unchanged"
   ok_item ".env present"
@@ -302,26 +302,11 @@ fi
 # =============================================================================
 # 8. Git hooks
 # =============================================================================
-step "8/9 Installing pre-commit git hooks"
+step "8/8 Installing pre-commit git hooks"
 if "$CONDA_BIN" run -n "$ENV_NAME" pre-commit install; then
   ok_item "pre-commit hooks installed"
 else
   warn_item "pre-commit install FAILED"
-fi
-
-# =============================================================================
-# 9. API types + summary
-# =============================================================================
-step "9/9 Generating frontend API types from the backend OpenAPI spec"
-if [ "$NODE_OK" -eq 1 ] && [ -d frontend/node_modules ]; then
-  if "$CONDA_BIN" run -n "$ENV_NAME" --cwd backend flask --app app openapi write --format=json ../openapi.json \
-     && "$CONDA_BIN" run -n "$ENV_NAME" --cwd frontend npm run gen:api; then
-    ok_item "API types generated (make gen-api)"
-  else
-    warn_item "make gen-api FAILED (see output above)"
-  fi
-else
-  warn_item "API types not generated (needs Node + npm packages)"
 fi
 
 printf '\n\033[1m================ Setup summary ================\033[0m\n'

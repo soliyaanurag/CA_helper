@@ -6,7 +6,7 @@ Accountant, and keeps verifiable proof of what was filed. MTech CSE lab project,
 
 - Product scope: [docs/SCOPE.md](docs/SCOPE.md) · Workflow: [docs/WORKFLOW.md](docs/WORKFLOW.md) ·
   Module context: [docs/modules/](docs/modules/)
-- Stack: Flask 3 + flask-smorest + SQLAlchemy 2 + Postgres/pgvector (backend), React + Vite + TypeScript +
+- Stack: Flask 3 + flask-smorest + SQLAlchemy 2 + Postgres/pgvector (backend), React + Vite + JavaScript +
   Tailwind/shadcn (frontend), APScheduler worker, Docker Compose, GitHub Actions.
 
 ## Requirements
@@ -76,18 +76,6 @@ Log in at http://localhost:5173/login with a demo user from `.env` (`DEMO_*` var
 (These are the `.env.example` defaults; if your `.env` predates them, copy the `DEMO_*` block into it and run
 `make seed`.)
 
-**After changing backend routes or schemas, regenerate the frontend API types** (the frontend imports them from
-`frontend/src/core/api/generated/`, which is not committed):
-
-```bash
-make gen-api              # exports ../openapi.json from Flask, then runs `npm run gen:api`
-```
-
-With the env activated you can do the same by hand: `cd backend && flask --app app openapi write --format=json
-../openapi.json`, then `cd ../frontend && npm run gen:api` (this npm script only converts an existing
-`openapi.json`; it does not export a new one). `npm run dev` keeps working with stale types, but `npm run
-typecheck`, `npm run build` and your editor will report errors until you regenerate.
-
 `backend/main.py` is only for this manual mode. The Make targets, Docker (gunicorn) and CI do not use it.
 
 ## Daily development: hybrid mode (default)
@@ -140,18 +128,17 @@ these targets or `conda run`; an activated env is only for running things by han
 | `make dev-backend` | Flask dev server | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app run --debug --port 8000` |
 | `make dev-worker` | worker | `conda run --no-capture-output -n ca-helper --cwd backend python worker.py` |
 | `make dev-frontend` | Vite dev server | `conda run --no-capture-output -n ca-helper --cwd frontend npm run dev` |
-| `make up` | full-Docker mode | `make gen-api && docker compose up -d --build --wait` |
+| `make up` | full-Docker mode | `docker compose up -d --build --wait` |
 | `make down` | stop containers | `docker compose down` |
 | `make logs` | follow logs | `docker compose logs -f --tail=100` |
 | `make test` | all tests | the two below |
 | `make test-backend` | pytest (needs `make infra`) | `conda run --no-capture-output -n ca-helper --cwd backend pytest` |
 | `make test-frontend` | Vitest | `conda run --no-capture-output -n ca-helper --cwd frontend npm test` |
-| `make lint` | ruff + mypy + ESLint + Prettier + tsc | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `conda run -n ca-helper --cwd backend mypy`, `conda run -n ca-helper --cwd frontend npm run lint` (then `format:check`, `typecheck`) |
+| `make lint` | ruff + mypy + ESLint + Prettier | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `conda run -n ca-helper --cwd backend mypy`, `conda run -n ca-helper --cwd frontend npm run lint` (then `format:check`) |
 | `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend`, `conda run -n ca-helper ruff format backend`, `conda run -n ca-helper --cwd frontend npm run format` |
 | `make migrate` | apply migrations | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db upgrade` |
 | `make migration name="onboarding: add businesses"` | new migration | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db migrate -m "onboarding: add businesses"` |
 | `make seed` | dev seed data | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed` |
-| `make gen-api` | OpenAPI → TypeScript types | `conda run -n ca-helper --cwd backend flask --app app openapi write --format=json ../openapi.json && conda run -n ca-helper --cwd frontend npm run gen:api` |
 
 ## VS Code
 
@@ -172,7 +159,6 @@ these targets or `conda run`; an activated env is only for running things by han
   run `make env-update`.
 - **Port already in use:** another Postgres on 5432 → set `DB_HOST_PORT` and the port in `DATABASE_URL` /
   `TEST_DATABASE_URL` in `.env`. On macOS, never use port 5000 (AirPlay Receiver); the backend uses 8000.
-- **Frontend type errors about `./generated/schema`:** run `make gen-api` (the types are generated, not committed).
 - **`conda: command not found` inside make:** open a new terminal after `conda init`, or run
   `make CONDA=/path/to/conda <target>`.
 - **Slow file watching / weird errors on WSL2:** the repo is probably under `/mnt/c`. Clone it inside Linux.

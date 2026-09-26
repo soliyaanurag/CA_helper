@@ -12,8 +12,9 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 - Backend: Python 3.12 (conda env `ca-helper`), Flask 3 app factory, flask-smorest (OpenAPI, Swagger at `/api/docs`),
   Flask-SQLAlchemy 2.x style + Flask-Migrate, JWT, CORS, Limiter, Postgres 16 + pgvector (psycopg 3), argon2,
   Fernet + HMAC blind index, APScheduler in a **separate worker process**, google-genai, Tesseract/PyMuPDF/pdfplumber/OpenCV.
-- Frontend: React + Vite + TypeScript, React Router, TanStack Query, Tailwind + shadcn/ui, React Hook Form + Zod,
-  openapi-typescript + openapi-fetch (types generated, never hand-written), FullCalendar, Recharts, Vitest + RTL.
+- Frontend: React + Vite + **JavaScript (`.js`/`.jsx`, no TypeScript)**, React Router, TanStack Query, Tailwind +
+  shadcn/ui, React Hook Form + Zod, openapi-fetch (plain JS; request/response fields per Swagger at `/api/docs`),
+  FullCalendar, Recharts, Vitest + RTL.
 - **Hybrid mode (daily):** `make infra` (db + Mailpit in Docker) + `make dev-backend` / `dev-worker` / `dev-frontend`.
   **Full-Docker (`make up`):** all 5 services; must always work. Both read the same root `.env` (hostnames differ).
   **Manual (for people, not Claude):** `conda activate ca-helper` + `cd backend && python main.py` + `npm run dev` (README
@@ -23,19 +24,34 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 
 ## Folder map
 ```
-backend/app/__init__.py      create_app(); config.py, extensions.py, cli.py (`flask seed`)
-backend/app/core/            auth/ permissions.py db/ security/ storage/ email/ notifications/ ai/ ocr/ errors.py health.py
-                             logging_config.py request_id.py · db/: base.py models.py (BaseModel, mixins) enums.py
-backend/app/modules/<m>/     __init__.py (blp, seed, register_jobs) routes.py models.py schemas.py services.py seed.py tests/
-backend/worker.py            APScheduler entrypoint (collects each module's register_jobs) · gunicorn.conf.py
-backend/migrations/          single Alembic dir · backend/conftest.py shared pytest fixtures
-frontend/src/core/           api/ (client.ts, generated/ gitignored) auth/ layout/ components/ui/ routes.tsx labels.ts
-frontend/src/features/<m>/   routes.tsx pages/ components/ hooks/ api.ts admin/
+backend/app/__init__.py      create_app() · config.py extensions.py errors.py seed.py (`flask seed`)
+backend/app/models/          base.py (BaseModel, mixins) enums.py <m>.py · __init__.py imports every model
+backend/app/schemas/         <m>.py (marshmallow request/response shapes)
+backend/app/services/        <m>_service.py (business logic, all DB access)
+backend/app/routes/          <m>.py (one Blueprint each) · __init__.py: BLUEPRINTS list, /api/v1 prefix
+backend/app/utils/           decorators.py (role checks) jwt_handlers.py passwords.py logging_setup.py
+backend/tests/               test_*.py · conftest.py shared pytest fixtures
+backend/main.py              dev server entrypoint (`python main.py`)
+backend/worker.py            APScheduler entrypoint (every job listed in build_scheduler()) · gunicorn.conf.py
+backend/migrations/          single Alembic dir
+frontend/src/routes.jsx      every page route + sidebar links (NAV) · main.jsx
+frontend/src/api/            client.js (API client, unwrap) <m>.js (query hooks)
+frontend/src/pages/          HomePage LoginPage NotFoundPage · business/ ca/ admin/ (one folder per role)
+frontend/src/components/     ui/ (shadcn) AppShell PublicLayout RequireRole Placeholder
+frontend/src/context/ hooks/ AuthProvider · useAuth       frontend/src/lib/  session labels queryClient utils
+frontend/src/test/           setup.js (Vitest setup) utils.jsx (render helpers)
 content/forms/<FORM>/        explanation.md instructions.md checklist.yaml
 docs/                        project docs · docs/modules/<m>.md = module context (what exists, contracts)
 eval/                        evaluation datasets (never real personal data) · scripts/ setup_dev.sh
 ```
+Folders are by layer; a module is the set of same-named files across them (`models/<m>.py`, `schemas/<m>.py`,
+`services/<m>_service.py`, `routes/<m>.py`, `tests/test_<m>_*.py`, `api/<m>.js`, `pages/<role>/...`). Only create a
+file when it has code. Registration is explicit: `BLUEPRINTS`, `models/__init__.py`, `SEEDS`, `routes.jsx`, `worker.py`.
 Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marketplace, ca_workspace, admin.
+Foundations (docs have no matching module name): `auth` → `docs/modules/core-auth.md`; shared backend/infra →
+`core-infra.md`; shared frontend → `frontend-core.md`.
+**Shared code** (used by every module): `app/{__init__,config,extensions,errors,seed}.py`, `models/{base,enums}.py`,
+`routes/__init__.py`, `utils/`; frontend `routes.jsx`, `api/client.js`, `components/`, `context/`, `hooks/`, `lib/`.
 
 ## Conda rules
 1. Miniforge / conda-forge only: `environment.yml` uses `channels: [conda-forge, nodefaults]`.
@@ -52,7 +68,7 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 
 ## Non-negotiable rules
 1. **No PII to Gemini.** Never send PAN, GSTIN, TAN, names, emails, phones, addresses or document contents. Every
-   Gemini call goes through `backend/app/core/ai/gemini_client.py`, which regex-scrubs PAN/GSTIN/email/phone/
+   Gemini call goes through `backend/app/utils/gemini_client.py`, which regex-scrubs PAN/GSTIN/email/phone/
    Aadhaar-like patterns and logs a warning when it finds any.
 2. **OCR is local only** (Tesseract/PyMuPDF). Documents never leave our server.
 3. **Legal rules are data, not code:** thresholds, due-date rules and applicability live in DB config tables with
@@ -74,7 +90,7 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 ## Key commands
 `make setup` · `make env-update` · `make infra` / `infra-down` · `make dev-backend` / `dev-worker` / `dev-frontend` ·
 `make up` / `down` / `logs` · `make test` (`test-backend`, `test-frontend`) · `make lint` / `format` ·
-`make migrate` · `make migration name="<module>: <msg>"` · `make seed` · `make gen-api`
+`make migrate` · `make migration name="<module>: <msg>"` · `make seed`
 
 ## Session checklist (details: docs/WORKFLOW.md)
 **Start**
@@ -83,21 +99,21 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 3. New task: `git switch -c <name>/<module>-<short-task>`. Continuing: switch, then `git rebase origin/main`.
    A conflict in files you didn't change in this task → **stop and ask**.
 4. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`.
-5. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, `backend/app/core/`,
-   `frontend/src/core/`, modules under "Depends on").
+5. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, shared code,
+   modules under "Depends on").
 6. Env check: env `ca-helper` exists (else tell the user to run `make setup`); `environment.yml`/`requirements*`
    changed → `make env-update`; `frontend/package*.json` changed → `conda run -n ca-helper --cwd frontend npm ci`; `make infra` running;
-   `make migrate`, `make gen-api` and `make test` pass **before** changing anything.
+   `make migrate` and `make test` pass **before** changing anything.
 
 **While working**
-- Keep changes scoped to the task; if a change touches `core/`, shared config, or another module, say so clearly
+- Keep changes scoped to the task; if a change touches shared code, shared config, or another module, say so clearly
   in the PR. Follow `docs/PATTERNS.md`; copy the closest existing example.
 - **The repo is the single source of truth:** anything decided in chat that affects others goes into `docs/`
   (module doc, `DECISIONS.md`, `DATA_MODEL.md` or `API_CONVENTIONS.md`) in the same PR.
 - Small Conventional Commits (`feat(documents): ...`); stage specific files, never `git add -A` blindly.
 - Migrations: pull main right before `make migration`; one per PR, message prefixed with the module; never edit a
   migration already on main; multiple heads → create a merge revision.
-- Route/schema change → `make gen-api` and fix type errors in your features.
+- Route/schema change → check every frontend call of that endpoint (`grep` the URL in `frontend/src/api/`).
 - New dependency: pin in `backend/requirements*.txt` + `make env-update`, or `conda run -n ca-helper --cwd frontend npm install <pkg>`;
   mention it in the PR. Every new service/route gets tests; every new table gets seed data.
 
@@ -108,7 +124,7 @@ Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marke
 - Show a summary and **ask before `git push`**; draft the PR from `.github/pull_request_template.md`.
 
 **Never:** commit to main · force-push main · rewrite a branch someone else uses · `git reset --hard` or delete
-branches without asking · commit secrets or generated files (`.env`, `openapi.json`, `frontend/src/core/api/generated/`, uploads).
+branches without asking · commit secrets or generated files (`.env`, `openapi.json`, uploads).
 
 ## Other docs (read when relevant)
 `docs/WORKFLOW.md` (git + sessions) · `docs/PATTERNS.md` (how to add a feature) · `docs/API_CONVENTIONS.md`
