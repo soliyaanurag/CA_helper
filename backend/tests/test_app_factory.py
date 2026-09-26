@@ -1,5 +1,6 @@
 """The app factory wires up the blueprints, OpenAPI docs and the JSON error format."""
 
+from app import create_app
 from app.errors import ApiError
 
 EXPECTED_BLUEPRINTS = {"health", "auth", "compliance", "ca_workspace", "admin"}
@@ -50,6 +51,23 @@ def test_api_error_returns_standard_error(app):
             "details": {"field": "pan"},
         }
     }
+
+
+def test_unhandled_error_returns_standard_500_error():
+    app = create_app("testing")
+    app.config["PROPAGATE_EXCEPTIONS"] = False  # behave like production: no traceback
+
+    @app.get("/api/v1/boom")
+    def boom():
+        raise RuntimeError("boom")
+
+    response = app.test_client().get("/api/v1/boom")
+
+    assert response.status_code == 500
+    error = response.get_json()["error"]
+    assert error["code"] == "INTERNAL_SERVER_ERROR"
+    assert error["message"]
+    assert "boom" not in error["message"]  # no exception text leaks to the client
 
 
 def test_api_root_redirects_to_the_docs(client):

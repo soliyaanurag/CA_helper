@@ -1,9 +1,9 @@
 # Shared conda environment for CA Helper. Every member uses exactly this file.
 #
 # Rules (see CLAUDE.md → "Conda rules"):
-#   - conda installs ONLY python, tesseract, nodejs and pip (from conda-forge).
+#   - conda installs ONLY python, nodejs and pip (from conda-forge).
 #   - ALL Python packages come from pip via backend/requirements*.txt,
-#     the same files Docker and CI use.
+#     the same files CI uses.
 #   - nodejs (with npm) runs the frontend tooling; every npm command runs through
 #     `conda run -n ca-helper` (the Makefile does this). Frontend packages still
 #     come from frontend/package-lock.json.
@@ -16,7 +16,6 @@ channels:
   - nodefaults
 dependencies:
   - python=3.12
-  - tesseract
   - nodejs=22
   - pip
   - pip:

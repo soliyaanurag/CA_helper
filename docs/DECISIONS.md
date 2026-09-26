@@ -3,7 +3,53 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-26: Simplified for explainability
+
+**What**
+- **New rule in `CLAUDE.md`, "Simplicity first":** build the simplest thing that works and is explainable in 1–2
+  sentences; no infrastructure, tooling or abstraction layers without asking.
+- **Logging:** `logging.basicConfig` with `LOG_LEVEL` in `create_app()`. Gone: the JSON format and `LOG_FORMAT`,
+  request IDs (`X-Request-ID`, `request_id` in error bodies, `requestId` in the frontend), the custom access log
+  (the dev server's own request lines are back) and the worker's `job` log field (APScheduler logs each job by name).
+- **Removed:** ProxyFix and `TRUST_PROXY`; full-Docker mode (both Dockerfiles and `.dockerignore`s, `nginx.conf`,
+  gunicorn and `gunicorn.conf.py`, the worker heartbeat and `--healthcheck`, the CI docker job, `make up/down/logs`;
+  `docker-compose.yml` keeps `db` and `mailpit`); mypy; pre-commit; flask-cors and `CORS_ORIGINS` (Vite forwards
+  `/api`, so the browser talks to one origin); `ProductionConfig`; `DEV_SERVER_DEBUG` (`make dev-backend` now runs
+  `python main.py`, like the manual mode); `RATELIMIT_STORAGE_URI` (fixed to `memory://`); every `.env` variable
+  nothing read yet; `make test-backend` / `test-frontend` (`make test` runs both).
+- **Tests:** the tables are created once per session and the `database` fixture deletes every row after each test,
+  in reverse foreign-key order. No outer transaction, savepoints or `db.session` swap.
+- **Dependencies: only what the code imports.** Python: removed pgvector, cryptography, google-genai, pytesseract,
+  PyMuPDF, pdfplumber, opencv-python-headless, requests, beautifulsoup4, feedparser, gunicorn, Faker, mypy and
+  pre-commit. Each feature adds its own packages when it lands; for PDFs that is PyMuPDF only (never pdfplumber as
+  well, no OpenCV). `tesseract` left `environment.yml`, together with the Tesseract smoke test, the
+  `requires_tesseract` marker and the CI install. npm: removed FullCalendar, recharts, lucide-react, openapi-fetch
+  and `cn` (shadcn's clsx + tailwind-merge replacement); `lib/utils.js` is the standard shadcn `cn()` built on
+  clsx + tailwind-merge, and `shadcn` is a devDependency. A calendar or chart library is chosen (ask first) when
+  its page is built.
+- **Frontend API client:** one `apiFetch(path, {method, body})` in `api/client.js` (adds the token, parses JSON,
+  throws `ApiRequestError` with `code` and `message`, logs out on a 401) replaces openapi-fetch, `unwrap()` and the
+  AuthProvider middleware. `lib/labels.js` keeps only the role labels.
+- **Tooling and docs:** `scripts/setup_dev.sh` is ~50 lines (no conda → print the Miniforge command and stop;
+  otherwise env, `npm ci`, `.conda-env` link, `.env` with random secrets). `docs/WORKFLOW.md` is merged into
+  `CLAUDE.md`. `docs/PATTERNS.md` covers only patterns with code behind them.
+- **Unchanged:** every endpoint and response (except the dropped `request_id`), error code, table, migration and
+  the login flow.
+
+**Why:** every file must be explainable in the viva by a team of three. Most of what went served a deployment we
+do not run (Docker images, nginx, gunicorn, proxy headers, JSON logs) or features that do not exist yet (their
+packages and settings); the rest (mypy, pre-commit, the openapi-fetch middleware, the savepoint fixture) needed
+long explanations for little benefit at this size.
+
+**Supersedes:** "JSON logs and request IDs" and "mypy in lenient mode" (2026-09-25); the savepoint fixture in
+"Service-level transactions"; openapi-fetch in "Frontend in plain JavaScript"; the `api.use()` middleware,
+`unwrap()` and `DEV_SERVER_DEBUG` in "Basic login, role areas and manual run mode"; the pre-commit hooks and the
+frontend Docker image in "Node.js comes from the conda env"; FullCalendar, nginx, `cn`, pre-commit, port 8080, the
+Tesseract CI step and the CI docker job in "Initial bootstrap".
+
 ## 2026-09-26: Frontend in plain JavaScript, not TypeScript
+
+> **Partly superseded (2026-09-26, "Simplified for explainability"):** openapi-fetch is gone; calls use `apiFetch()`.
 
 **What**
 - Every frontend file is `.js` / `.jsx` (types stripped mechanically, comments kept). `tsconfig*.json` is replaced
@@ -67,6 +113,8 @@ explain in the viva. One file per module per layer keeps the modules separate.
 
 ## 2026-09-25: Basic login, role areas and manual run mode
 
+> **Partly superseded (2026-09-26, "Simplified for explainability"):** `apiFetch()` replaces `unwrap()` and the middleware; `make dev-backend` runs `python main.py`, so `DEV_SERVER_DEBUG` is gone.
+
 **What**
 - **Business area URL is `/business`** (was `/app`), so each role's area matches its name: `/business`, `/ca`,
   `/admin`. `AREA_PREFIX.business` in `frontend/src/core/routing.ts`; supersedes "`business` /app" in the
@@ -112,6 +160,8 @@ suspension take effect immediately; the manual mode is the simplest way to expla
 
 ## 2026-09-25: Node.js comes from the conda env
 
+> **Partly superseded (2026-09-26, "Simplified for explainability"):** there are no pre-commit hooks or Docker images any more.
+
 **What:** `environment.yml` installs `nodejs=22` (conda-forge) next to Python and Tesseract. Every node/npm command
 runs through `conda run -n ca-helper` (Makefile `NPM` variable, pre-commit ESLint/Prettier hooks, `make setup`).
 `.nvmrc` and all nvm instructions are removed. CI uses `actions/setup-node` with `node-version: "22"` (as it uses
@@ -122,6 +172,8 @@ pip, not conda, for Python) and the frontend Docker image stays on `node:22-alpi
 everyone runs the same Node version without per-user nvm setups.
 
 ## 2026-09-25: JSON logs and request IDs
+
+> **Superseded (2026-09-26, "Simplified for explainability"):** plain `logging.basicConfig`, no request IDs.
 
 **What:** every request gets an ID: a valid incoming `X-Request-ID` (1–128 chars of `A-Za-z0-9._-`) is reused,
 otherwise a UUID hex is generated (`app/core/request_id.py`). It is returned in the `X-Request-ID` header, added to
@@ -136,6 +188,8 @@ in Docker are searchable with `jq`, while text stays readable in a hybrid-mode t
 
 ## 2026-09-25: Service-level transactions
 
+> **Partly superseded (2026-09-26, "Simplified for explainability"):** services still commit once; tests now delete every row after each test instead of rolling back a savepoint transaction.
+
 **What:** routes parse input, call one service function and serialize the result; they never touch `db.session`.
 Each public service function is one unit of work and commits once at its end; helpers composed by other service
 functions do not commit and say so. Models hold data only. Tests wrap each test in one outer transaction with
@@ -148,6 +202,8 @@ session bound to the test connection. This replaces the old "delete all rows aft
 call real services (which commit) and still stay isolated and fast.
 
 ## 2026-09-25: mypy in lenient mode
+
+> **Superseded (2026-09-26, "Simplified for explainability"):** mypy is removed.
 
 **What:** `mypy==2.3.1` (dev dependency) runs in `make lint` and CI over `app`, `tests`, `worker.py` and
 `conftest.py`. Lenient: only annotated functions are checked (`check_untyped_defs = false`) and missing third-party
@@ -213,6 +269,8 @@ and tests without a DB round-trip for the key, and one base class gives every ta
 to keep in sync. Everything technical (stack, rules, conventions, run modes) is unchanged.
 
 ## 2026-09-25: Initial bootstrap
+
+> **Partly superseded (2026-09-26, "Simplified for explainability"):** no full-Docker mode (nginx, gunicorn, port 8080, CI docker job), pre-commit, `cn`, FullCalendar or Tesseract CI step.
 
 **Stack and versions**
 - **Stack as specified in the bootstrap prompt**; direct dependencies pinned exactly in

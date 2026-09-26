@@ -17,9 +17,9 @@ Basic login works: email + password → JWT access token, role-checked endpoints
 - **Config:** `JWT_ACCESS_TOKEN_EXPIRES` from `JWT_ACCESS_TOKEN_MINUTES` (default 60).
 - **OpenAPI:** bearer auth is the global default (`API_SPEC_OPTIONS["security"]`). Public endpoints opt out with `@blp.doc(security=[])`.
 - **Frontend** (`frontend/src/`):
-  - `context/AuthProvider.jsx` (session in localStorage; TODO: move to a refresh cookie). An `api.use()` middleware adds the Bearer header and logs out on any 401 to a request that carried a token.
+  - `context/AuthProvider.jsx` (session in localStorage; TODO: move to a refresh cookie). It hands the token and `logout` to `apiFetch()` (`setAuth()` in `api/client.js`), which adds the Bearer header and logs out on any 401 to a request that carried a token.
   - `useAuth()` in `hooks/useAuth.js`; `login()` throws `ApiRequestError` (`api/client.js`) with the API error code.
-  - `components/RequireRole.jsx` guard; `ROLE_HOME`, `User`/`Role` and the localStorage session in `lib/session.js`.
+  - `components/RequireRole.jsx` guard; `ROLE_HOME` and the localStorage session in `lib/session.js`.
   - The login page is `pages/LoginPage.jsx` (`/login`).
 - **Tests:**
   - `backend/tests/test_auth_login.py`: success, email normalization, wrong password vs unknown email, dummy-hash check, inactive, soft-deleted, rehash, validation, rate limit.
@@ -64,4 +64,4 @@ core-infra (email, planned in `app/utils/email.py`), marketplace (engagement sta
 ## Known issues
 - Access token only, stored in localStorage (XSS-readable). Moving to an httpOnly refresh-token cookie is planned.
 - No logout endpoint or token revocation: a stolen token works until it expires (a deactivated user is still rejected at once).
-- The rate limit uses in-memory storage (per process): with several gunicorn workers each has its own counter.
+- The rate limit uses in-memory storage (per process): the counters reset when the API restarts.

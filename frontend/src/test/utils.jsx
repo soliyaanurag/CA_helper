@@ -10,12 +10,13 @@ import { saveSession } from "@/lib/session";
 import { appRoutes } from "@/routes";
 
 /**
- * Replace fetch with a fake backend. Returns the mock, so tests can inspect the
- * requests it received (e.g. their Authorization header).
+ * Replace fetch with a fake backend: routes maps "METHOD /path" to [status, body].
+ * Returns the mock, so tests can inspect the requests it received: each call is
+ * [path, init] as passed to fetch (e.g. init.headers.Authorization).
  */
 export function fakeApi(routes) {
-  const fetchMock = vi.fn(async (request) => {
-    const key = `${request.method} ${new URL(request.url).pathname}`;
+  const fetchMock = vi.fn(async (path, init = {}) => {
+    const key = `${init.method ?? "GET"} ${path}`;
     const [status, body] = routes[key] ?? [404, { error: { code: "NOT_FOUND", message: key } }];
     return new Response(JSON.stringify(body), {
       status,
