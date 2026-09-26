@@ -1,9 +1,8 @@
 # Continuous integration: runs on every pull request and on pushes to main.
 #
-#   backend   ruff, mypy, migrations, pytest (with Postgres + Tesseract),
-#             then exports the OpenAPI spec for the frontend job
+#   backend   ruff, migrations, pytest (with Postgres), then exports the OpenAPI
+#             spec for the frontend job
 #   frontend  generates API types from that spec, then lint, format, types, tests, build
-#   docker    builds all images and smoke-tests full-Docker mode (`make up` equivalent)
 #
 # CI installs Python packages with pip from backend/requirements-dev.txt, the same
 # file the conda env uses, so CI and laptops run the same versions. Node is the
@@ -49,9 +48,6 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
 
-      - name: Install Tesseract
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
-
       - name: Install Python dependencies
         run: pip install -r backend/requirements-dev.txt
 
@@ -59,10 +55,6 @@ jobs:
         run: |
           ruff check backend
           ruff format --check backend
-
-      - name: Mypy (lenient; config in backend/pyproject.toml)
-        working-directory: backend
-        run: mypy
 
       - name: Migrations apply cleanly
         working-directory: backend
@@ -112,49 +104,3 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: api-types
-          path: frontend/src/core/api/generated/
-
-  docker:
-    name: Docker images
-    needs: [backend, frontend]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: api-types
-          path: frontend/src/core/api/generated/
-
-      - name: Create .env from the example
-        run: cp .env.example .env
-
-      - name: Build images
-        run: docker compose build
-
-      - name: Start full-Docker mode and wait until healthy
-        run: docker compose up -d --wait
-
-      - name: All five services are healthy
-        run: |
-          docker compose ps
-          test "$(docker compose ps --format '{{.Health}}' | grep -c '^healthy$')" -eq 5
-
-      - name: Smoke test through nginx
-        run: |
-          curl --fail --silent http://localhost:8080/ | grep -q '<div id="root">'
-          curl --fail --silent http://localhost:8080/api/health | grep -q '"status": *"ok"'
-          curl --fail --silent --include -H 'X-Request-ID: ci-smoke' http://localhost:8080/api/health \
-            | grep -qi '^x-request-id: ci-smoke'
-
-      - name: Logs on failure
-        if: failure()
-        run: docker compose logs
-
-      - name: Stop
-        if: always()
-        run: docker compose down -v

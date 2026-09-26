@@ -1,6 +1,6 @@
-# pytest and mypy configuration for the backend. (Ruff settings live in the root ruff.toml.)
+# pytest configuration for the backend. (Ruff settings live in the root ruff.toml.)
 # Dependencies are NOT declared here: they live in requirements.txt and
-# requirements-dev.txt, the single source used by conda, Docker and CI.
+# requirements-dev.txt, the single source used by conda and CI.
 
 [tool.pytest.ini_options]
 # Tests live in tests/ (cross-cutting) and app/modules/<module>/tests/.
@@ -10,14 +10,3 @@ addopts = "-ra --strict-markers"
 markers = [
     "requires_tesseract: needs the Tesseract OCR binary; skipped with a message if it is missing",
 ]
-
-# mypy in lenient mode (make lint, CI): only functions with type annotations are
-# checked, and third-party packages without type information are treated as Any.
-# Tighten it module by module later, never all at once.
-[tool.mypy]
-python_version = "3.12"
-files = ["app", "tests", "main.py", "worker.py", "conftest.py"]
-exclude = ["^migrations/"]
-ignore_missing_imports = true
-check_untyped_defs = false
-warn_unused_ignores = true

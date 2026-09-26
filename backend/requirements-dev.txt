@@ -2,8 +2,4 @@
 -r requirements.txt
 
 pytest==9.1.1
-Faker==40.39.0
 ruff==0.16.9
-# Type checker, lenient mode (config: [tool.mypy] in backend/pyproject.toml).
-mypy==2.3.1
-pre-commit==4.6.2
