@@ -1,5 +1,5 @@
 # Runtime dependencies for the backend and worker.
-# Used by: the conda env (via requirements-dev.txt), backend/Dockerfile, and CI.
+# Used by: the conda env (via requirements-dev.txt) and CI.
 # Pin exact versions. After editing, run `make env-update` and mention the change in your PR.
 
 # --- Web framework and API ---
@@ -39,6 +39,3 @@ opencv-python-headless==5.0.0.93
 requests==2.34.2
 beautifulsoup4==4.15.0
 feedparser==6.0.14
-
-# --- Production server (used only inside the Docker image) ---
-gunicorn==26.2.0

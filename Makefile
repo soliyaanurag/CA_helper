@@ -18,7 +18,7 @@ FLASK := $(BACKEND) flask --app app
 NPM := $(PY) --cwd frontend npm
 
 .PHONY: help setup env-update infra infra-down dev-backend dev-worker dev-frontend \
-	up down logs test test-backend test-frontend lint format \
+	test test-backend test-frontend lint format \
 	migrate migration seed
 
 help: ## List all targets
@@ -60,19 +60,6 @@ dev-worker: .env ## Background worker (APScheduler) in the foreground
 
 dev-frontend: ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
 	$(NPM) run dev
-
-# ----------------------------------------------------------------------------
-# Full-Docker mode (all five services in containers)
-# ----------------------------------------------------------------------------
-up: .env ## Build and start all services (frontend: http://localhost:8080)
-	docker compose up -d --build --wait
-	@echo "Frontend: http://localhost:8080   API: http://localhost:8000/api/docs   Mailpit: http://localhost:8025"
-
-down: ## Stop and remove all containers (volumes are kept)
-	docker compose down
-
-logs: ## Follow logs of all services
-	docker compose logs -f --tail=100
 
 # ----------------------------------------------------------------------------
 # Quality
