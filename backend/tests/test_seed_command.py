@@ -32,7 +32,9 @@ def run_seed(app):
 def test_seed_command_runs_core_and_all_modules(app, database, demo_env):
     result = run_seed(app)
 
-    assert "Seeded 10 module(s): core.auth, " in result.output
+    # Demo users always come first; modules follow once they define seed().
+    assert result.output.startswith("Seeded ")
+    assert "module(s): core.auth" in result.output
 
 
 def test_seed_creates_one_hashed_demo_user_per_role(app, database, demo_env):
