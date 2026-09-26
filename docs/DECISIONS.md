@@ -3,7 +3,7 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
-## 2026-09-26: Workflow commands (make feature / sync / check / pr / merge)
+## 2026-09-26: Workflow commands (make doctor / feature / sync / check / pr / merge)
 
 **What**
 - `scripts/workflow.sh` with one subcommand per step, called by five new Make targets; no existing target changed.
@@ -14,6 +14,16 @@ in the same PR.
   (`git hash-object`) in `.git/`, so nothing new is committed or gitignored.
 - `make check` adds two migration checks CI does not have: exactly one Alembic head, and `flask db check` (fails
   when a model changed without a migration).
+- `make doctor` checks git, the conda env (Python 3.12, Node 22), packages, `.env`, Docker, the database's
+  migration and the dev servers, changes nothing, and prints a fix for every problem.
+- Every failure prints `ERROR in step "<step>"` with the fix. Known causes get specific advice: Docker not running,
+  a database migration the branch does not know, Postgres unreachable, a port taken, uncommitted changes, main
+  moved on, CI pending or failed, missing approval, requested changes, conflicts. Anything else names the step and
+  points to `make doctor`.
+- `make merge` merges only without conflicts, with green CI, at least one approval and no open "changes requested";
+  always as a squash, deleting the branch.
+- These commands are the team's workflow for every task; `CLAUDE.md` "Session checklist" and the README "Team
+  workflow" describe it. The pull request template ticks `make check` instead of lint, test and build separately.
 - The scripts never force-push, pull only fast-forward, refuse to switch branches with uncommitted changes, and only
   warn about variables missing from `.env` (they never edit it). They use `git`, `gh` and `make`, which we already use.
 

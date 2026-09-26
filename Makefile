@@ -84,7 +84,7 @@ doctor: ## Check this machine (git, env, packages, .env, Docker, database) and s
 feature: ## Start a task: latest main, set up, new branch: make feature branch=anurag/documents-ack-upload
 	@bash scripts/workflow.sh feature "$(branch)"
 
-sync: ## After a pull (or any time): latest main, packages, .env check, Docker, migrations, seed
+sync: ## After a pull (or any time): pull main if on main, packages, .env check, Docker, migrations, seed
 	@bash scripts/workflow.sh sync
 
 check: ## Before pushing: lint, tests, frontend build, migration checks

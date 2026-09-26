@@ -32,6 +32,14 @@ make setup            # safe to re-run
 pip packages), installs the npm packages with the env's Node, and creates `.env` with random secrets (an existing
 `.env` is left alone). If conda is missing, it prints the Miniforge install command and stops.
 
+Then start Docker Desktop and finish with:
+
+```bash
+make sync             # Postgres + Mailpit, migrations, seed data (and it records the installed packages)
+make doctor           # should end with "Everything needed is in place."
+gh auth login         # once, for make pr / make merge (GitHub CLI: sudo apt install gh, or brew install gh)
+```
+
 ## Quick start (manual)
 
 The simplest way to run the app by hand: two terminals with the conda env activated.
@@ -96,21 +104,65 @@ make dev-frontend   # Vite dev server                      -> http://localhost:5
 
 ## Team workflow
 
-Five commands take a feature from a new branch to everyone's machine. Each stops at the first problem and never
-throws work away: it refuses to switch branches with uncommitted changes, pulls only fast-forward and never
-force-pushes. `make pr` and `make merge` need the GitHub CLI logged in (`gh auth login`).
+**Every feature goes through these commands, for all three of us and for Claude Code.** They carry out the rules in
+[CLAUDE.md](CLAUDE.md) ("Session checklist"), so a change reaches main tested, and works on everyone's machine
+after they pull.
 
 | When | Command | What it does |
 |---|---|---|
-| Start a task | `make feature branch=anurag/documents-ack-upload` | latest main, then `make sync`, then a new branch `<name>/<module>-<short-task>` |
-| Before pushing | `make check` | lint, format, migrations applied, one migration head, no model change without a migration, all tests, frontend build |
-| Send it for review | `make pr` | refuses on main or if main moved on (then `git rebase origin/main`), runs `make check`, pushes, opens the pull request from the template (or updates it) |
-| After approval | `make merge` | only if CI is green and a teammate approved: squash-merge, delete the branch, switch to main, `make sync` |
-| After someone else merged | `make sync` | pull main, reinstall Python or npm packages only if their files changed, warn about variables missing from your `.env`, start Postgres + Mailpit, migrate, seed |
+| Something is off, or before you start | `make doctor` | checks git, the conda env, packages, `.env`, Docker, the database and the dev servers; changes nothing; every problem comes with its fix |
+| Start a task | `make feature branch=anurag/documents-ack-upload` | pulls the latest main, runs `make sync`, then creates the branch `<name>/<module>-<short-task>` |
+| Before pushing | `make check` | lint + format, migrations applied, exactly one migration head, no model change without a migration, all tests, frontend build |
+| Send it for review | `make pr` | runs `make check`, pushes the branch, opens the pull request from the template (or updates the open one) |
+| After a teammate approved | `make merge` | only when there are no conflicts, CI is green and nobody asked for changes: squash-merges, deletes the branch, then `make sync` on main |
+| After someone else merged (or any time) | `make sync` | pulls main, reinstalls Python or npm packages only if their files changed, lists `.env` variables you lack, starts Postgres + Mailpit, migrates, seeds |
 
-A typical round: you run `make feature ...`, build and commit, then `make pr`. Your friend reviews and approves on
-GitHub, and you run `make merge`. Your friend then runs `make sync` on main and has the same code, packages,
-database tables and seed data. If `make sync` says packages changed, restart the dev servers.
+### One feature, start to finish
+
+```bash
+# You
+make feature branch=anurag/documents-ack-upload   # latest main + a fresh branch
+# ...build, commit in small Conventional Commits (feat(documents): ...)...
+make pr                                            # checks, pushes, opens the pull request
+#   On GitHub: fill in the template; a teammate reviews and approves; CI turns green.
+make merge                                         # squash-merge into main, back on an up-to-date main
+
+# Your teammates, after the merge
+git switch main          # if they were on another branch (commit or stash their work first)
+make sync                # same code, packages, tables and seed data as you
+```
+
+If `make sync` ends with "Packages changed", restart `make dev-backend`, `make dev-worker` and `make dev-frontend`.
+Otherwise the running dev servers reload the new code by themselves.
+
+**Continuing an existing branch** after main moved on: `git switch <branch>`, `git rebase origin/main` (on a
+conflict: fix the files, `git add` them, `git rebase --continue`), then `make sync`. After a rebase of a branch
+you already pushed, `make pr` asks you to run `git push --force-with-lease` once. That is safe on your own branch,
+never on main.
+
+### What the commands guarantee
+- **Nothing is lost.** They refuse to switch branches with uncommitted changes, pull only fast-forward, never
+  force-push, never touch main directly and never edit `.env`. `make doctor` changes nothing at all.
+- **Nothing broken reaches main.** `make pr` pushes only after `make check` passes. `make merge` needs no conflicts,
+  green CI and at least one approval (you cannot approve your own pull request), and it always squash-merges.
+- **Every machine matches main after `make sync`.** New packages, migrations and seed data arrive with the pull;
+  variables new in `.env.example` are listed so you can copy them.
+- **Every failure says which step failed and what to do.** Examples:
+
+| Message | What to do |
+|---|---|
+| `You have uncommitted changes` | commit them, or `git stash` them, then run the command again |
+| `Docker is not running` | start Docker Desktop (WSL integration on), wait until it is running, run again |
+| `main has new commits since you branched` | `git rebase origin/main`, then `make pr` again |
+| `The database has a migration that this code does not know` | you are on an older branch: `git rebase origin/main` (on main: `git pull`), then `make sync` |
+| `A model changed but no migration covers it` | `make migration name="<module>: <what changed>"`, review it, `make migrate`, commit |
+| `Alembic has 2 migration heads` | run the `flask db merge heads` command it prints, commit the new file |
+| `Your local main has N commit(s) that are not on GitHub` | follow the printed steps: keep them on a branch, reset main, `make pr` |
+| `CI is still running` / `CI failed` | wait, or open the failed job on GitHub, fix, `make pr`, then `make merge` |
+| `No teammate has approved yet` | ask a teammate to review the pull request on GitHub |
+| `The GitHub CLI is not logged in` | `gh auth login` (only `make pr` and `make merge` need it) |
+
+The commands live in `scripts/workflow.sh` (one function per command); the Makefile only calls it.
 
 ## Command reference
 
@@ -134,6 +186,12 @@ these targets or `conda run`; an activated env is only for running things by han
 | `make dev-backend` | Flask dev server | `conda run --no-capture-output -n ca-helper --cwd backend python main.py` |
 | `make dev-worker` | worker | `conda run --no-capture-output -n ca-helper --cwd backend python worker.py` |
 | `make dev-frontend` | Vite dev server | `conda run --no-capture-output -n ca-helper --cwd frontend npm run dev` |
+| `make doctor` | check the whole setup, change nothing | `bash scripts/workflow.sh doctor` |
+| `make feature branch=<name>/<module>-<task>` | latest main, sync, new branch | `bash scripts/workflow.sh feature <branch>` |
+| `make sync` | match this machine to the checked-out code | `bash scripts/workflow.sh sync` |
+| `make check` | everything before a push | `bash scripts/workflow.sh check` |
+| `make pr` | check, push, open or update the pull request | `bash scripts/workflow.sh pr` |
+| `make merge` | squash-merge an approved, green pull request | `bash scripts/workflow.sh merge` |
 
 ## VS Code
 
@@ -146,6 +204,14 @@ these targets or `conda run`; an activated env is only for running things by han
 
 ## Troubleshooting
 
+Run **`make doctor`** first: it checks the whole setup and prints a fix for each problem.
+
+- **The API fails with `connection to server at "127.0.0.1", port 5432 failed: Connection refused`:** Postgres is
+  down, almost always because Docker Desktop was closed. Start Docker Desktop, then `make infra`. Your data is kept.
+- **`The command 'docker' could not be found in this WSL 2 distro`:** same cause: Docker Desktop is not running (or
+  its WSL integration is off for your distro).
+- **Emails (signup codes, reset codes) never reach your inbox:** by design in development. Every email is caught by
+  Mailpit: open http://localhost:8025.
 - **`permission denied ... docker.sock`** right after installing Docker Desktop: open a new terminal. If that is
   not enough, run `wsl --shutdown` in PowerShell and reopen Ubuntu. Check Docker Desktop → Settings → Resources
   → WSL integration.
