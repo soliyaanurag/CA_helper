@@ -5,7 +5,6 @@ They are created once here, without an app, and bound to the app inside
 `from app.extensions import db`.
 """
 
-from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -42,6 +41,5 @@ migrate = Migrate()
 api = CaHelperApi()
 
 jwt = JWTManager()
-cors = CORS()
 # No global limit. Individual routes (login, OTP) add @limiter.limit(...).
 limiter = Limiter(key_func=get_remote_address)

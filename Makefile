@@ -53,7 +53,7 @@ infra-down: ## Stop db + Mailpit (data is kept in the Docker volume)
 # Hybrid development (each in its own terminal)
 # ----------------------------------------------------------------------------
 dev-backend: .env ## Flask dev server with auto-reload on http://localhost:8000
-	$(FLASK) run --debug --port 8000
+	$(BACKEND) python main.py
 
 dev-worker: .env ## Background worker (APScheduler) in the foreground
 	$(BACKEND) python worker.py
