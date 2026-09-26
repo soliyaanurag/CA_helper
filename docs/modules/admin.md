@@ -5,8 +5,8 @@ The admin area shell, user/CA management (verify, suspend, soft-delete), the ser
 
 ## What exists now
 Only the admin dashboard stub; no admin features yet.
-- Backend (`backend/app/modules/admin/`): `GET /api/v1/admin/dashboard` (admin role only) returns a welcome message: route in `routes.py`, `AdminDashboardSchema` in `schemas.py`, `get_dashboard(user)` in `services.py`, tests in `tests/test_dashboard.py`. No models; `seed()` does nothing. The demo admin user is seeded by core-auth.
-- Frontend (`frontend/src/features/admin/`): `AdminDashboardPage` is the admin area home (`/admin`, index route, nav "Dashboard"), using `useAdminDashboard()` from `api.ts`; placeholder "Users & CAs" page at `/admin/users`. The admin layout itself (`AdminLayout`) is in frontend core.
+- Backend (`backend/app/modules/admin/`): `GET /api/v1/admin/dashboard` (admin role only) returns a welcome message: route in `routes.py`, `AdminDashboardSchema` in `schemas.py`, `get_dashboard(user)` in `services.py`, tests in `tests/test_dashboard.py`. No models or seed data yet. The demo admin user is seeded by core-auth.
+- Frontend (`frontend/src/features/admin/`): `AdminDashboardPage` is the admin area home (`/admin`, index route, nav "Dashboard"), using `useAdminDashboard()` from `api.ts`; placeholder "Users & CAs" page at `/admin/users`. Routes are listed in the admin area of `frontend/src/core/routes.tsx`, which also holds the sidebar links (`ADMIN_NAV`).
 
 ## Tables
 None yet. Planned:

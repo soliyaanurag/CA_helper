@@ -1,8 +1,7 @@
-"""BaseModel, the timestamp/soft-delete mixins, str_enum() and per-test rollback."""
+"""BaseModel, the timestamp/soft-delete mixins, str_enum() and per-test cleanup."""
 
 import uuid
 from datetime import timedelta
-from enum import StrEnum
 
 import pytest
 from sqlalchemy import func, select, text
@@ -112,43 +111,13 @@ def test_enum_check_constraint_has_a_stable_name(database):
     assert set(names) == {"ck_test_gadgets_gadget_colour"}
 
 
-def test_enum_values_must_be_lowercase_snake_case():
-    class BadStatus(StrEnum):
-        DOCS_PENDING = "Docs pending"
-
-    with pytest.raises(ValueError, match="lowercase snake_case"):
-        str_enum(BadStatus)
-
-
 def test_enum_constraint_name_can_be_overridden():
     assert str_enum(GadgetColour, name="paint").name == "paint"
 
 
-# --- Per-test transaction with savepoints (conftest.py `database`) ---------------
-
-
-def test_service_commit_is_not_visible_outside_the_test_transaction(database):
-    create_gadget()
-
-    assert db.session.scalar(select(func.count()).select_from(Gadget)) == 1
-    # A separate connection sees only committed data: our "commit" only released a
-    # savepoint inside the outer transaction, which the fixture rolls back.
-    with db.engine.connect() as other_connection:
-        count = other_connection.execute(text("SELECT count(*) FROM test_gadgets")).scalar()
-    assert count == 0
-
-
-def test_rollback_after_a_commit_keeps_committed_rows(database):
-    create_gadget(name="Kept")
-    db.session.add(Gadget(name="Broken", colour="purple"))
-    with pytest.raises(StatementError):
-        db.session.flush()
-
-    db.session.rollback()  # back to the last savepoint, not the start of the test
-
-    assert db.session.scalars(select(Gadget.name)).all() == ["Kept"]
+# --- Per-test cleanup (conftest.py `database`) -------------------------------------
 
 
 def test_rows_from_earlier_tests_are_gone(database):
-    # Earlier tests in this file committed gadgets; each was rolled back after its test.
+    # Earlier tests in this file committed gadgets; the fixture deleted them after each test.
     assert db.session.scalar(select(func.count()).select_from(Gadget)) == 0

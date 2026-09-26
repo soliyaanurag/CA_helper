@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // Hybrid mode: forward API calls to the Flask dev server (make dev-backend),
+    // Forward API calls to the Flask dev server (make dev-backend or python main.py),
     // so the browser only ever talks to one origin. "/api" covers both the
     // versioned module routes (/api/v1/...) and the unversioned /api/health and /api/docs.
     proxy: { "/api": "http://localhost:8000" },

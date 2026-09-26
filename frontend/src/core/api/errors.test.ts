@@ -15,13 +15,13 @@ describe("unwrap", () => {
   });
 
   it("throws ApiRequestError with the standard error body's fields", async () => {
-    const body = { error: { code: "FORBIDDEN", message: "No access.", request_id: "req-9" } };
+    const body = { error: { code: "FORBIDDEN", message: "No access." } };
 
     const error = await unwrap(call(403, body)).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiRequestError);
-    expect(error).toMatchObject({ status: 403, code: "FORBIDDEN", requestId: "req-9" });
-    expect(errorMessage(error)).toBe("No access. (reference: req-9)");
+    expect(error).toMatchObject({ status: 403, code: "FORBIDDEN" });
+    expect(errorMessage(error)).toBe("No access.");
   });
 
   it("still throws ApiRequestError when the body is not the standard shape", async () => {

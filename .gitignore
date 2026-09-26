@@ -6,9 +6,8 @@
 !.env.example
 
 # ---------------------------------------------------------------------------
-# Generated files — never commit (recreate with `make gen-api`)
+# Generated files — never commit (recreate with `make gen-api`): OpenAPI spec + TS types
 # ---------------------------------------------------------------------------
-/openapi.json
 frontend/src/core/api/generated/
 
 # ---------------------------------------------------------------------------

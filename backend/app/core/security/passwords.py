@@ -2,10 +2,8 @@
 
     password_hash = hash_password("s3cret")
     verify_password(password_hash, "s3cret")   # True / False
-    needs_rehash(password_hash)                # True if the argon2 parameters are outdated
 
-argon2-cffi's default parameters are used; when a newer version raises them,
-`needs_rehash` becomes true for old hashes and login stores a fresh hash.
+argon2-cffi's default parameters are used.
 """
 
 from argon2 import PasswordHasher
@@ -24,7 +22,3 @@ def verify_password(password_hash: str, password: str) -> bool:
         return _hasher.verify(password_hash, password)
     except (VerificationError, InvalidHashError):
         return False
-
-
-def needs_rehash(password_hash: str) -> bool:
-    return _hasher.check_needs_rehash(password_hash)

@@ -5,9 +5,9 @@ Encrypted upload/download of documents (acknowledgements, checklist documents), 
 
 ## What exists now
 Skeleton only; no features yet.
-- Backend (`backend/app/modules/documents/`): the `documents` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
-- Frontend (`frontend/src/features/documents/`): one placeholder page, "Document vault" at `/app/documents` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
-- The encrypted storage and OCR helpers it needs (`core/storage`, `core/ocr`) are empty packages too; only a Tesseract smoke test exists.
+- Backend (`backend/app/modules/documents/`): only `__init__.py` and `routes.py`, whose `documents` blueprint is registered under `/api/v1` with no routes yet; no models, services or seed data; no tests yet.
+- Frontend (`frontend/src/features/documents/`): one placeholder page, "Document vault" at `/business/documents` (business nav), built from `ModulePlaceholder`; no API hooks yet.
+- The encrypted storage and OCR helpers it needs (`core/storage/`, `core/ocr/`) are planned in core-infra and do not exist yet.
 
 ## Tables
 None yet. Planned:

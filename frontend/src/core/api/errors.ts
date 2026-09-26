@@ -2,20 +2,17 @@ import type { ApiErrorBody } from "./client";
 
 /**
  * A failed API call, carrying the standard error body (docs/API_CONVENTIONS.md):
- * switch on `code` (e.g. "INVALID_CREDENTIALS"), show `message`, and quote
- * `requestId` for unexpected errors so the matching log lines can be found.
+ * switch on `code` (e.g. "INVALID_CREDENTIALS") and show `message`.
  */
 export class ApiRequestError extends Error {
   status: number;
   code: string;
-  requestId?: string;
 
-  constructor(status: number, code: string, message: string, requestId?: string) {
+  constructor(status: number, code: string, message: string) {
     super(message);
     this.name = "ApiRequestError";
     this.status = status;
     this.code = code;
-    this.requestId = requestId;
   }
 }
 
@@ -35,8 +32,7 @@ export async function unwrap<T>(
   const { data, error, response } = await call;
   if (response.ok) return data as T; // (undefined for 204 No Content)
   if (isErrorBody(error)) {
-    const { code, message, request_id } = error.error;
-    throw new ApiRequestError(response.status, code, message, request_id);
+    throw new ApiRequestError(response.status, error.error.code, error.error.message);
   }
   throw new ApiRequestError(
     response.status,
@@ -45,10 +41,8 @@ export async function unwrap<T>(
   );
 }
 
-/** Text to show for any error thrown by a query: API message (+ reference) or a network hint. */
+/** Text to show for any error thrown by a query: the API's message, or a network hint. */
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiRequestError) {
-    return error.requestId ? `${error.message} (reference: ${error.requestId})` : error.message;
-  }
+  if (error instanceof ApiRequestError) return error.message;
   return "Cannot reach the server. Check your connection and try again.";
 }

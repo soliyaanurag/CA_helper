@@ -5,6 +5,5 @@ Discovered automatically by app/modules/__init__.py.
 """
 
 from app.modules.onboarding.routes import blp
-from app.modules.onboarding.seed import seed
 
-__all__ = ["blp", "seed"]
+__all__ = ["blp"]

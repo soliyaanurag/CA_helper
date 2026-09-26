@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from app.core.auth.models import User
 from app.core.errors import ApiError
-from app.core.security.passwords import hash_password, needs_rehash, verify_password
+from app.core.security.passwords import hash_password, verify_password
 from app.extensions import db
 
 log = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def authenticate(email: str, password: str) -> User:
 
     401 INVALID_CREDENTIALS for an unknown email or a wrong password (the same
     error for both); 403 ACCOUNT_INACTIVE for a deactivated or deleted account.
-    Rehashes the password if argon2's parameters changed since it was stored.
+    Only reads data, so it does not commit.
     """
     user = db.session.scalar(select(User).where(User.email == normalize_email(email)))
     if user is None:
@@ -52,11 +52,6 @@ def authenticate(email: str, password: str) -> User:
         raise ApiError(401, "INVALID_CREDENTIALS", "Wrong email or password.")
     if not user.is_active or user.deleted_at is not None:
         raise ApiError(403, "ACCOUNT_INACTIVE", "This account is inactive.")
-
-    if needs_rehash(user.password_hash):
-        user.password_hash = hash_password(password)
-        log.info("Rehashed password for user %s", user.id)
-    db.session.commit()
     log.info("User %s logged in", user.id)
     return user
 

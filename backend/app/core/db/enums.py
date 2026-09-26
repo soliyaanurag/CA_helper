@@ -10,7 +10,7 @@
   names, in a VARCHAR column (no Postgres ENUM type, which is hard to migrate).
 - A CHECK constraint named `ck_<table>_<enum name>` (from the naming convention
   in base.py) rejects any other value, even from raw SQL.
-- Values must be lowercase snake_case; display text lives in the frontend label
+- Write values in lowercase snake_case; display text lives in the frontend label
   map (frontend/src/core/labels.ts) and docs/DATA_MODEL.md.
 - Adding a value later needs a hand-written migration that replaces the CHECK
   constraint: Alembic autogenerate does not detect CHECK changes.
@@ -25,8 +25,6 @@ import sqlalchemy as sa
 # what restricts the allowed values.
 ENUM_COLUMN_LENGTH = 50
 
-_SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
-
 
 def _snake_case(name: str) -> str:
     """ComplianceStatus -> compliance_status."""
@@ -38,15 +36,7 @@ def str_enum(enum_cls: type[StrEnum], name: str | None = None) -> sa.Enum:
 
     `name` names the CHECK constraint; it defaults to the enum class name in
     snake_case. Pass it when one table has two columns of the same enum.
-    Raises ValueError if a value is not lowercase snake_case or is too long.
     """
-    values = [member.value for member in enum_cls]
-    for value in values:
-        if not _SNAKE_CASE.match(value) or len(value) > ENUM_COLUMN_LENGTH:
-            raise ValueError(
-                f"{enum_cls.__name__} value {value!r} must be lowercase snake_case "
-                f"and at most {ENUM_COLUMN_LENGTH} characters"
-            )
     return sa.Enum(
         enum_cls,
         name=name or _snake_case(enum_cls.__name__),

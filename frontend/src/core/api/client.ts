@@ -7,9 +7,9 @@ import type { components, paths } from "./generated/schema";
  * the backend's OpenAPI spec. The types in ./generated/ come from
  * `make gen-api` and are never written by hand (and never committed).
  *
- * Requests go to the same origin: in hybrid mode Vite proxies /api to Flask,
- * in Docker nginx does. The auth header and "log out on 401" are added by
- * AuthProvider (core/auth) through `api.use(...)`.
+ * Requests go to the same origin: the Vite dev server proxies /api to Flask.
+ * The auth header and "log out on 401" are added by AuthProvider (core/auth)
+ * through `api.use(...)`.
  *
  * baseUrl is the page's own origin, with no path, on purpose: module routes live
  * under /api/v1, and the generated `paths` already contain that full prefix

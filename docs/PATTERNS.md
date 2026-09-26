@@ -1,15 +1,9 @@
 # Patterns: how to add a feature
 
-> The recipes below follow the conventions already in the code. Building blocks with no working example yet are
-> marked "no example yet"; when the first one lands, replace the note with a link to it. Always copy the closest
-> existing example instead of inventing a new pattern. **Real, end-to-end examples: see "First feature examples"
-> right below Foundations.**
+Only patterns the code already uses are listed here, each with a real file to copy. Copy the closest example
+instead of inventing a new pattern; if you need something new, ask first (CLAUDE.md rule 0).
 
-The running example is a made-up `widgets` resource in module `<module>`. Read "Foundations" first: the recipes
-build on it.
-
-## 0. Foundations
-The shared building blocks every feature uses. Each has working code and tests; copy them, don't reinvent them.
+## Foundations
 
 ### Layering
 | Layer | File | Does | Never |
@@ -21,72 +15,40 @@ The shared building blocks every feature uses. Each has working code and tests; 
 Other modules call a module's **service functions** (listed in its module doc), never its models.
 
 ### Transactions
-- Each public service function is one unit of work: it validates, changes rows, and calls `db.session.commit()`
-  **once, at its end**. If something is wrong it raises `ApiError` before committing; Flask-SQLAlchemy rolls the
-  session back at the end of the request.
+- Each public service function that changes data calls `db.session.commit()` **once, at its end**. If something is
+  wrong it raises `ApiError` before committing; Flask-SQLAlchemy rolls the session back at the end of the request.
 - Helpers that other service functions compose do **not** commit; their docstrings say "Does not commit."
-- Worker jobs and `flask seed` follow the same rule (`run_all_seeds()` in `backend/app/modules/__init__.py` commits
-  once after all seeds; a `seed()` does not commit).
-- Tests: the `database` fixture (`backend/conftest.py`) wraps each test in one transaction with
-  `join_transaction_mode="create_savepoint"`, so a service's `commit()` only releases a savepoint and everything is
-  rolled back after the test. Proof: `backend/tests/test_db_foundations.py`.
+- `flask seed` follows the same rule: a module's `seed()` adds rows, `run_all_seeds()` commits once.
 
-### Base model
-`backend/app/core/db/models.py`:
-- `BaseModel`: every model subclasses it. `id` is a UUID (uuid4, Postgres `uuid`), plus `TimestampMixin`.
-- `TimestampMixin`: `created_at`, `updated_at` (timezone-aware UTC; `utcnow()` in Python, `now()` in the DB).
-- `SoftDeleteMixin` (opt-in, for user-facing rows): `is_active`, `deleted_at`. Services soft-delete; nothing is
-  hard-deleted. Put the mixin first: `class Document(SoftDeleteMixin, BaseModel)`.
-- Constraint and index names come from the naming convention in `backend/app/core/db/base.py`, so Alembic
-  migrations are identical on every machine.
+### Base model and enums
+- `backend/app/core/db/models.py`: every model subclasses `BaseModel` (UUID `id`, UTC `created_at`/`updated_at`).
+  User-facing rows add `SoftDeleteMixin` (`is_active`, `deleted_at`) first: `class Document(SoftDeleteMixin, BaseModel)`.
+  Services soft-delete; nothing is hard-deleted.
+- `backend/app/core/db/enums.py`: `status: Mapped[WidgetStatus] = mapped_column(str_enum(WidgetStatus))` stores the
+  lowercase snake_case value as text with a CHECK constraint `ck_<table>_widget_status`. The frontend shows a label
+  from `frontend/src/core/labels.ts`; codes and labels are listed in `docs/DATA_MODEL.md`. Adding a value later needs
+  a hand-written migration replacing the CHECK constraint.
+- Constraint names come from the naming convention in `backend/app/core/db/base.py`.
 
-### Enums
-`backend/app/core/db/enums.py`:
-```python
-class WidgetStatus(StrEnum):
-    DRAFT = "draft"
-    IN_REVIEW = "in_review"          # values: lowercase snake_case (checked at import)
+### Errors and logging
+- `raise ApiError(409, "DUPLICATE_WIDGET", "...")` (`backend/app/core/errors.py`) or `abort(404)`. Every error body
+  is `{"error": {"code", "message", "details?"}}`; never build error JSON by hand.
+- `log = logging.getLogger(__name__)` at the top of a file, then `log.info("...")`; no `print`. Logs go to the
+  console (level from `LOG_LEVEL`). Never log PII (PAN, GSTIN, names, emails, phones, document contents); log IDs.
 
-status: Mapped[WidgetStatus] = mapped_column(str_enum(WidgetStatus))
-```
-Stored as text (the value, not the member name) with a CHECK constraint `ck_<table>_widget_status`. The API sends
-the code; the frontend shows a label from `frontend/src/core/labels.ts`. Status codes and labels are listed in
-`docs/DATA_MODEL.md`. Adding a value = hand-written migration replacing the CHECK constraint.
-
-### Errors
-`backend/app/core/errors.py`: `raise ApiError(409, "DUPLICATE_WIDGET", "...")` in services (or `abort(404)`).
-Every error body is `{"error": {"code", "message", "details?", "request_id"}}`; never build error JSON by hand.
-
-### Logging and request IDs
-- `log = logging.getLogger(__name__)` at the top of a file, then `log.info("...")`. No `print`.
-- `backend/app/core/request_id.py` gives every request an ID (incoming `X-Request-ID` or a new one), returns it in
-  the response header and in error bodies, and logs one access line per request.
-- `backend/app/core/logging_config.py` adds `request_id` and `job` to every line; `LOG_FORMAT=json` (Docker) or
-  `text` (hybrid). The worker sets `job` to the job id (`backend/worker.py`). gunicorn uses the same format
-  (`backend/gunicorn.conf.py`).
-- Never log PII (PAN, GSTIN, names, emails, phones, document contents); log IDs instead.
-- Tests: `backend/tests/test_request_id_and_logging.py`.
-
-### API prefix
-Module blueprints get `/api/v1` from `register_blueprints()`; don't set `url_prefix` in a module. `/api/health`
-and the docs stay unversioned. Tests: `backend/tests/test_api_prefix_and_proxy.py`.
-
-## First feature examples (basic login)
-The login feature is the first one built end to end. Copy these files.
+## Worked example: basic login (copy these files)
 
 **A. Table + migration + seed**
 - Model: `backend/app/core/auth/models.py` (`User(SoftDeleteMixin, BaseModel)`, unique email, `str_enum(UserRole)`).
-  Shared enum: `UserRole` in `backend/app/core/db/enums.py`.
 - Migration: `backend/migrations/versions/2026_09_25_1912-80850e135434_core_auth_create_users_table.py`
-  (autogenerated by `make migration name="core-auth: create users table"`, reviewed, unchanged; the CHECK
-  constraint `ck_users_user_role` and `uq_users_email` get their names from the naming convention).
-- Seed: `backend/app/core/auth/seed.py` (values from `.env`, idempotent "check before insert", no commit).
-  Test: `backend/tests/test_seed_command.py` (runs `flask seed` twice, `monkeypatch.setenv`).
+  (autogenerated by `make migration name="core-auth: create users table"`, reviewed, unchanged).
+- Seed: `backend/app/core/auth/seed.py` (values from `.env`, "check before insert", no commit).
+  Test: `backend/tests/test_seed_command.py`.
 
 **B. Service + thin route + schema + role check**
-- Service: `backend/app/core/auth/services.py` `authenticate()`: raises `ApiError` for expected failures, commits
-  once at its end. Simpler: `get_dashboard(user)` in `backend/app/modules/compliance/services.py`.
-- Route: `backend/app/modules/compliance/routes.py`, which is the whole pattern in five lines:
+- Service: `authenticate()` in `backend/app/core/auth/services.py` (raises `ApiError`); simpler:
+  `get_dashboard(user)` in `backend/app/modules/compliance/services.py`.
+- Route: `backend/app/modules/compliance/routes.py`, the whole pattern in five lines:
   ```python
   @blp.route("/compliance/dashboard")
   class ComplianceDashboard(MethodView):
@@ -95,143 +57,69 @@ The login feature is the first one built end to end. Copy these files.
       def get(self):
           return services.get_dashboard(current_user())
   ```
-  Public endpoint + request body + rate limit + documented errors: `Login` in `backend/app/core/auth/routes.py`.
-- Schemas: `backend/app/modules/compliance/schemas.py`; `backend/app/core/auth/schemas.py` (request vs response).
-  Name schemas uniquely across modules (`ComplianceDashboardSchema`, not `DashboardSchema`): the OpenAPI component
-  name comes from the class name.
-- Role check: `roles_required(*roles)`, `login_required` (any logged-in user) and `current_user()` in
-  `backend/app/core/permissions.py`.
-- Tests: `backend/app/modules/compliance/tests/test_dashboard.py` (allowed role, other roles 403, no token 401)
-  with the `make_user` and `auth_headers` fixtures from `backend/conftest.py`; `backend/tests/test_auth_login.py`.
+  Public endpoint + request body + rate limit + documented errors: `Login` in `backend/app/core/auth/routes.py`
+  (`@blp.doc(security=[])` marks it public).
+- Schemas: `backend/app/modules/compliance/schemas.py`. Name them uniquely across modules
+  (`ComplianceDashboardSchema`, not `DashboardSchema`): the OpenAPI component name comes from the class name.
+- Tests: `backend/app/modules/compliance/tests/test_dashboard.py` (allowed role, other roles 403, no token 401).
 
 **C. Page + form + API call + guard**
 - Page calling the API: `frontend/src/features/compliance/pages/BusinessDashboardPage.tsx` with the hook
-  `useComplianceDashboard()` in `frontend/src/features/compliance/api.ts`, registered as the area home
-  (`index: true`) in `frontend/src/features/compliance/routes.tsx`.
-- Form: `frontend/src/core/pages/LoginPage.tsx` (React Hook Form + Zod, shadcn `Input`/`Label`/`Button`, one
-  message per API error code).
-- Guard: `frontend/src/core/auth/RequireRole.tsx`, applied per area in `frontend/src/core/routes.tsx`; auth
-  state from `useAuth()` (`frontend/src/core/auth/auth-context.ts`).
-- Tests: `frontend/src/core/pages/LoginPage.test.tsx`, `frontend/src/core/auth/auth.test.tsx`, using
-  `fakeApi()`, `loginAs()` and `renderApp()` from `frontend/src/test/utils.tsx`.
+  `useComplianceDashboard()` in `frontend/src/features/compliance/api.ts`.
+- Form: `frontend/src/core/pages/LoginPage.tsx` (React Hook Form + Zod, one message per API error code).
+- Guard: `frontend/src/core/auth/RequireRole.tsx` wraps each area in `frontend/src/core/routes.tsx`.
+- Tests: `frontend/src/core/pages/LoginPage.test.tsx`, `frontend/src/core/auth/auth.test.tsx`.
 
-## 1. Backend route (flask-smorest)
-Existing example: `backend/app/core/health.py` (schema + route + `alt_response`) and its test
-`backend/tests/test_health.py`.
+## Backend recipes
 
-Each module has one Blueprint in `routes.py` without a `url_prefix` (it is registered under `/api/v1`), and the
-module segment is written in every route, so URLs are easy to grep (`/api/v1/<module>/widgets`):
+**Module files.** A module starts with only `__init__.py` (exports `blp`) and `routes.py`. Create `schemas.py`,
+`services.py`, `models.py`, `seed.py` and `tests/` (with an empty `__init__.py`, because several modules have a
+`test_dashboard.py`) when the module first needs them; copy them from `app/modules/compliance/`.
 
+**Route.** One Blueprint per module in `routes.py`, without a `url_prefix` (it is registered under `/api/v1`); write
+the module segment in every route (`/<module>/widgets`). Put `@roles_required(...)` (or `@login_required`) first on
+**every** endpoint. Admin endpoints for a module's config: `/api/v1/admin/<module>/...` in the same blueprint.
+After adding or changing routes or schemas: `make gen-api`.
+
+**Schemas.** Money: `fields.Decimal(as_string=True, places=2)`. Timestamps: `fields.DateTime()` (UTC). Dates:
+`fields.Date()`. See `docs/API_CONVENTIONS.md`.
+
+**Model + migration.**
 ```python
-# app/modules/<module>/routes.py
-from flask.views import MethodView
-
-from app.core.db.enums import UserRole
-from app.core.permissions import current_user, roles_required
-from app.modules.<module> import services
-from app.modules.<module>.schemas import WidgetCreateSchema, WidgetSchema
-
-@blp.route("/<module>/widgets")
-class Widgets(MethodView):
-    @roles_required(UserRole.BUSINESS)          # first: 401/403 before anything else runs
-    @blp.response(200, WidgetSchema(many=True))
-    def get(self):
-        return services.list_widgets(current_user())
-
-    @roles_required(UserRole.BUSINESS)
-    @blp.arguments(WidgetCreateSchema)          # request body validated -> 422 on errors
-    @blp.response(201, WidgetSchema)
-    def post(self, data):
-        return services.create_widget(current_user(), **data)
-```
-
-- Routes are thin: validate input (schemas), call one service function, return data. No queries or
-  `db.session` in routes (see "Foundations").
-- Protect **every** endpoint with `@roles_required(...)` (or `@login_required` for any role) from
-  `app/core/permissions.py` (example: `app/modules/compliance/routes.py`). A public endpoint instead declares `@blp.doc(security=[])` (example:
-  `app/core/auth/routes.py`, login).
-- Expected errors: `raise ApiError(409, "DUPLICATE_WIDGET", "A widget with this name exists.")`
-  (`app/core/errors.py`). Never return ad-hoc error JSON.
-- Admin endpoints for this module's config: `/api/v1/admin/<module>/...` in the same blueprint.
-- After adding/changing routes or schemas: `make gen-api`.
-
-## 2. Schemas (marshmallow)
-`schemas.py` holds request and response shapes. Money: `fields.Decimal(as_string=True, places=2)`.
-Timestamps: `fields.DateTime()` (UTC). Dates: `fields.Date()`. See `docs/API_CONVENTIONS.md`.
-
-## 3. Service functions
-`services.py` holds business logic and all DB access for the module. Each public function commits once at its
-end (see "Foundations", Transactions). Functions listed under
-"Service functions other modules call" in the module doc are the module's public interface; other modules import
-**those functions**, never this module's models.
-
-## 4. Model + migration
-```python
-# app/modules/<module>/models.py
-from decimal import Decimal
-from sqlalchemy import Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
-from app.core.db.enums import str_enum
-from app.core.db.models import BaseModel, SoftDeleteMixin
-
-class Widget(SoftDeleteMixin, BaseModel):     # id (UUID), created_at, updated_at, is_active, deleted_at
+class Widget(SoftDeleteMixin, BaseModel):
     __tablename__ = "widgets"
     name: Mapped[str] = mapped_column(String(200))
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))  # rupees
     status: Mapped[WidgetStatus] = mapped_column(str_enum(WidgetStatus))
 ```
-Working example (test-only): `backend/tests/_models.py`.
-- Soft delete only: add `SoftDeleteMixin` to user-facing entities.
-- PAN, GSTIN, TAN, phone use `EncryptedString` + blind index from core/security (no example yet).
-- Timestamps are timezone-aware UTC; display in Asia/Kolkata. Financial year = April–March.
-- Then: `git pull` on main → `make migration name="<module>: add widgets"` → review the generated file →
-  `make migrate`. One migration per PR. Add the table to `docs/DATA_MODEL.md` and your module doc.
+Then: pull main → `make migration name="<module>: add widgets"` → review the file → `make migrate`. One migration
+per PR. Add the table to `docs/DATA_MODEL.md` and the module doc.
 
-## 5. Seed data
-`seed.py` → `seed()` must be idempotent (check before insert). Set `SEED_ORDER` in the module `__init__.py` if it
-depends on another module's seed (lower runs first; default 100). Run with `make seed`.
+**Seed.** `seed.py` → `seed()` must be safe to re-run (check before insert) and must not commit; export it from the
+module's `__init__.py` (`from app.modules.<m>.seed import seed`). `make seed` runs the demo users first
+(`app/core/auth/seed.py`), then every module's `seed()` in name order.
 
-## 6. Scheduled job (worker)
-```python
-# app/modules/<module>/__init__.py
-def register_jobs(scheduler):
-    scheduler.add_job(services.send_widget_digest, "cron", hour=8, id="<module>.widget_digest")
-```
-Jobs run only in the worker process, inside the Flask app context. Cron times are IST. See `backend/worker.py`.
+**Tests.** `app/modules/<module>/tests/test_*.py`, fixtures from `backend/conftest.py`: `app`, `client`,
+`database` (request it in any test that touches the DB; after the test every row is deleted, so each test starts
+with empty tables), `make_user(role=UserRole.CA)` and `auth_headers(user)`.
 
-## 7. Tests
-- Backend: `app/modules/<module>/tests/test_*.py`. Fixtures from `backend/conftest.py`: `app`, `client`, and
-  `database` (request it in any test that touches the DB; each test runs in one transaction that is rolled back
-  afterwards, even when services commit).
-- OCR tests: `@pytest.mark.requires_tesseract`.
-- Backend auth in tests: `make_user(role=UserRole.CA)` + `client.get(url, headers=auth_headers(user))`.
-- Frontend: `*.test.tsx` next to the code, Vitest + React Testing Library (example: `frontend/src/core/routes.test.tsx`).
-  Fake the backend with `fakeApi({"GET /api/v1/...": [200, body]})`, log in with `loginAs(role)` and render with
-  `renderApp(path)` (`frontend/src/test/utils.tsx`).
+## Frontend recipes
 
-## 8. Frontend page, route and nav link
-Existing example: any `frontend/src/features/<module>/routes.tsx` and its placeholder page.
-
+**Page and route.** A feature exports a plain array of routes, with paths relative to its area:
 ```tsx
-// features/<module>/routes.tsx: picked up automatically by core/routes.tsx
-export const routes: FeatureRoutes = {
-  business: {
-    routes: [{ path: "widgets", element: <WidgetsPage /> }],           // -> /business/widgets
-    nav: [{ label: "Widgets", path: "widgets", order: 70 }],
-  },
-};
+// features/<module>/routes.tsx
+export const routes: RouteObject[] = [{ path: "widgets", element: <WidgetsPage /> }]; // -> /business/widgets
 ```
-Areas: `public` (/), `business` (/business), `ca` (/ca), `admin` (/admin). No central route list to edit.
-Each logged-in area is guarded by `RequireRole` in `core/routes.tsx`, so feature pages need no guard of their own.
-An area's home page is a feature's `{ index: true, element: ... }` route with a nav item `path: ""` (example:
-`features/compliance/routes.tsx`).
+Then, in `frontend/src/core/routes.tsx`, import it (`import { routes as widgetsRoutes } from "@/features/<module>/routes"`),
+spread it into the right area's `children` (next to "Add your feature's routes here") and add a sidebar link to that
+area's nav list (`BUSINESS_NAV`, `CA_NAV` or `ADMIN_NAV`). The area already checks the role (`RequireRole`), so
+pages need no guard of their own. An area's home page is a feature's `{ index: true, element: ... }` route.
+A module's admin screens live in `features/<module>/admin/` and go into the admin area (example:
+`features/regulatory/routes.tsx`).
 
-## 9. Frontend data fetching
+**Data fetching.**
 ```ts
 // features/<module>/api.ts
-import { api } from "@/core/api/client";
-import { unwrap } from "@/core/api/errors";
-
 export function useWidgets() {
   return useQuery({
     queryKey: ["<module>", "widgets"],
@@ -239,24 +127,17 @@ export function useWidgets() {
   });
 }
 ```
-`unwrap()` returns the typed data or throws `ApiRequestError` (`status`, `code`, `message`, `requestId`). Show
-a failure with `errorMessage(query.error)` (adds the request ID as a reference); switch on `error.code` when a
-page reacts to a specific error (example: `LOGIN_ERROR_TEXT` in `core/pages/LoginPage.tsx`). Example hook:
-`features/compliance/api.ts`. Types come from the generated OpenAPI types. Never hand-write API types. Forms:
-React Hook Form + Zod.
+`unwrap()` (`core/api/errors.ts`) returns the typed data or throws `ApiRequestError` (`status`, `code`, `message`).
+Show a failure with `errorMessage(query.error)`; switch on `error.code` when a page reacts to a specific error
+(example: `LOGIN_ERROR_TEXT` in `core/pages/LoginPage.tsx`). Types come from `make gen-api`; never hand-write them.
 
-## 10. Admin screen for a module's config
-The module that holds the data also holds its admin screen. Backend under `/api/v1/admin/<module>/...`; frontend
-page in `features/<module>/admin/`, registered under the `admin` key of the module's `routes.tsx` (example:
-`features/regulatory/routes.tsx`).
-
-## 11. Calling Gemini or OCR
-Only through `app/core/ai/gemini_client.py` (PII scrubbed) and `app/core/ocr/` (local only).
-No example yet: neither the Gemini client nor the OCR helpers exist so far.
+**Tests.** `*.test.tsx` next to the code (example: `frontend/src/core/routes.test.tsx`). Fake the backend with
+`fakeApi({"GET /api/v1/...": [200, body]})`, log in with `loginAs(role)`, render with `renderApp(path)`
+(`frontend/src/test/utils.tsx`).
 
 ## Checklist for a new feature
 - [ ] route (thin) + schema + service (commits once) + tests
 - [ ] `@roles_required(...)` on every endpoint (or `@blp.doc(security=[])` if it is public on purpose)
 - [ ] model on `BaseModel` (+ `SoftDeleteMixin`, `str_enum()`) + one migration + seed data (if a table was added)
-- [ ] `make gen-api`, frontend page + route + api hook + test
+- [ ] `make gen-api`, frontend page + route in `core/routes.tsx` + nav link + api hook + test
 - [ ] module doc updated (what exists now, tables, endpoints, services, contracts)

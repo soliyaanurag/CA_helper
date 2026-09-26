@@ -2,14 +2,11 @@
 
 Every error response has this shape:
 
-    {"error": {"code": "NOT_FOUND", "message": "Business not found.", "details": {...},
-               "request_id": "3f2a..."}}
+    {"error": {"code": "NOT_FOUND", "message": "Business not found.", "details": {...}}}
 
 - `code` is a stable UPPER_SNAKE_CASE string the frontend can switch on.
 - `message` is human-readable.
 - `details` is optional, e.g. field validation errors for 422.
-- `request_id` is the request's ID (app/core/request_id.py), also in the
-  `X-Request-ID` response header and in every log line of that request.
 
 How errors reach this format:
 - `raise ApiError(409, "DUPLICATE_PAN", "A business with this PAN already exists.")`
@@ -28,8 +25,6 @@ from flask import Flask
 from flask_smorest import Api
 from werkzeug.exceptions import HTTPException
 
-from app.core.request_id import get_request_id
-
 
 class ApiError(Exception):
     """An expected error with a specific HTTP status and error code."""
@@ -45,13 +40,10 @@ class ApiError(Exception):
 
 
 def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict:
-    """Build the standard error payload (with the request ID when inside a request)."""
+    """Build the standard error payload."""
     error: dict[str, Any] = {"code": code, "message": message}
     if details:
         error["details"] = details
-    request_id = get_request_id()
-    if request_id:
-        error["request_id"] = request_id
     return {"error": error}
 
 
@@ -69,9 +61,6 @@ class ErrorDetailSchema(ma.Schema):
     code = ma.fields.String(required=True, metadata={"description": "Stable error code"})
     message = ma.fields.String(required=True, metadata={"description": "Human-readable text"})
     details = ma.fields.Dict(metadata={"description": "Extra data, e.g. field errors"})
-    request_id = ma.fields.String(
-        metadata={"description": "ID of the request; also in the X-Request-ID header and the logs"}
-    )
 
 
 class ErrorSchema(ma.Schema):

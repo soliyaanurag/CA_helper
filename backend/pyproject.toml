@@ -1,6 +1,6 @@
-# pytest and mypy configuration for the backend. (Ruff settings live in the root ruff.toml.)
+# pytest and Ruff configuration for the backend (all Python lives in backend/).
 # Dependencies are NOT declared here: they live in requirements.txt and
-# requirements-dev.txt, the single source used by conda, Docker and CI.
+# requirements-dev.txt, the single source used by conda and CI.
 
 [tool.pytest.ini_options]
 # Tests live in tests/ (cross-cutting) and app/modules/<module>/tests/.
@@ -11,13 +11,23 @@ markers = [
     "requires_tesseract: needs the Tesseract OCR binary; skipped with a message if it is missing",
 ]
 
-# mypy in lenient mode (make lint, CI): only functions with type annotations are
-# checked, and third-party packages without type information are treated as Any.
-# Tighten it module by module later, never all at once.
-[tool.mypy]
-python_version = "3.12"
-files = ["app", "tests", "main.py", "worker.py", "conftest.py"]
-exclude = ["^migrations/"]
-ignore_missing_imports = true
-check_untyped_defs = false
-warn_unused_ignores = true
+# Ruff (linter + formatter); run via `make lint` / `make format`.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Our own importable code (app, worker) for import sorting.
+src = ["."]
+# Alembic files are generated; keep them exactly as generated.
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # modern Python syntax
+    "B",   # common bugs
+    "SIM", # simplifications
+    "DTZ", # naive datetimes (we store UTC; see CLAUDE.md rule 7)
+]

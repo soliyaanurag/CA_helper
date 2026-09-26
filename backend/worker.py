@@ -1,37 +1,24 @@
 """Background worker: runs scheduled jobs (reminders, scrapers, expiry checks).
 
-It runs as its OWN process, never inside the web server:
-    hybrid mode:  make dev-worker
-    Docker:       the `worker` service in docker-compose.yml
+It runs as its OWN process, never inside the web server:  make dev-worker
 
 Each feature module may define `register_jobs(scheduler)` in its __init__.py.
 This file collects them all. Every job runs inside the Flask app context, so
-jobs use db.session and service functions exactly like routes do. While a job
-runs, every log line carries its id in the `job` field.
+jobs use db.session and service functions exactly like routes do.
 
 Example, in app/modules/alerts/__init__.py:
 
     def register_jobs(scheduler):
         scheduler.add_job(send_due_reminders, "cron", hour=8, id="alerts.due_reminders")
-
-Health: the built-in `core.heartbeat` job touches HEARTBEAT_FILE every 30 seconds.
-`python worker.py --healthcheck` (the Docker healthcheck) exits 1 if that file is
-older than 90 seconds, i.e. the scheduler has stopped running jobs.
 """
 
 import functools
 import logging
-import sys
-import tempfile
-import time
-from datetime import UTC, datetime
-from pathlib import Path
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
-from app.core.logging_config import job_var
 from app.modules import register_all_jobs
 
 log = logging.getLogger("worker")
@@ -39,11 +26,6 @@ log = logging.getLogger("worker")
 # Cron times in register_jobs() are written in Indian time (e.g. hour=8 is 08:00 IST).
 # Data is still stored in UTC.
 SCHEDULER_TIMEZONE = "Asia/Kolkata"
-
-HEARTBEAT_FILE = Path(tempfile.gettempdir()) / "ca-helper-worker.heartbeat"
-HEARTBEAT_INTERVAL_SECONDS = 30
-HEARTBEAT_MAX_AGE_SECONDS = 90
-HEARTBEAT_JOB_ID = "core.heartbeat"
 
 
 class AppScheduler(BlockingScheduler):
@@ -54,70 +36,32 @@ class AppScheduler(BlockingScheduler):
         self.app = app
 
     def add_job(self, func, *args, **kwargs):
-        job_name = kwargs.get("id") or func.__qualname__
-        # The heartbeat runs every 30 s; its start/finish lines would drown the rest.
-        level = logging.DEBUG if job_name == HEARTBEAT_JOB_ID else logging.INFO
-
         @functools.wraps(func)
         def run_in_app_context(*job_args, **job_kwargs):
-            token = job_var.set(job_name)
-            started = time.perf_counter()
-            try:
-                log.log(level, "Job started")
-                with self.app.app_context():
-                    result = func(*job_args, **job_kwargs)
-                log.log(level, "Job finished in %.0fms", (time.perf_counter() - started) * 1000)
-                return result
-            except Exception:
-                log.exception("Job failed")
-                raise
-            finally:
-                job_var.reset(token)
+            with self.app.app_context():
+                return func(*job_args, **job_kwargs)
 
         return super().add_job(run_in_app_context, *args, **kwargs)
 
 
-def write_heartbeat() -> None:
-    """Record that the scheduler is alive (read by `--healthcheck`)."""
-    HEARTBEAT_FILE.write_text(datetime.now(UTC).isoformat())
-
-
-def heartbeat_is_fresh(max_age_seconds: float = HEARTBEAT_MAX_AGE_SECONDS) -> bool:
-    """True if the heartbeat file was written within the last `max_age_seconds`."""
-    try:
-        age = time.time() - HEARTBEAT_FILE.stat().st_mtime
-    except FileNotFoundError:
-        return False
-    return age <= max_age_seconds
-
-
 def build_scheduler(app: Flask) -> AppScheduler:
-    """Create the scheduler with the heartbeat job, then let every module register its jobs."""
+    """Create the scheduler and let every module register its jobs."""
     scheduler = AppScheduler(app)
-    scheduler.add_job(
-        write_heartbeat,
-        "interval",
-        seconds=HEARTBEAT_INTERVAL_SECONDS,
-        id=HEARTBEAT_JOB_ID,
-        next_run_time=datetime.now(UTC),  # first beat immediately at start
-    )
     modules = register_all_jobs(scheduler)
     log.info("Modules with jobs: %s", ", ".join(modules) or "(none)")
     return scheduler
 
 
 def main() -> None:
-    app = create_app()  # also configures logging (LOG_FORMAT / LOG_LEVEL)
+    app = create_app()
     scheduler = build_scheduler(app)
     job_ids = [job.id for job in scheduler.get_jobs()]
     log.info("Worker starting with %d job(s): %s", len(job_ids), ", ".join(job_ids))
     try:
-        scheduler.start()  # blocks until Ctrl+C / container stop
+        scheduler.start()  # blocks until Ctrl+C
     except (KeyboardInterrupt, SystemExit):
         log.info("Worker stopped")
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--healthcheck"]:
-        sys.exit(0 if heartbeat_is_fresh() else 1)
     main()

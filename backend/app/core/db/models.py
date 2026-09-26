@@ -13,20 +13,11 @@ soft-deleting a row) lives in the module's services.py. See docs/PATTERNS.md,
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, func, true
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
 from app.extensions import db
-
-# mypy cannot use `db.Model` (created at runtime by Flask-SQLAlchemy) as a base
-# class, so for type checking only it sees our declarative Base instead.
-if TYPE_CHECKING:
-    Model = Base
-else:
-    Model = db.Model
 
 
 def utcnow() -> datetime:
@@ -62,7 +53,7 @@ class SoftDeleteMixin:
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class BaseModel(TimestampMixin, Model):
+class BaseModel(TimestampMixin, db.Model):
     """Abstract base for every table: UUID primary key plus timestamps.
 
     The UUID is generated in Python (uuid4) and stored in Postgres's native

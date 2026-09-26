@@ -17,78 +17,48 @@ FLASK := $(BACKEND) flask --app app
 # npm from the conda env (Node 22), running inside frontend/.
 NPM := $(PY) --cwd frontend npm
 
-.PHONY: help setup env-update infra infra-down dev-backend dev-worker dev-frontend \
-	up down logs test test-backend test-frontend lint format \
-	migrate migration seed gen-api
+.PHONY: help setup env-update infra infra-down migrate migration seed test lint format \
+	gen-api dev-backend dev-worker dev-frontend
 
 help: ## List all targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-# `.env` is required by Docker Compose and the backend. `make setup` creates it.
+# `.env` is needed by Docker Compose and the backend. `make setup` creates it.
 .env:
 	@echo "ERROR: .env is missing. Run 'make setup' (or: cp .env.example .env)." >&2
 	@exit 1
 
-# ----------------------------------------------------------------------------
-# Setup
-# ----------------------------------------------------------------------------
-setup: ## One-time (and re-runnable) developer setup: conda env, npm, .env, git hooks
+setup: ## One-time (and re-runnable) setup: conda env, npm packages, .env, API types
 	bash scripts/setup_dev.sh
 
 env-update: ## Sync the conda env after environment.yml / requirements*.txt change
 	$(CONDA) env update -n $(ENV_NAME) -f environment.yml --prune
 
-# ----------------------------------------------------------------------------
-# Infrastructure for hybrid mode (db + Mailpit in Docker)
-# ----------------------------------------------------------------------------
-infra: .env ## Start db + Mailpit in Docker and wait until they are ready
+infra: .env ## Start Postgres + Mailpit in Docker and wait until they are ready
 	docker compose up -d --wait db mailpit
 	@echo "Postgres: localhost:$${DB_HOST_PORT:-5432}   Mailpit UI: http://localhost:8025"
 
-infra-down: ## Stop db + Mailpit (data is kept in the Docker volume)
+infra-down: ## Stop Postgres + Mailpit (data is kept in the Docker volume)
 	docker compose stop db mailpit
 
-# ----------------------------------------------------------------------------
-# Hybrid development (each in its own terminal)
-# ----------------------------------------------------------------------------
-dev-backend: .env ## Flask dev server with auto-reload on http://localhost:8000
-	$(FLASK) run --debug --port 8000
+migrate: .env ## Apply all migrations (flask db upgrade)
+	$(FLASK) db upgrade
 
-dev-worker: .env ## Background worker (APScheduler) in the foreground
-	$(BACKEND) python worker.py
+migration: .env ## Create a migration: make migration name="onboarding: add business table"
+	@if [ -z "$(name)" ]; then echo 'Usage: make migration name="<module>: <message>"' >&2; exit 1; fi
+	$(FLASK) db migrate -m "$(name)"
 
-dev-frontend: gen-api ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
-	$(NPM) run dev
+seed: .env ## Insert development seed data (demo users + every module; safe to re-run)
+	$(FLASK) seed
 
-# ----------------------------------------------------------------------------
-# Full-Docker mode (all five services in containers)
-# ----------------------------------------------------------------------------
-up: .env gen-api ## Build and start all services (frontend: http://localhost:8080)
-	docker compose up -d --build --wait
-	@echo "Frontend: http://localhost:8080   API: http://localhost:8000/api/docs   Mailpit: http://localhost:8025"
-
-down: ## Stop and remove all containers (volumes are kept)
-	docker compose down
-
-logs: ## Follow logs of all services
-	docker compose logs -f --tail=100
-
-# ----------------------------------------------------------------------------
-# Quality
-# ----------------------------------------------------------------------------
-test: test-backend test-frontend ## Run all tests (backend needs `make infra`)
-
-test-backend: ## Backend tests (pytest)
+test: gen-api ## All tests: pytest (needs `make infra`), then Vitest
 	$(BACKEND) pytest
-
-test-frontend: gen-api ## Frontend tests (Vitest)
 	$(NPM) test
 
-lint: gen-api ## Lint + format + types: ruff + mypy (Python), ESLint + Prettier + tsc (frontend)
+lint: gen-api ## Lint + format check: ruff (Python), ESLint + Prettier + tsc (frontend)
 	$(PY) ruff check backend
 	$(PY) ruff format --check backend
-	$(BACKEND) mypy
 	$(NPM) run lint
 	$(NPM) run format:check
 	$(NPM) run typecheck
@@ -98,22 +68,16 @@ format: ## Auto-format and auto-fix Python and frontend code
 	$(PY) ruff format backend
 	$(NPM) run format
 
-# ----------------------------------------------------------------------------
-# Database
-# ----------------------------------------------------------------------------
-migrate: .env ## Apply all migrations (flask db upgrade)
-	$(FLASK) db upgrade
-
-migration: .env ## Create a migration: make migration name="onboarding: add business table"
-	@if [ -z "$(name)" ]; then echo 'Usage: make migration name="<module>: <message>"' >&2; exit 1; fi
-	$(FLASK) db migrate -m "$(name)"
-
-seed: .env ## Insert development seed data from every module (safe to re-run)
-	$(FLASK) seed
-
-# ----------------------------------------------------------------------------
-# Other
-# ----------------------------------------------------------------------------
-gen-api: ## Export OpenAPI spec (openapi.json) and generate frontend TypeScript types
-	$(FLASK) openapi write --format=json ../openapi.json
+gen-api: ## Export the OpenAPI spec and generate frontend TypeScript types (both gitignored)
+	@mkdir -p frontend/src/core/api/generated
+	$(FLASK) openapi write --format=json ../frontend/src/core/api/generated/openapi.json
 	$(NPM) run gen:api
+
+dev-backend: .env ## Flask dev server with auto-reload on http://localhost:8000
+	$(FLASK) run --debug --port 8000
+
+dev-worker: .env ## Background worker (APScheduler) in the foreground
+	$(BACKEND) python worker.py
+
+dev-frontend: gen-api ## Vite dev server on http://localhost:5173 (proxies /api to :8000)
+	$(NPM) run dev

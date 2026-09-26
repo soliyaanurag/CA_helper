@@ -1,6 +1,6 @@
 /**
  * API calls for the compliance module: TanStack Query hooks around the typed client.
- * Every call goes through unwrap(), so failures are ApiRequestError (code, message, requestId).
+ * Every call goes through unwrap(), so failures are ApiRequestError (code, message).
  */
 import { useQuery } from "@tanstack/react-query";
 

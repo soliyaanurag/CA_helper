@@ -11,7 +11,7 @@
 - [ ] `make lint`
 - [ ] `make test`
 - [ ] Frontend builds (`conda run -n ca-helper --cwd frontend npm run build`)
-- [ ] Tried it by hand (hybrid mode or `make up`)
+- [ ] Tried it by hand (`make dev-backend` + `make dev-frontend`, or `python main.py` + `npm run dev`)
 
 ## Checklist
 
@@ -20,7 +20,7 @@
 - [ ] New dependencies? If yes, list them below (Python: pinned in `backend/requirements*.txt`; frontend: `package.json`)
 - [ ] `make gen-api` run after route/schema changes
 - [ ] Touches `core/`, shared config or another module? Then the summary says so clearly
-- [ ] No secrets, `.env`, `openapi.json`, generated types or uploaded files committed
+- [ ] No secrets, `.env`, generated API files (`frontend/src/core/api/generated/`) or uploaded files committed
 - [ ] `docs/DATA_MODEL.md` / `docs/DECISIONS.md` updated if the data model or conventions changed
 
 ## New dependencies

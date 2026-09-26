@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime
 
-from argon2 import PasswordHasher
 from flask_jwt_extended import decode_token
 
 from app.core.auth import services
@@ -94,17 +93,6 @@ def test_inactive_user_with_wrong_password_gets_invalid_credentials(client, make
     response = login(client, "gone@example.com", "not-the-password")
 
     assert response.status_code == 401
-
-
-def test_outdated_hash_is_rehashed_on_login(client, make_user):
-    weak_hash = PasswordHasher(time_cost=1, memory_cost=8, parallelism=1).hash(TEST_PASSWORD)
-    user = make_user(email="old@example.com", password_hash=weak_hash)
-
-    assert login(client, "old@example.com").status_code == 200
-
-    assert user.password_hash != weak_hash
-    assert not services.needs_rehash(user.password_hash)
-    assert login(client, "old@example.com").status_code == 200
 
 
 def test_invalid_body_is_a_validation_error(client, database):
