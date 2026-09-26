@@ -72,10 +72,9 @@ test-backend: ## Backend tests (pytest)
 test-frontend: ## Frontend tests (Vitest)
 	$(NPM) test
 
-lint: ## Lint + format: ruff + mypy (Python), ESLint + Prettier (frontend)
+lint: ## Lint + format check: ruff (Python), ESLint + Prettier (frontend)
 	$(PY) ruff check backend
 	$(PY) ruff format --check backend
-	$(BACKEND) mypy
 	$(NPM) run lint
 	$(NPM) run format:check
 

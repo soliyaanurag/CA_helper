@@ -1,5 +1,5 @@
 # Ruff (Python linter + formatter) settings for the whole repo (all Python lives in backend/).
-# Run via `make lint` / `make format`; also runs as a pre-commit hook.
+# Run via `make lint` / `make format`.
 
 line-length = 100
 target-version = "py312"

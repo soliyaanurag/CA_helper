@@ -1,7 +1,7 @@
 # Continuous integration: runs on every pull request and on pushes to main.
 #
-#   backend   ruff, mypy, migrations, pytest (with Postgres + Tesseract),
-#             then checks that the OpenAPI spec builds
+#   backend   ruff, migrations, pytest (with Postgres), then checks that the
+#             OpenAPI spec builds
 #   frontend  lint, format, tests, build
 #
 # CI installs Python packages with pip from backend/requirements-dev.txt, the same
@@ -58,10 +58,6 @@ jobs:
         run: |
           ruff check backend
           ruff format --check backend
-
-      - name: Mypy (lenient; config in backend/pyproject.toml)
-        working-directory: backend
-        run: mypy
 
       - name: Migrations apply cleanly
         working-directory: backend

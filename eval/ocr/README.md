@@ -21,4 +21,4 @@ eval/ocr/
 | `created_by` | `<initials>` | who created the sample |
 
 Metric: field-level accuracy (exact match after normalisation), per field and per document type.
-Keep each sample under 1 MB (pre-commit blocks larger files).
+Keep each sample under 1 MB.
