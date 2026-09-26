@@ -18,7 +18,7 @@ FLASK := $(BACKEND) flask --app app
 NPM := $(PY) --cwd frontend npm
 
 .PHONY: help setup env-update infra infra-down migrate migration seed test lint format \
-	dev-backend dev-worker dev-frontend feature sync check pr merge
+	dev-backend dev-worker dev-frontend doctor feature sync check pr merge
 
 help: ## List all targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -77,6 +77,9 @@ dev-frontend: ## Vite dev server on http://localhost:5173 (forwards /api to :800
 	$(NPM) run dev
 
 # --- Team workflow (scripts/workflow.sh; README "Team workflow") ---------------------
+
+doctor: ## Check this machine (git, env, packages, .env, Docker, database) and say how to fix problems
+	@bash scripts/workflow.sh doctor
 
 feature: ## Start a task: latest main, set up, new branch: make feature branch=anurag/documents-ack-upload
 	@bash scripts/workflow.sh feature "$(branch)"
