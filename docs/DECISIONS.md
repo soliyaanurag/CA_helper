@@ -3,7 +3,56 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-26: Simplified for explainability
+
+**What:** removed everything that a 3-person lab project does not need, so every piece can be explained in a viva
+in one or two sentences. New rule 0 in CLAUDE.md: build the simplest thing that works; ask before adding
+infrastructure, tooling or abstraction layers.
+
+Removed:
+- **JSON logging, request IDs and the custom access log** (`core/logging_config.py`, `core/request_id.py`,
+  `X-Request-ID`, `request_id` in error bodies, `ApiRequestError.requestId`). Now one `logging.basicConfig()` line in
+  `create_app()`, level from `LOG_LEVEL`; Werkzeug prints its own access lines. Error bodies are
+  `{"error": {"code", "message", "details?"}}`.
+- **ProxyFix / `TRUST_PROXY`**: there is no reverse proxy any more.
+- **mypy** (and the `TYPE_CHECKING` workaround it needed in `core/db/models.py`). Linting is ruff + ESLint + tsc.
+- **pre-commit**: `make lint` / `make format` and CI do the same checks.
+- **Savepoint test fixture** (per-test outer transaction + swapped `db.session`). Now the tables are created once per
+  test session and every row is deleted after each test that uses `database`.
+- **Full-Docker mode**: Dockerfiles, nginx, gunicorn, the worker heartbeat and container healthchecks, the CI Docker
+  job, `make up/down/logs`. `docker-compose.yml` keeps only Postgres (with its healthcheck, so `make infra` can wait
+  for it) and Mailpit. Development is `make infra` + the `dev-*` targets, or `python main.py` + `npm run dev`.
+- **Makefile** trimmed to `help setup env-update infra infra-down migrate migration seed test lint format gen-api
+  dev-backend dev-worker dev-frontend` (`test` runs pytest then Vitest).
+- **Unused dependencies**: pgvector, google-genai, pytesseract, PyMuPDF, pdfplumber, opencv, requests,
+  beautifulsoup4, feedparser, cryptography, gunicorn, Faker, mypy, pre-commit; FullCalendar and Recharts; `shadcn`
+  moved to devDependencies (it is a CLI; its CSS is only needed at build time). Each package comes back in the PR
+  of the feature that first imports it. **PDFs use PyMuPDF only** (no pdfplumber). The Tesseract smoke test and
+  the CI Tesseract install go too; the OCR PR adds them back with pytesseract.
+- **Config for unbuilt features** (`MAIL_*`, `FIELD_ENCRYPTION_KEY`, `BLIND_INDEX_KEY`, `UPLOAD_DIR`, `GEMINI_*`,
+  `FRONTEND_URL`, `DISPLAY_TIMEZONE`) and **`ProductionConfig`**. A feature adds its variables when it needs them.
+- **Rehash-on-login** (`needs_rehash`), **`SEED_ORDER`** and the "core seeds" list, **`str_enum()`'s import-time
+  snake_case check** (the CHECK constraint stays), and `tests/test_main.py`.
+- **Frontend route auto-discovery** (`import.meta.glob`, `FeatureRoutes`, `core/routing.ts`, `AreaIndexPage`, the
+  `ROLE_LAYOUTS` loop) and the three identical layout files. Each feature exports a plain `routes` array;
+  `core/routes.tsx` imports each one explicitly into its area, next to that area's sidebar links, and uses `AppShell`
+  directly.
+- **`AuthProvider`'s `tokenRef` + `useLayoutEffect`**: one middleware is registered when `AuthProvider.tsx` loads; it
+  reads the token from `session.ts` (which keeps the session in memory and in localStorage).
+- **Premature label maps** (`COMPLIANCE_STATUS_LABELS`, `ENGAGEMENT_STATUS_LABELS`) and 27 empty `.gitkeep` folders.
+- **`scripts/setup_dev.sh`** from about 340 to about 60 lines: if conda is missing it prints the install command and
+  stops (no auto-install, no OS or Docker diagnostics).
+- **`docs/WORKFLOW.md`** merged into CLAUDE.md ("Shared context", "Session checklist"); PATTERNS.md keeps only the
+  patterns the code uses.
+
+**Why:** the project is judged on whether the team can explain it, not on production readiness. Each removed piece
+solved a deployment or large-team problem we do not have, and each one was another thing to learn, test and keep
+in sync. Supersedes "JSON logs and request IDs" and "mypy in lenient mode", and the parts of earlier entries that
+mention the items above.
+
 ## 2026-09-25: Basic login, role areas and manual run mode
+
+*Partly superseded on 2026-09-26 by "Simplified for explainability".*
 
 **What**
 - **Business area URL is `/business`** (was `/app`), so each role's area matches its name: `/business`, `/ca`,
@@ -61,6 +110,8 @@ everyone runs the same Node version without per-user nvm setups.
 
 ## 2026-09-25: JSON logs and request IDs
 
+**Superseded on 2026-09-26 by "Simplified for explainability" (removed).**
+
 **What:** every request gets an ID: a valid incoming `X-Request-ID` (1–128 chars of `A-Za-z0-9._-`) is reused,
 otherwise a UUID hex is generated (`app/core/request_id.py`). It is returned in the `X-Request-ID` header, added to
 every log line and to every error body (`error.request_id`). The API logs one access line per request itself
@@ -86,6 +137,8 @@ session bound to the test connection. This replaces the old "delete all rows aft
 call real services (which commit) and still stay isolated and fast.
 
 ## 2026-09-25: mypy in lenient mode
+
+**Superseded on 2026-09-26 by "Simplified for explainability" (removed).**
 
 **What:** `mypy==2.3.1` (dev dependency) runs in `make lint` and CI over `app`, `tests`, `worker.py` and
 `conftest.py`. Lenient: only annotated functions are checked (`check_untyped_defs = false`) and missing third-party
@@ -151,6 +204,8 @@ and tests without a DB round-trip for the key, and one base class gives every ta
 to keep in sync. Everything technical (stack, rules, conventions, run modes) is unchanged.
 
 ## 2026-09-25: Initial bootstrap
+
+*Partly superseded on 2026-09-26 by "Simplified for explainability".*
 
 **Stack and versions**
 - **Stack as specified in the bootstrap prompt**; direct dependencies pinned exactly in

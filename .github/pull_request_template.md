@@ -11,7 +11,7 @@
 - [ ] `make lint`
 - [ ] `make test`
 - [ ] Frontend builds (`conda run -n ca-helper --cwd frontend npm run build`)
-- [ ] Tried it by hand (hybrid mode or `make up`)
+- [ ] Tried it by hand (`make dev-backend` + `make dev-frontend`, or `python main.py` + `npm run dev`)
 
 ## Checklist
 

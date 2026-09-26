@@ -6,7 +6,7 @@ Business registration (mandatory + conditional fields), the rule engine that der
 ## What exists now
 Skeleton only; no features yet.
 - Backend (`backend/app/modules/onboarding/`): the `onboarding` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
-- Frontend (`frontend/src/features/onboarding/`): one placeholder page, "Business profile" at `/app/onboarding` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
+- Frontend (`frontend/src/features/onboarding/`): one placeholder page, "Business profile" at `/business/onboarding` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
 - No legal values exist yet; what needs verifying is listed in `docs/TODO_VERIFY.md`.
 
 ## Tables

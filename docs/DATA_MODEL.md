@@ -61,7 +61,7 @@
 This section is the one authoritative list of these values. Module docs and code refer here; changing a value
 means telling the team (it is a contract). The **code** is what the database stores and the API sends
 (lowercase snake_case, via `str_enum()`); the **label** is display text only, shown by the frontend through
-`frontend/src/core/labels.ts`, which must match these tables. The migration that creates each column fixes its
+`frontend/src/core/labels.ts` (one map per enum, added when the enum first reaches the UI), which must match these tables. The migration that creates each column fixes its
 CHECK constraint to exactly these codes.
 
 **`users.role`** (core/auth; `UserRole` in `backend/app/core/db/enums.py`; CHECK `ck_users_user_role`)

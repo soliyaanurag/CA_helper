@@ -6,8 +6,8 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
 ## URLs
 - **Every API route is under `/api/v1`.** `register_blueprints()` (`backend/app/modules/__init__.py`) adds the
   prefix to every module blueprint, so blueprints set no `url_prefix` of their own.
-- **Unversioned (infrastructure only):** `/api/health` (Docker/CI healthchecks, the frontend status badge),
-  `/api/docs` (Swagger UI) and `/api/openapi.json`.
+- **Unversioned (infrastructure only):** `/api/health` (the frontend status badge), `/api/docs` (Swagger UI) and
+  `/api/openapi.json`.
 - The API's bare root `/` redirects to `/api/docs` (the API serves no pages; the app is the frontend).
 - Module resources: `/api/v1/<module>/<resource>`, with kebab-case segments and plural nouns:
   `/api/v1/compliance/items`, `/api/v1/compliance/items/{item_id}`, `/api/v1/ca-workspace/clients`.
@@ -18,8 +18,8 @@ Applies to every endpoint. The live spec is at `/api/docs` (Swagger UI) and `/ap
 - An area's home-page data is served by the module that owns that page, under its own segment:
   `/api/v1/compliance/dashboard` (business), `/api/v1/ca-workspace/dashboard` (CA), `/api/v1/admin/dashboard`.
 - A breaking change would get a new prefix (`/api/v2`) next to the old one; nothing needs that yet.
-- The Vite proxy (hybrid) and nginx (Docker) forward all of `/api/`, which covers both. The frontend client uses
-  `baseUrl: ""` because the generated paths already contain `/api/v1` (`frontend/src/core/api/client.ts`).
+- The Vite dev server proxies all of `/api/` to Flask, which covers both. The frontend client's `baseUrl` is the page
+  origin with no path, because the generated paths already contain `/api/v1` (`frontend/src/core/api/client.ts`).
 
 ## JSON
 - Keys are `snake_case` (the same names as in Python and in the generated TypeScript types).
@@ -54,8 +54,7 @@ Every error response has the same body (built in `backend/app/core/errors.py`):
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Some fields are invalid.",
-    "details": {"json": {"pan": ["Invalid PAN format."]}},
-    "request_id": "3f2a9c1e0b7d4e5f8a6b2c1d0e9f8a7b"
+    "details": {"json": {"pan": ["Invalid PAN format."]}}
   }
 }
 ```
@@ -64,17 +63,9 @@ Every error response has the same body (built in `backend/app/core/errors.py`):
   `VALIDATION_ERROR`. Domain errors use specific codes: `raise ApiError(409, "DUPLICATE_PAN", "...")`.
 - `message`: human-readable, safe to show.
 - `details`: optional; for 422 it maps location (`json`, `query`, ...) → field → messages.
-- `request_id`: the request's ID (see "Request IDs" below). Show it to users with unexpected errors ("quote this
-  ID") so the matching log lines can be found.
 - Never put PII or stack traces in error messages.
 - Frontend: every call goes through `unwrap()` (`frontend/src/core/api/errors.ts`), which turns this body into an
-  `ApiRequestError` with `status`, `code`, `message` and `requestId`.
-
-## Request IDs
-- Every response has an `X-Request-ID` header. If the request carried a valid `X-Request-ID` (1–128 characters of
-  `A-Z a-z 0-9 . _ -`), the same value is returned; otherwise the API generates one (32 hex characters).
-- The same ID is in every log line written while handling the request and in every error body
-  (`backend/app/core/request_id.py`, `backend/app/core/logging_config.py`).
+  `ApiRequestError` with `status`, `code` and `message`.
 
 ## Status codes
 | Code | When |

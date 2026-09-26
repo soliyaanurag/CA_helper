@@ -7,22 +7,22 @@ Users, signup/login for businesses and CAs, JWT access/refresh tokens with a rol
 Basic login works: email + password → JWT access token, role-checked endpoints, demo users. No signup, OTP, password reset or refresh token yet.
 - **Backend** (`backend/app/core/auth/`):
   - `models.py`: `User` (`users` table).
-  - `services.py`: `authenticate()`, which always checks an argon2 hash, even for an unknown email, so timing doesn't reveal which emails exist. It rejects inactive or deleted users and rehashes outdated hashes. Also `get_active_user()` and `normalize_email()`.
+  - `services.py`: `authenticate()`, which always checks an argon2 hash, even for an unknown email, so timing doesn't reveal which emails exist. It rejects inactive or deleted users. Also `get_active_user()` and `normalize_email()`.
   - `tokens.py`: token contents and the JWT error callbacks (standard error body).
   - `routes.py`: login and me.
   - `seed.py`: one demo user per role from `DEMO_*` in `.env`, idempotent. `run_all_seeds()` runs it before the module seeds.
-- **Password hashing:** `backend/app/core/security/passwords.py` (`hash_password`, `verify_password`, `needs_rehash`; argon2-cffi defaults).
+- **Password hashing:** `backend/app/core/security/passwords.py` (`hash_password`, `verify_password`; argon2-cffi defaults).
 - **Access control:** `backend/app/core/permissions.py` has `roles_required(*roles)`, `login_required` (any role) and `current_user()`. The role is checked against the DB row, not only the token claim.
 - **Enum:** `UserRole` (`business` | `ca` | `admin`) in `backend/app/core/db/enums.py`.
 - **Config:** `JWT_ACCESS_TOKEN_EXPIRES` from `JWT_ACCESS_TOKEN_MINUTES` (default 60).
 - **OpenAPI:** bearer auth is the global default (`API_SPEC_OPTIONS["security"]`). Public endpoints opt out with `@blp.doc(security=[])`.
 - **Frontend** (`frontend/src/core/auth/`):
-  - `AuthProvider` (session in localStorage; TODO: move to a refresh cookie). An `api.use()` middleware adds the Bearer header and logs out on any 401 to a request that carried a token.
+  - `session.ts` keeps the session in memory and in localStorage (TODO: move to a refresh cookie). `AuthProvider.tsx` registers one `api.use()` middleware when it loads: it adds the Bearer header and logs out on any 401 to a request that carried a token.
   - `useAuth()` in `auth-context.ts`; `login()` throws `ApiRequestError` (`core/api/errors.ts`) with the API error code.
   - `RequireRole` guard; `ROLE_HOME` in `session.ts`.
   - The login page is `frontend/src/core/pages/LoginPage.tsx` (`/login`).
 - **Tests:**
-  - `backend/tests/test_auth_login.py`: success, email normalization, wrong password vs unknown email, dummy-hash check, inactive, soft-deleted, rehash, validation, rate limit.
+  - `backend/tests/test_auth_login.py`: success, email normalization, wrong password vs unknown email, dummy-hash check, inactive, soft-deleted, validation, rate limit.
   - `backend/tests/test_auth_me_and_permissions.py`: `/me` with no, bad, expired and deactivated tokens; role read from the DB; OpenAPI security.
   - `backend/tests/test_seed_command.py`: demo users, idempotent, skip when variables are missing.
   - `frontend/src/core/auth/auth.test.tsx` and `frontend/src/core/pages/LoginPage.test.tsx`.
@@ -64,4 +64,4 @@ core-infra (password hashing in core/security, email in core/email), marketplace
 ## Known issues
 - Access token only, stored in localStorage (XSS-readable). Moving to an httpOnly refresh-token cookie is planned.
 - No logout endpoint or token revocation: a stolen token works until it expires (a deactivated user is still rejected at once).
-- The rate limit uses in-memory storage (per process): with several gunicorn workers each has its own counter.
+- The rate limit uses in-memory storage (per process); fine for the single dev-server process.

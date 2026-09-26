@@ -6,7 +6,7 @@ All scheduled user alerts (T-7/T-3/T-1 and overdue reminders by email + tray), p
 ## What exists now
 Skeleton only; no features yet.
 - Backend (`backend/app/modules/alerts/`): the `alerts` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; no `register_jobs`, so the worker runs no jobs; `tests/` is empty.
-- Frontend (`frontend/src/features/alerts/`): one placeholder page, "Notification settings" at `/app/alerts` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
+- Frontend (`frontend/src/features/alerts/`): one placeholder page, "Notification settings" at `/business/alerts` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
 
 ## Tables
 None yet. Planned:

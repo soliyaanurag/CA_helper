@@ -6,7 +6,7 @@ CA signup/practice profile, verification (Certificate of Practice), the marketpl
 ## What exists now
 Skeleton only; no features yet.
 - Backend (`backend/app/modules/marketplace/`): the `marketplace` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
-- Frontend (`frontend/src/features/marketplace/`): one placeholder page, "Find a CA" at `/app/marketplace` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
+- Frontend (`frontend/src/features/marketplace/`): one placeholder page, "Find a CA" at `/business/marketplace` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
 
 ## Tables
 None yet. Planned:
