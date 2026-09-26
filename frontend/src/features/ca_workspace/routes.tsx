@@ -1,18 +1,10 @@
-import type { FeatureRoutes } from "@/core/routing";
+import type { RouteObject } from "react-router";
 
-import { CaWorkspacePage } from "./pages/CaWorkspacePage";
 import { CaDashboardPage } from "./pages/CaDashboardPage";
+import { CaWorkspacePage } from "./pages/CaWorkspacePage";
 
-/** Routes of the ca_workspace module, picked up automatically by core/routes.tsx. */
-export const routes: FeatureRoutes = {
-  ca: {
-    routes: [
-      { index: true, element: <CaDashboardPage /> },
-      { path: "clients", element: <CaWorkspacePage /> },
-    ],
-    nav: [
-      { label: "Dashboard", path: "", order: 0 },
-      { label: "My clients", path: "clients", order: 10 },
-    ],
-  },
-};
+/** CA area pages of the ca_workspace module (paths are relative to /ca). */
+export const routes: RouteObject[] = [
+  { index: true, element: <CaDashboardPage /> },
+  { path: "clients", element: <CaWorkspacePage /> },
+];

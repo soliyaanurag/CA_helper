@@ -1,76 +1,48 @@
-import type { ComponentType } from "react";
 import type { RouteObject } from "react-router";
 
 import { RequireRole } from "@/core/auth/RequireRole";
-import type { Role } from "@/core/auth/session";
 import { USER_ROLE_LABELS } from "@/core/labels";
-import { AdminLayout } from "@/core/layout/AdminLayout";
-import { BusinessLayout } from "@/core/layout/BusinessLayout";
-import { CaLayout } from "@/core/layout/CaLayout";
+import { AppShell, type NavItem } from "@/core/layout/AppShell";
 import { PublicLayout } from "@/core/layout/PublicLayout";
-import { AreaIndexPage } from "@/core/pages/AreaIndexPage";
 import { HomePage } from "@/core/pages/HomePage";
 import { LoginPage } from "@/core/pages/LoginPage";
 import { NotFoundPage } from "@/core/pages/NotFoundPage";
-import { AREA_PREFIX, type Area, type FeatureRoutes, type NavItem } from "@/core/routing";
+import { routes as adminRoutes } from "@/features/admin/routes";
+import { routes as alertsRoutes } from "@/features/alerts/routes";
+import { routes as assistantRoutes } from "@/features/assistant/routes";
+import { routes as caWorkspaceRoutes } from "@/features/ca_workspace/routes";
+import { routes as complianceRoutes } from "@/features/compliance/routes";
+import { routes as documentsRoutes } from "@/features/documents/routes";
+import { routes as marketplaceRoutes } from "@/features/marketplace/routes";
+import { routes as onboardingRoutes } from "@/features/onboarding/routes";
+import { routes as regulatoryRoutes } from "@/features/regulatory/routes";
 
-/**
- * Route aggregation: every `features/<module>/routes.tsx` is picked up
- * automatically at build time. There is no central list to edit, so modules
- * never conflict here.
+/*
+ * Every page of the app. Each logged-in area (/business, /ca, /admin) is only for
+ * its role (RequireRole; the backend checks the role again on every request) and
+ * shows its pages inside AppShell with the sidebar links listed below.
  */
-const featureFiles = import.meta.glob<{ routes: FeatureRoutes }>("../features/*/routes.tsx", {
-  eager: true,
-});
 
-/** Module name -> its routes, e.g. "compliance" -> { business: {...} }. */
-export const featureRoutes: Record<string, FeatureRoutes> = Object.fromEntries(
-  Object.entries(featureFiles).map(([file, mod]) => [file.split("/")[2], mod.routes]),
-);
+const BUSINESS_NAV: NavItem[] = [
+  { label: "Dashboard", path: "/business" },
+  { label: "Business profile", path: "/business/onboarding" },
+  { label: "Compliance calendar", path: "/business/compliance" },
+  { label: "Document vault", path: "/business/documents" },
+  { label: "Find a CA", path: "/business/marketplace" },
+  { label: "Notification settings", path: "/business/alerts" },
+  { label: "AI assistant", path: "/business/assistant" },
+];
 
-function routesFor(area: Area): RouteObject[] {
-  return Object.values(featureRoutes).flatMap((feature) => feature[area]?.routes ?? []);
-}
+const CA_NAV: NavItem[] = [
+  { label: "Dashboard", path: "/ca" },
+  { label: "My clients", path: "/ca/clients" },
+];
 
-/** The area's routes, plus AreaIndexPage as its home if no module gives an index route. */
-function areaChildren(area: Area): RouteObject[] {
-  const routes = routesFor(area);
-  if (routes.some((route) => route.index)) return routes;
-  const title = area === "public" ? "" : USER_ROLE_LABELS[area];
-  return [{ index: true, element: <AreaIndexPage title={title} nav={navFor(area)} /> }, ...routes];
-}
-
-/** Sidebar links for one area, with absolute paths, sorted by `order`. */
-export function navFor(area: Area): NavItem[] {
-  return Object.values(featureRoutes)
-    .flatMap((feature) => feature[area]?.nav ?? [])
-    .map((item) => ({
-      ...item,
-      path: item.path ? `${AREA_PREFIX[area]}/${item.path}` : AREA_PREFIX[area],
-    }))
-    .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
-}
-
-/** The logged-in areas: one per role, each with its own layout. */
-const ROLE_LAYOUTS: Record<Role, ComponentType<{ nav: NavItem[] }>> = {
-  business: BusinessLayout,
-  ca: CaLayout,
-  admin: AdminLayout,
-};
-
-function roleArea(role: Role): RouteObject {
-  const Layout = ROLE_LAYOUTS[role];
-  return {
-    path: AREA_PREFIX[role],
-    // Only for this role (RequireRole); the backend checks again on every request.
-    element: (
-      <RequireRole role={role}>
-        <Layout nav={navFor(role)} />
-      </RequireRole>
-    ),
-    children: areaChildren(role),
-  };
-}
+const ADMIN_NAV: NavItem[] = [
+  { label: "Dashboard", path: "/admin" },
+  { label: "Users & CAs", path: "/admin/users" },
+  { label: "Regulatory news", path: "/admin/regulatory" },
+];
 
 export const appRoutes: RouteObject[] = [
   {
@@ -79,9 +51,44 @@ export const appRoutes: RouteObject[] = [
     children: [
       { index: true, element: <HomePage /> },
       { path: "login", element: <LoginPage /> },
-      ...routesFor("public"),
     ],
   },
-  ...(Object.keys(ROLE_LAYOUTS) as Role[]).map(roleArea),
+  {
+    path: "/business",
+    element: (
+      <RequireRole role="business">
+        <AppShell title={USER_ROLE_LABELS.business} home="/business" nav={BUSINESS_NAV} />
+      </RequireRole>
+    ),
+    // Add your feature's routes here.
+    children: [
+      ...complianceRoutes,
+      ...onboardingRoutes,
+      ...documentsRoutes,
+      ...marketplaceRoutes,
+      ...alertsRoutes,
+      ...assistantRoutes,
+    ],
+  },
+  {
+    path: "/ca",
+    element: (
+      <RequireRole role="ca">
+        <AppShell title={USER_ROLE_LABELS.ca} home="/ca" nav={CA_NAV} />
+      </RequireRole>
+    ),
+    // Add your feature's routes here.
+    children: [...caWorkspaceRoutes],
+  },
+  {
+    path: "/admin",
+    element: (
+      <RequireRole role="admin">
+        <AppShell title={USER_ROLE_LABELS.admin} home="/admin" nav={ADMIN_NAV} />
+      </RequireRole>
+    ),
+    // Add your feature's routes here.
+    children: [...adminRoutes, ...regulatoryRoutes],
+  },
   { path: "*", element: <NotFoundPage /> },
 ];

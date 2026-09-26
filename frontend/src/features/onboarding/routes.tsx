@@ -1,11 +1,6 @@
-import type { FeatureRoutes } from "@/core/routing";
+import type { RouteObject } from "react-router";
 
 import { OnboardingPage } from "./pages/OnboardingPage";
 
-/** Routes of the onboarding module, picked up automatically by core/routes.tsx. */
-export const routes: FeatureRoutes = {
-  business: {
-    routes: [{ path: "onboarding", element: <OnboardingPage /> }],
-    nav: [{ label: "Business profile", path: "onboarding", order: 10 }],
-  },
-};
+/** Business area pages of the onboarding module (paths are relative to /business). */
+export const routes: RouteObject[] = [{ path: "onboarding", element: <OnboardingPage /> }];

@@ -1,11 +1,6 @@
-import type { FeatureRoutes } from "@/core/routing";
+import type { RouteObject } from "react-router";
 
 import { AlertsPage } from "./pages/AlertsPage";
 
-/** Routes of the alerts module, picked up automatically by core/routes.tsx. */
-export const routes: FeatureRoutes = {
-  business: {
-    routes: [{ path: "alerts", element: <AlertsPage /> }],
-    nav: [{ label: "Notification settings", path: "alerts", order: 50 }],
-  },
-};
+/** Business area pages of the alerts module (paths are relative to /business). */
+export const routes: RouteObject[] = [{ path: "alerts", element: <AlertsPage /> }];

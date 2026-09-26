@@ -3,7 +3,12 @@ import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "@/core/auth/auth-context";
 import { Button } from "@/core/components/ui/button";
 import { cn } from "@/core/lib/utils";
-import type { NavItem } from "@/core/routing";
+
+/** A sidebar link, e.g. { label: "Document vault", path: "/business/documents" }. */
+export interface NavItem {
+  label: string;
+  path: string;
+}
 
 interface AppShellProps {
   /** Area name shown under the logo, e.g. "Business". */
@@ -13,7 +18,7 @@ interface AppShellProps {
   nav: NavItem[];
 }
 
-/** Shared frame for the logged-in areas: sidebar navigation, user + logout, page content. */
+/** Frame for the logged-in areas (/business, /ca, /admin): sidebar links, user + logout, page content. */
 export function AppShell({ title, home, nav }: AppShellProps) {
   const { user, logout } = useAuth();
 
