@@ -21,6 +21,8 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
   People may run the servers by hand (README "Quick start"); Claude always uses Make targets or `conda run`.
 - Ports: API 8000, Vite 5173, Postgres 5432, Mailpit UI 8025. Node 22 LTS from the conda env.
 - Ask before substituting or adding any tool. Record decisions in `docs/DECISIONS.md`.
+- Team workflow: `make doctor`, `make feature branch=...`, `make sync`, `make check`, `make pr`, `make merge` (see
+  "Session checklist" below and README "Team workflow").
 
 ## Folder map
 ```
@@ -88,16 +90,19 @@ infrastructure, tooling or abstraction layers without asking.
    Enums are `StrEnum` with lowercase snake_case values stored via `str_enum()`. See `docs/PATTERNS.md` "Foundations".
 
 ## Session checklist
+Every task goes through the workflow commands (README "Team workflow", code in `scripts/workflow.sh`). Never replace
+them with hand-made git sequences; if a command refuses, read its ERROR message and follow the fix it names.
+
 **Start**
 1. `git status`: if there are uncommitted changes you didn't make in this task, **stop and ask**.
-2. `git fetch origin`, then `git switch main && git pull --ff-only`.
-3. New task: `git switch -c <name>/<module>-<short-task>` (e.g. `anurag/documents-ack-upload`). Continuing: switch,
-   then `git rebase origin/main`. A conflict in files you didn't change in this task → **stop and ask**.
-4. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`.
-5. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, shared code, "Depends on").
-6. Env check: env `ca-helper` exists (else tell the user to run `make setup`); `environment.yml`/`requirements*`
-   changed → `make env-update`; `frontend/package*.json` changed → `conda run -n ca-helper --cwd frontend npm ci`;
-   `make infra` running; `make migrate` and `make test` pass **before** changing anything.
+2. `make doctor`. Fix every `FIX` line it prints (it names the fix). Docker not running → ask the user to start
+   Docker Desktop. The conda env missing → tell the user to run `make setup`.
+3. New task: `make feature branch=<name>/<module>-<short-task>` (e.g. `anurag/documents-ack-upload`); it pulls main,
+   runs `make sync` and creates the branch. Continuing: `git switch <branch>`, `git rebase origin/main`, `make sync`.
+   A rebase conflict in files you didn't change in this task → **stop and ask**.
+4. `make test` passes **before** changing anything.
+5. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`.
+6. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, shared code, "Depends on").
 
 **While working**
 - Keep changes scoped to the task; if a change touches shared code, shared config, or another module, say so clearly
@@ -106,19 +111,23 @@ infrastructure, tooling or abstraction layers without asking.
   (module doc, `DECISIONS.md`, `DATA_MODEL.md` or `API_CONVENTIONS.md`) in the same PR.
 - Small Conventional Commits (`feat(documents): ...`, `fix(...)`, `docs(...)`, `test(...)`, `chore(...)`); stage
   specific files, never `git add -A` blindly.
-- Migrations: pull main right before `make migration name="<module>: <msg>"`; one per PR; never edit a migration
-  already on main; multiple heads → `conda run -n ca-helper --cwd backend flask --app app db merge heads -m "merge"`.
+- Migrations: `make sync` right before `make migration name="<module>: <msg>"`; one per PR; never edit a migration
+  already on main. Multiple heads → `make check` prints the merge command.
 - Route/schema change → check every frontend call of that endpoint (`grep` the URL in `frontend/src/api/`).
-- New dependency (ask first): pin in `backend/requirements*.txt` + `make env-update`, or `conda run -n ca-helper
-  --cwd frontend npm install <pkg>`; mention it in the PR. New service/route → tests; new table → seed data.
+- New dependency (ask first): pin in `backend/requirements*.txt` or `conda run -n ca-helper --cwd frontend npm install
+  <pkg>`, then `make sync` (it installs only what changed); mention it in the PR. New service/route → tests; new
+  table → seed data; new `.env` variable → `.env.example` with a comment (`make sync` lists it for teammates).
+- Something in the environment fails (database, Docker, packages) → `make doctor` before guessing.
 
 **End / before a PR**
-- `make lint` and `make test` pass and the frontend builds (`conda run -n ca-helper --cwd frontend npm run build`).
-  Never leave the branch red.
+- `make check` passes: lint, migration checks, tests, frontend build. Never leave the branch red.
 - Update the module doc: "What exists now", tables, endpoints, contracts, known issues. Data model or
   conventions changed → `docs/DATA_MODEL.md` / `docs/DECISIONS.md`.
-- Show a summary and **ask before `git push`**; PR from `.github/pull_request_template.md` (`gh pr create`), one task
-  per PR. CI green and a teammate's review before a squash-merge into `main`.
+- Show a summary and **ask before `make pr`** (it pushes). It runs `make check` again, pushes and opens the PR from
+  `.github/pull_request_template.md`; fill in the template with `gh pr edit --body-file`. One task per PR.
+- **Ask before `make merge`.** It merges only with no conflicts, green CI and a teammate's approval, always as a
+  squash, then syncs main. Never merge on GitHub with "Create a merge commit".
+- After the merge, teammates run `make sync` on main.
 
 **Never:** commit to main · force-push main · rewrite a branch someone else uses · `git reset --hard` or delete
 branches without asking · commit secrets or generated files (`.env`, `openapi.json`, uploads).

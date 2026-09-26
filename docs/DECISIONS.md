@@ -3,6 +3,34 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-26: Workflow commands (make doctor / feature / sync / check / pr / merge)
+
+**What**
+- `scripts/workflow.sh` with one subcommand per step, called by five new Make targets; no existing target changed.
+  `make feature` (latest main, sync, new branch), `make sync` (after a pull), `make check` (before pushing),
+  `make pr` (check, push, open the PR), `make merge` (squash-merge when CI is green and a teammate approved).
+- `make sync` reinstalls packages only when `environment.yml`, `backend/requirements*.txt` or
+  `frontend/package-lock.json` changed since the last install. It remembers a fingerprint of those files
+  (`git hash-object`) in `.git/`, so nothing new is committed or gitignored.
+- `make check` adds two migration checks CI does not have: exactly one Alembic head, and `flask db check` (fails
+  when a model changed without a migration).
+- `make doctor` checks git, the conda env (Python 3.12, Node 22), packages, `.env`, Docker, the database's
+  migration and the dev servers, changes nothing, and prints a fix for every problem.
+- Every failure prints `ERROR in step "<step>"` with the fix. Known causes get specific advice: Docker not running,
+  a database migration the branch does not know, Postgres unreachable, a port taken, uncommitted changes, main
+  moved on, CI pending or failed, missing approval, requested changes, conflicts. Anything else names the step and
+  points to `make doctor`.
+- `make merge` merges only without conflicts, with green CI, at least one approval and no open "changes requested";
+  always as a squash, deleting the branch.
+- These commands are the team's workflow for every task; `CLAUDE.md` "Session checklist" and the README "Team
+  workflow" describe it. The pull request template ticks `make check` instead of lint, test and build separately.
+- The scripts never force-push, pull only fast-forward, refuse to switch branches with uncommitted changes, and only
+  warn about variables missing from `.env` (they never edit it). They use `git`, `gh` and `make`, which we already use.
+
+**Why:** the team asked for one set of commands that gets a feature from a branch to main and onto everyone's
+machine without breaking anything. The usual failures were a missing migration, a missed package install, a stale
+`.env` and Docker not running; each step now checks for those.
+
 ## 2026-09-26: Signup, email OTP and passwords
 
 **What**

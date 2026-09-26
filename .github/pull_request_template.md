@@ -8,9 +8,7 @@
 
 <!-- Paste the relevant output or tick what you ran. -->
 
-- [ ] `make lint`
-- [ ] `make test`
-- [ ] Frontend builds (`conda run -n ca-helper --cwd frontend npm run build`)
+- [ ] `make check` (lint, migration checks, tests, frontend build; `make pr` runs it before pushing)
 - [ ] Tried it by hand (`make dev-backend` + `make dev-frontend`)
 
 ## Checklist
