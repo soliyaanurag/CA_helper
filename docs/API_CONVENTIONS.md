@@ -93,7 +93,10 @@ List endpoints that can grow take `?page=1&page_size=20` (`page` starts at 1; `p
 ```json
 {"items": [...], "page": 1, "page_size": 20, "total": 57}
 ```
-A shared schema/helper for this is added with the first paginated endpoint.
+Shared shapes in `backend/app/schemas/pagination.py`: the endpoint's query schema subclasses `PageArgsSchema` (adding
+its filters) and its response schema subclasses `PageSchema` (adding `items`); the service pages its query with
+`db.paginate(stmt, page=page, per_page=page_size, error_out=False)`. A page past the end returns empty `items`.
+First user: `GET /api/v1/marketplace/cas` (`list_verified_cas()` in `app/services/marketplace_service.py`).
 
 ## Filtering and sorting
 Plain query parameters named after fields: `?status=overdue&form_code=GSTR-3B&sort=due_date` (`-due_date` for descending).
