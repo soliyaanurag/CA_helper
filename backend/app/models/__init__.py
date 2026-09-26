@@ -4,12 +4,14 @@
     enums.py      str_enum() and the enums shared by several models (UserRole)
     user.py       User (`users`)
     email_otp.py  EmailOtp (`email_otps`): emailed one-time codes, OtpPurpose
+    marketplace.py  CaProfile (`ca_profiles`): a CA's practice profile, CaVerificationStatus
 
 Every model is imported here, so Alembic (`make migration`) sees every table.
 Import a new model here when you add its file.
 """
 
 from app.models.email_otp import EmailOtp
+from app.models.marketplace import CaProfile
 from app.models.user import User
 
-__all__ = ["EmailOtp", "User"]
+__all__ = ["CaProfile", "EmailOtp", "User"]
