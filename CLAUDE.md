@@ -23,16 +23,18 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 ## Folder map
 ```
 backend/app/__init__.py      create_app(); config.py, extensions.py, cli.py (`flask seed`)
-backend/app/core/            auth/ permissions.py db/ security/ storage/ email/ notifications/ ai/ ocr/ errors.py health.py
-                             db/: base.py models.py (BaseModel, mixins) enums.py
-backend/app/modules/<m>/     __init__.py (blp, seed, register_jobs) routes.py models.py schemas.py services.py seed.py tests/
+backend/app/core/            auth/ permissions.py db/ (base.py, models.py: BaseModel + mixins, enums.py) security/ errors.py
+                             health.py · planned: ai/ email/ notifications/ ocr/ storage/ (docs/modules/core-infra.md)
+backend/app/modules/<m>/     __init__.py (blp, optional seed, register_jobs) routes.py; add models.py schemas.py
+                             services.py seed.py tests/ (with __init__.py) when the module first needs them
 backend/worker.py            APScheduler entrypoint (collects each module's register_jobs) · backend/main.py manual dev server
 backend/migrations/          single Alembic dir · backend/conftest.py shared pytest fixtures
-frontend/src/core/           api/ (client.ts, generated/ gitignored) auth/ layout/ components/ui/ routes.tsx labels.ts
+frontend/src/core/           api/ (client.ts, generated/ = openapi.json + schema.d.ts, gitignored) auth/ layout/
+                             components/ui/ routes.tsx labels.ts
 frontend/src/features/<m>/   routes.tsx (a plain `routes` array, listed in core/routes.tsx) pages/ api.ts
 content/forms/<FORM>/        explanation.md instructions.md checklist.yaml
 docs/                        project docs · docs/modules/<m>.md = module context (what exists, contracts)
-eval/                        evaluation datasets (never real personal data) · scripts/ setup_dev.sh
+eval/                        evaluation datasets, formats in eval/README.md (never real personal data) · scripts/
 ```
 Modules: onboarding, compliance, alerts, documents, assistant, regulatory, marketplace, ca_workspace, admin.
 
@@ -113,7 +115,7 @@ others goes into `docs/` (module doc, `DECISIONS.md`, `DATA_MODEL.md` or `API_CO
   One task per PR, Conventional Commit title; CI green and a teammate's review before a squash-merge.
 
 **Never:** commit to main · force-push main · rewrite a branch someone else uses · `git reset --hard` or delete
-branches without asking · commit secrets or generated files (`.env`, `openapi.json`, `frontend/src/core/api/generated/`, uploads).
+branches without asking · commit secrets or generated files (`.env`, `frontend/src/core/api/generated/`, uploads).
 
 ## Other docs (read when relevant)
 `docs/PATTERNS.md` (how to add a feature) · `docs/API_CONVENTIONS.md` (URLs, auth, errors, pagination) ·

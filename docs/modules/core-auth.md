@@ -52,7 +52,7 @@ Planned: signup, refresh, logout, verify-email (OTP), password reset.
 - Planned: `ca_has_active_access(ca_id, business_id)`.
 
 ## Depends on
-core-infra (password hashing in core/security, email in core/email), marketplace (engagement status for `ca_has_active_access`).
+core-infra (password hashing in core/security; email in core/email, planned), marketplace (engagement status for `ca_has_active_access`).
 
 ## Contracts (don't change without telling the team)
 - JWT: `sub` = user id (UUID string), `role` claim = `business` | `ca` | `admin`, expiry from `JWT_ACCESS_TOKEN_MINUTES`

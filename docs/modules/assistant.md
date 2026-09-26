@@ -5,9 +5,9 @@ The floating assistant for both roles: answers through the PII-scrubbing Gemini 
 
 ## What exists now
 Skeleton only; no features yet.
-- Backend (`backend/app/modules/assistant/`): the `assistant` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; `tests/` is empty.
-- Frontend (`frontend/src/features/assistant/`): one placeholder page, "AI assistant" at `/business/assistant` (business nav), built from `ModulePlaceholder`; `api.ts` is empty. The floating widget shell (frontend core) does not exist yet.
-- The Gemini wrapper it needs (`core/ai/gemini_client.py`) does not exist yet.
+- Backend (`backend/app/modules/assistant/`): only `__init__.py` and `routes.py`, whose `assistant` blueprint is registered under `/api/v1` with no routes yet; no models, services or seed data; no tests yet.
+- Frontend (`frontend/src/features/assistant/`): one placeholder page, "AI assistant" at `/business/assistant` (business nav), built from `ModulePlaceholder`; no API hooks yet. The floating widget shell (frontend core) does not exist yet.
+- The Gemini wrapper it needs (`core/ai/gemini_client.py`, planned in core-infra) does not exist yet.
 
 ## Tables
 None yet. Planned:

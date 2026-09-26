@@ -73,12 +73,12 @@ Log in at http://localhost:5173/login with a demo user from `.env` (`DEMO_*` var
 `frontend/src/core/api/generated/`, which is not committed):
 
 ```bash
-make gen-api              # exports ../openapi.json from Flask, then runs `npm run gen:api`
+make gen-api              # exports the OpenAPI spec from Flask, then runs `npm run gen:api`
 ```
 
-With the env activated you can do the same by hand: `cd backend && flask --app app openapi write --format=json
-../openapi.json`, then `cd ../frontend && npm run gen:api` (this npm script only converts an existing
-`openapi.json`; it does not export a new one). `npm run dev` keeps working with stale types, but `npm run
+Both files land in `frontend/src/core/api/generated/` (`openapi.json` and `schema.d.ts`). `npm run gen:api` alone
+only converts an existing `openapi.json`; it does not export a new one, so use `make gen-api` (it needs no
+activated env). `npm run dev` keeps working with stale types, but `npm run
 typecheck`, `npm run build` and your editor will report errors until you regenerate.
 
 `backend/main.py` is only for this manual mode. The Make targets and CI do not use it.
@@ -126,7 +126,7 @@ these targets or `conda run`; an activated env is only for running things by han
 | `make migrate` | apply migrations | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db upgrade` |
 | `make migration name="onboarding: add businesses"` | new migration | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db migrate -m "onboarding: add businesses"` |
 | `make seed` | dev seed data | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed` |
-| `make gen-api` | OpenAPI → TypeScript types | `conda run -n ca-helper --cwd backend flask --app app openapi write --format=json ../openapi.json && conda run -n ca-helper --cwd frontend npm run gen:api` |
+| `make gen-api` | OpenAPI → TypeScript types | `conda run -n ca-helper --cwd backend flask --app app openapi write --format=json ../frontend/src/core/api/generated/openapi.json && conda run -n ca-helper --cwd frontend npm run gen:api` |
 
 ## VS Code
 

@@ -72,6 +72,10 @@ Other modules call a module's **service functions** (listed in its module doc), 
 
 ## Backend recipes
 
+**Module files.** A module starts with only `__init__.py` (exports `blp`) and `routes.py`. Create `schemas.py`,
+`services.py`, `models.py`, `seed.py` and `tests/` (with an empty `__init__.py`, because several modules have a
+`test_dashboard.py`) when the module first needs them; copy them from `app/modules/compliance/`.
+
 **Route.** One Blueprint per module in `routes.py`, without a `url_prefix` (it is registered under `/api/v1`); write
 the module segment in every route (`/<module>/widgets`). Put `@roles_required(...)` (or `@login_required`) first on
 **every** endpoint. Admin endpoints for a module's config: `/api/v1/admin/<module>/...` in the same blueprint.
@@ -91,8 +95,9 @@ class Widget(SoftDeleteMixin, BaseModel):
 Then: pull main → `make migration name="<module>: add widgets"` → review the file → `make migrate`. One migration
 per PR. Add the table to `docs/DATA_MODEL.md` and the module doc.
 
-**Seed.** `seed.py` → `seed()` must be safe to re-run (check before insert) and must not commit. `make seed` runs the
-demo users first, then every module's `seed()` in name order.
+**Seed.** `seed.py` → `seed()` must be safe to re-run (check before insert) and must not commit; export it from the
+module's `__init__.py` (`from app.modules.<m>.seed import seed`). `make seed` runs the demo users first
+(`app/core/auth/seed.py`), then every module's `seed()` in name order.
 
 **Tests.** `app/modules/<module>/tests/test_*.py`, fixtures from `backend/conftest.py`: `app`, `client`,
 `database` (request it in any test that touches the DB; after the test every row is deleted, so each test starts

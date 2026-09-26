@@ -30,7 +30,7 @@ core-infra (OpenAPI spec via `make gen-api`), core-auth (auth context needs logi
 
 ## Contracts (don't change without telling the team)
 - Each feature exports a plain `routes: RouteObject[]` from `features/<module>/routes.tsx`, with paths relative to its area (`/business`, `/ca`, `/admin`); `core/routes.tsx` imports it explicitly into that area and lists its sidebar links; a module may give its area's home as an `index: true` route; module admin screens live in `features/<module>/admin/` and go into the admin area
-- API types are generated into `src/core/api/generated/` (gitignored); never hand-write API types
+- The OpenAPI spec and API types are generated into `src/core/api/generated/` (`openapi.json`, `schema.d.ts`; gitignored) by `make gen-api`; never hand-write API types
 - Enum codes from the API are shown only through `label()` / the maps in `core/labels.ts`, never as raw codes
 
 ## Known issues

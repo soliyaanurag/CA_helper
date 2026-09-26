@@ -44,6 +44,13 @@ Removed:
   stops (no auto-install, no OS or Docker diagnostics).
 - **`docs/WORKFLOW.md`** merged into CLAUDE.md ("Shared context", "Session checklist"); PATTERNS.md keeps only the
   patterns the code uses.
+- **Directory clean-up:** modules keep only the files they use (`__init__.py` + `routes.py`, plus `schemas.py`,
+  `services.py` and `tests/` where there is code; the frontend drops empty `api.ts` files), and no module has an empty
+  `seed()`. The docstring-only core packages (`ai`, `email`, `notifications`, `ocr`, `storage`) are removed; their
+  plans live in `docs/modules/core-infra.md`. The four README-only `eval/` subfolders are folded into
+  `eval/README.md`. `ruff.toml` moved into `backend/pyproject.toml` (`[tool.ruff]`), and the generated
+  `openapi.json` moved from the repo root into the gitignored `frontend/src/core/api/generated/`. VS Code hides
+  `__pycache__`, `.pytest_cache`, `.ruff_cache` and `frontend/dist` (`files.exclude`).
 
 **Why:** the project is judged on whether the team can explain it, not on production readiness. Each removed piece
 solved a deployment or large-team problem we do not have, and each one was another thing to learn, test and keep
