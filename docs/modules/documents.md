@@ -7,7 +7,7 @@ Encrypted upload/download of documents (acknowledgements, checklist documents), 
 Skeleton only; no features yet.
 - Backend: no code yet (no blueprint, models, schemas or services). Create `routes/documents.py`, `schemas/documents.py`, `services/documents_service.py` (and `models/documents.py`) when the first feature lands, and add the blueprint to `BLUEPRINTS` (docs/PATTERNS.md).
 - Frontend: one placeholder page, "Document vault" at `/business/documents` (business nav), `frontend/src/pages/business/DocumentsPage.jsx`, built from `Placeholder`; no API hooks yet.
-- The encrypted storage and OCR helpers it needs (`app/utils/storage.py`, `app/utils/ocr.py`) do not exist yet; only a Tesseract smoke test exists.
+- The encrypted storage and OCR helpers it needs (`app/utils/storage.py`, `app/utils/ocr.py`) do not exist yet, nor do their packages (pytesseract, PyMuPDF) or the Tesseract binary in the conda env.
 
 ## Tables
 None yet. Planned:

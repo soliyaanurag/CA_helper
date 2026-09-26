@@ -1,6 +1,6 @@
 """GET /api/health: is the API up and can it reach the database?
 
-Used by the Docker healthcheck, CI and the frontend's status badge.
+Used by the frontend's API status badge on the landing page.
 """
 
 import logging
