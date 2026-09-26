@@ -18,7 +18,7 @@ FLASK := $(BACKEND) flask --app app
 NPM := $(PY) --cwd frontend npm
 
 .PHONY: help setup env-update infra infra-down migrate migration seed test lint format \
-	dev-backend dev-worker dev-frontend
+	dev-backend dev-worker dev-frontend feature sync check pr merge
 
 help: ## List all targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -75,3 +75,20 @@ dev-worker: .env ## Background worker (APScheduler) in the foreground
 
 dev-frontend: ## Vite dev server on http://localhost:5173 (forwards /api to :8000)
 	$(NPM) run dev
+
+# --- Team workflow (scripts/workflow.sh; README "Team workflow") ---------------------
+
+feature: ## Start a task: latest main, set up, new branch: make feature branch=anurag/documents-ack-upload
+	@bash scripts/workflow.sh feature "$(branch)"
+
+sync: ## After a pull (or any time): latest main, packages, .env check, Docker, migrations, seed
+	@bash scripts/workflow.sh sync
+
+check: ## Before pushing: lint, tests, frontend build, migration checks
+	@bash scripts/workflow.sh check
+
+pr: ## Check, push this branch and open (or update) its pull request
+	@bash scripts/workflow.sh pr
+
+merge: ## Squash-merge this branch's approved, green pull request, then sync main
+	@bash scripts/workflow.sh merge

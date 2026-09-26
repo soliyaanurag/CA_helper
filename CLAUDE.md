@@ -91,13 +91,14 @@ infrastructure, tooling or abstraction layers without asking.
 **Start**
 1. `git status`: if there are uncommitted changes you didn't make in this task, **stop and ask**.
 2. `git fetch origin`, then `git switch main && git pull --ff-only`.
-3. New task: `git switch -c <name>/<module>-<short-task>` (e.g. `anurag/documents-ack-upload`). Continuing: switch,
-   then `git rebase origin/main`. A conflict in files you didn't change in this task → **stop and ask**.
+3. New task: `git switch -c <name>/<module>-<short-task>` (e.g. `anurag/documents-ack-upload`); `make feature
+   branch=<...>` does steps 2, 3 and 6 in one go. Continuing: switch, then `git rebase origin/main`. A conflict in files you didn't change in this task → **stop and ask**.
 4. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`.
 5. Summarize what changed on main that matters here (`docs/`, `backend/migrations/`, shared code, "Depends on").
 6. Env check: env `ca-helper` exists (else tell the user to run `make setup`); `environment.yml`/`requirements*`
    changed → `make env-update`; `frontend/package*.json` changed → `conda run -n ca-helper --cwd frontend npm ci`;
-   `make infra` running; `make migrate` and `make test` pass **before** changing anything.
+   `make infra` running; `make migrate` and `make test` pass **before** changing anything. `make sync` does all of
+   this except the tests (README "Team workflow").
 
 **While working**
 - Keep changes scoped to the task; if a change touches shared code, shared config, or another module, say so clearly
@@ -113,12 +114,12 @@ infrastructure, tooling or abstraction layers without asking.
   --cwd frontend npm install <pkg>`; mention it in the PR. New service/route → tests; new table → seed data.
 
 **End / before a PR**
-- `make lint` and `make test` pass and the frontend builds (`conda run -n ca-helper --cwd frontend npm run build`).
-  Never leave the branch red.
+- `make check` passes: lint, tests, frontend build and migration checks. Never leave the branch red.
 - Update the module doc: "What exists now", tables, endpoints, contracts, known issues. Data model or
   conventions changed → `docs/DATA_MODEL.md` / `docs/DECISIONS.md`.
-- Show a summary and **ask before `git push`**; PR from `.github/pull_request_template.md` (`gh pr create`), one task
-  per PR. CI green and a teammate's review before a squash-merge into `main`.
+- Show a summary and **ask before `git push`**; then `make pr` (checks, pushes, opens the PR from
+  `.github/pull_request_template.md`), one task per PR. CI green and a teammate's review before a squash-merge into
+  `main` (`make merge` checks both).
 
 **Never:** commit to main · force-push main · rewrite a branch someone else uses · `git reset --hard` or delete
 branches without asking · commit secrets or generated files (`.env`, `openapi.json`, uploads).

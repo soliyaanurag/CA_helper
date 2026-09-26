@@ -94,6 +94,24 @@ make dev-frontend   # Vite dev server                      -> http://localhost:5
 | API docs (Swagger UI) | http://localhost:8000/api/docs |
 | Mailpit (caught emails) | http://localhost:8025 |
 
+## Team workflow
+
+Five commands take a feature from a new branch to everyone's machine. Each stops at the first problem and never
+throws work away: it refuses to switch branches with uncommitted changes, pulls only fast-forward and never
+force-pushes. `make pr` and `make merge` need the GitHub CLI logged in (`gh auth login`).
+
+| When | Command | What it does |
+|---|---|---|
+| Start a task | `make feature branch=anurag/documents-ack-upload` | latest main, then `make sync`, then a new branch `<name>/<module>-<short-task>` |
+| Before pushing | `make check` | lint, format, migrations applied, one migration head, no model change without a migration, all tests, frontend build |
+| Send it for review | `make pr` | refuses on main or if main moved on (then `git rebase origin/main`), runs `make check`, pushes, opens the pull request from the template (or updates it) |
+| After approval | `make merge` | only if CI is green and a teammate approved: squash-merge, delete the branch, switch to main, `make sync` |
+| After someone else merged | `make sync` | pull main, reinstall Python or npm packages only if their files changed, warn about variables missing from your `.env`, start Postgres + Mailpit, migrate, seed |
+
+A typical round: you run `make feature ...`, build and commit, then `make pr`. Your friend reviews and approves on
+GitHub, and you run `make merge`. Your friend then runs `make sync` on main and has the same code, packages,
+database tables and seed data. If `make sync` says packages changed, restart the dev servers.
+
 ## Command reference
 
 Every Make target runs Python and Node inside the conda env through `conda run`, so it works without
