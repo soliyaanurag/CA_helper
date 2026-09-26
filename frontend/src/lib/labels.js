@@ -58,6 +58,15 @@ export const CA_LANGUAGE_LABELS = {
   urdu: "Urdu",
 };
 
+/** What one price of a catalog service pays for (service_catalog.unit). */
+export const SERVICE_UNIT_LABELS = {
+  per_return: "per return",
+  per_month: "per month",
+  per_year: "per year",
+  one_time: "one time",
+  per_notice: "per notice",
+};
+
 /** The label for `code`, or the code itself if the map has no entry (never crash on a new value). */
 export function label(labels, code) {
   return labels[code] ?? code;

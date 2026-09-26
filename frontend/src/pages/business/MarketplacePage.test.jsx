@@ -74,6 +74,36 @@ describe("Find a CA page", () => {
     expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
   });
 
+  it("shows the typical fee and each CA's price for the chosen service", async () => {
+    loginAs("business");
+    fakeApi({
+      "GET /api/v1/marketplace/services": [
+        200,
+        [
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            code: "gstr_3b",
+            name: "GSTR-3B filing",
+            description: "Summary GST return.",
+            unit: "per_return",
+            ca_count: 3,
+            min_price: "600.00",
+            median_price: "700.00",
+            max_price: "1000.00",
+          },
+        ],
+      ],
+      [`GET ${URL}?service=gstr_3b`]: page([ca({ price: "650.00" })]),
+    });
+    renderApp("/business/marketplace?service=gstr_3b");
+
+    expect(await screen.findByText("₹650 per return · Below the median")).toBeInTheDocument();
+    expect(
+      screen.getByText("₹600 – ₹1,000, median ₹700 (3 CAs) · per return", { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Service")).toHaveValue("gstr_3b");
+  });
+
   it("shows an API error", async () => {
     loginAs("business");
     fakeApi({ [`GET ${URL}`]: [500, { error: { code: "X", message: "Something broke." } }] });

@@ -7,13 +7,16 @@ import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { RegulatoryAdminPage } from "@/pages/admin/RegulatoryAdminPage";
 import { AlertsPage } from "@/pages/business/AlertsPage";
 import { AssistantPage } from "@/pages/business/AssistantPage";
+import { CaDetailPage } from "@/pages/business/CaDetailPage";
 import { BusinessDashboardPage } from "@/pages/business/BusinessDashboardPage";
 import { CompliancePage } from "@/pages/business/CompliancePage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { MarketplacePage } from "@/pages/business/MarketplacePage";
+import { TypicalFeesPage } from "@/pages/business/TypicalFeesPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
 import { CaProfilePage } from "@/pages/ca/CaProfilePage";
+import { CaServicesPage } from "@/pages/ca/CaServicesPage";
 import { CaWorkspacePage } from "@/pages/ca/CaWorkspacePage";
 import { ChangePasswordPage } from "@/pages/ChangePasswordPage";
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
@@ -37,12 +40,14 @@ export const NAV = {
     { label: "Compliance calendar", path: "/business/compliance" },
     { label: "Document vault", path: "/business/documents" },
     { label: "Find a CA", path: "/business/marketplace" },
+    { label: "Typical fees", path: "/business/fees" },
     { label: "Notification settings", path: "/business/alerts" },
     { label: "AI assistant", path: "/business/assistant" },
   ],
   ca: [
     { label: "Dashboard", path: "/ca" },
     { label: "My profile", path: "/ca/profile" },
+    { label: "Services & prices", path: "/ca/services" },
     { label: "My clients", path: "/ca/clients" },
   ],
   admin: [
@@ -89,12 +94,15 @@ export const appRoutes = [
     { path: "compliance", element: <CompliancePage /> },
     { path: "documents", element: <DocumentsPage /> },
     { path: "marketplace", element: <MarketplacePage /> },
+    { path: "marketplace/:caId", element: <CaDetailPage /> },
+    { path: "fees", element: <TypicalFeesPage /> },
     { path: "alerts", element: <AlertsPage /> },
     { path: "assistant", element: <AssistantPage /> },
   ]),
   roleArea("ca", [
     { index: true, element: <CaDashboardPage /> },
     { path: "profile", element: <CaProfilePage /> },
+    { path: "services", element: <CaServicesPage /> },
     { path: "clients", element: <CaWorkspacePage /> },
   ]),
   roleArea("admin", [
