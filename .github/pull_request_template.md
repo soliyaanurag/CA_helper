@@ -1,7 +1,7 @@
 ## Summary
 
 <!-- What does this PR do, and why? One short paragraph.
-     If it touches core/, shared config (root configs, scripts/, CI) or another module, or changes a contract,
+     If it touches shared code (see CLAUDE.md "Folder map"), shared config (root configs, scripts/, CI) or another module, or changes a contract,
      say so here in the first line. -->
 
 ## Tests run
@@ -18,9 +18,9 @@
 - [ ] Module doc updated in `docs/modules/<module>.md` ("What exists now", tables, endpoints, contracts, known issues)
 - [ ] Migration added? If yes: one migration, message prefixed with the module name, created after pulling main
 - [ ] New dependencies? If yes, list them below (Python: pinned in `backend/requirements*.txt`; frontend: `package.json`)
-- [ ] `make gen-api` run after route/schema changes
-- [ ] Touches `core/`, shared config or another module? Then the summary says so clearly
-- [ ] No secrets, `.env`, `openapi.json`, generated types or uploaded files committed
+- [ ] Frontend calls updated after route/schema changes
+- [ ] Touches shared code, shared config or another module? Then the summary says so clearly
+- [ ] No secrets, `.env`, `openapi.json` or uploaded files committed
 - [ ] `docs/DATA_MODEL.md` / `docs/DECISIONS.md` updated if the data model or conventions changed
 
 ## New dependencies

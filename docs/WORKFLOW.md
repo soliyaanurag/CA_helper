@@ -22,18 +22,18 @@ checklist in the root `CLAUDE.md`.
    - Continuing: switch to the branch and `git rebase origin/main`.
    - If a conflict touches files you didn't change in this task, **stop and ask**.
 4. Read `docs/modules/<module>.md` and `docs/PATTERNS.md`.
-5. Summarize what changed on main that matters for this module: check `docs/`, `backend/migrations/`,
-   `backend/app/core/`, `frontend/src/core/`, and any modules listed under "Depends on".
-   (`git log --oneline -20 origin/main -- docs backend/migrations backend/app/core frontend/src/core`)
+5. Summarize what changed on main that matters for this module: check `docs/`, `backend/migrations/`, the
+   shared code (list in `CLAUDE.md`, "Folder map"), and any modules listed under "Depends on".
+   (`git log --oneline -20 origin/main -- docs backend/migrations backend/app/*.py backend/app/models/base.py backend/app/models/enums.py backend/app/routes/__init__.py backend/app/utils frontend/src/routes.jsx frontend/src/api/client.js frontend/src/components frontend/src/context frontend/src/hooks frontend/src/lib`)
 6. **Environment check:**
    - The conda env `ca-helper` exists (`conda env list`); otherwise tell the user to run `make setup`.
    - If `environment.yml` or `backend/requirements*.txt` changed, run `make env-update`.
      If `frontend/package*.json` changed, run `conda run -n ca-helper --cwd frontend npm ci`.
    - `make infra` is running.
-   - `make migrate`, `make gen-api` and `make test` pass **before** changing anything.
+   - `make migrate` and `make test` pass **before** changing anything.
 
 ## While working
-- Keep changes scoped to the task. If a change touches `core/`, shared config (root configs, `scripts/`, CI) or
+- Keep changes scoped to the task. If a change touches shared code, shared config (root configs, `scripts/`, CI) or
   another module, say so clearly in the PR.
 - Follow `docs/PATTERNS.md`. Copy the closest existing example rather than inventing a new pattern.
 - Small commits in Conventional Commit style: `feat(documents): extract ARN from acknowledgement`,
@@ -44,7 +44,7 @@ checklist in the root `CLAUDE.md`.
   - One migration per PR, message prefixed with the module name.
   - Never edit a migration that's already on main.
   - If Alembic reports multiple heads: `conda run -n ca-helper --cwd backend flask --app app db merge heads -m "merge heads"`.
-- After route or schema changes, run `make gen-api` and fix the type errors it reveals in the frontend.
+- After route or schema changes, update every frontend call of that endpoint (`grep` the URL in `frontend/src/api/`).
 - **New dependency:**
   - Python: pin it (`package==x.y.z`) in `backend/requirements.txt` (runtime) or `requirements-dev.txt` (dev only),
     then `make env-update`. Never `conda install` a Python library.
@@ -63,11 +63,11 @@ checklist in the root `CLAUDE.md`.
 ## Pull requests
 - One task (or a few tightly related ones) per PR; title in Conventional Commit style.
 - CI must be green. A teammate reviews before merging.
-- If the PR touches `core/`, shared config or another module, or changes a contract, say so at the top of the
+- If the PR touches shared code, shared config or another module, or changes a contract, say so at the top of the
   description so the whole team sees it.
 - Squash-merge into `main`.
 
 ## Never
 Commit to main directly · force-push main · rewrite a branch someone else uses · run `git reset --hard` or delete
 branches without asking · commit secrets or generated files (`.env`, `openapi.json`,
-`frontend/src/core/api/generated/`, uploads).
+uploads).

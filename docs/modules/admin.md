@@ -1,12 +1,12 @@
 # admin: admin shell, users and CAs, service catalog
 
 ## Purpose
-The admin area shell, user/CA management (verify, suspend, soft-delete), the service catalog editor and the admin action audit log. Other modules' admin screens live in their own `features/<module>/admin/` folders and appear here through route aggregation.
+The admin area shell, user/CA management (verify, suspend, soft-delete), the service catalog editor and the admin action audit log. Every admin screen, including other modules' config screens, is a page in `frontend/src/pages/admin/` registered in the admin area of `frontend/src/routes.jsx`.
 
 ## What exists now
 Only the admin dashboard stub; no admin features yet.
-- Backend (`backend/app/modules/admin/`): `GET /api/v1/admin/dashboard` (admin role only) returns a welcome message: route in `routes.py`, `AdminDashboardSchema` in `schemas.py`, `get_dashboard(user)` in `services.py`, tests in `tests/test_dashboard.py`. No models; `seed()` does nothing. The demo admin user is seeded by core-auth.
-- Frontend (`frontend/src/features/admin/`): `AdminDashboardPage` is the admin area home (`/admin`, index route, nav "Dashboard"), using `useAdminDashboard()` from `api.ts`; placeholder "Users & CAs" page at `/admin/users`. The admin layout itself (`AdminLayout`) is in frontend core.
+- Backend: `GET /api/v1/admin/dashboard` (admin role only) returns a welcome message: route in `app/routes/admin.py`, `AdminDashboardSchema` in `app/schemas/admin.py`, `get_dashboard(user)` in `app/services/admin_service.py`, tests in `tests/test_admin_dashboard.py`. No models or seed data. The demo admin user is seeded by `seed_demo_users()` (core-auth).
+- Frontend: `pages/admin/AdminDashboardPage.jsx` is the admin area home (`/admin`, index route, nav "Dashboard"), using `useAdminDashboard()` from `api/admin.js`; placeholder "Users & CAs" page at `/admin/users` (`pages/admin/AdminUsersPage.jsx`). The sidebar layout (`AppShell`) is in frontend core.
 
 ## Tables
 None yet. Planned:

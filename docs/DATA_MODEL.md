@@ -5,13 +5,13 @@
 > a table decides its details.
 
 ## Global rules (from CLAUDE.md)
-- Every model subclasses `BaseModel` (`backend/app/core/db/models.py`): primary key `id` is a **UUID** (uuid4,
+- Every model subclasses `BaseModel` (`backend/app/models/base.py`): primary key `id` is a **UUID** (uuid4,
   generated in Python, Postgres `uuid` type); foreign keys are therefore UUID columns too.
 - Timestamps: every table has `created_at` and `updated_at` (`TimestampMixin`), timezone-aware UTC, with a
   database default `now()`; display in Asia/Kolkata.
 - Soft delete only: user-facing entities add `SoftDeleteMixin` (`is_active` default true + `deleted_at`).
 - Enums: Python `StrEnum` with lowercase snake_case values, stored as text with a CHECK constraint via
-  `str_enum()` (`backend/app/core/db/enums.py`). Constraint name: `ck_<table>_<enum_name_in_snake_case>`.
+  `str_enum()` (`backend/app/models/enums.py`). Constraint name: `ck_<table>_<enum_name_in_snake_case>`.
   Adding a value needs a hand-written migration that replaces the CHECK constraint.
 - Money: `Numeric(12, 2)` rupees ↔ Python `Decimal`.
 - Financial year: April–March, stored as a string like `2026-27`.
@@ -20,16 +20,16 @@
 - Legal rules are **data**: every config table with thresholds, due-date rules or rates has `source_reference`,
   `effective_from`, `effective_to`. Unverified values have `TODO_VERIFY` in `source_reference` and are listed
   in `docs/TODO_VERIFY.md`.
-- Constraint/index names are generated from the naming convention in `backend/app/core/db/base.py`.
+- Constraint/index names are generated from the naming convention in `backend/app/extensions.py`.
 - A module never imports another module's models; it calls that module's service functions.
 
 ## Tables
 
 | Table | Module | One row is... | Key columns (indicative) |
 |---|---|---|---|
-| `users` **(implemented)** | core/auth | a login account | id, email (unique; stored trimmed + lowercased), password_hash (argon2), full_name, role (`user_role`), is_active, deleted_at, created_at, updated_at. Planned: email_verified (OTP task) |
-| `email_otps` | core/auth | a one-time code | user_id, purpose (verify/reset), code_hash, expires_at, attempts, used_at |
-| `notifications` | core/notifications | a tray entry | user_id, type, title, body, link, read_at, created_at |
+| `users` **(implemented)** | core-auth | a login account | id, email (unique; stored trimmed + lowercased), password_hash (argon2), full_name, role (`user_role`), is_active, deleted_at, created_at, updated_at. Planned: email_verified (OTP task) |
+| `email_otps` | core-auth | a one-time code | user_id, purpose (verify/reset), code_hash, expires_at, attempts, used_at |
+| `notifications` | core-infra | a tray entry | user_id, type, title, body, link, read_at, created_at |
 | `businesses` | onboarding | a registered business | user_id, legal_name, entity_type, state, description, turnover_range, investment_amount, pan (enc) + pan_bidx, gst_registered, gstin (enc) + gstin_bidx, tan (enc), deducts_tds, pays_salary_above_limit, cin_llpin, udyam_number, phone (enc), nic_code |
 | `regulatory_profiles` | onboarding | the computed profile of a business | business_id, msme_tier, gst_scheme, itr_form, presumptive_eligible, audit_applicable, tds_returns, explanations (JSON), rule_version, computed_at |
 | `rule_thresholds` | onboarding | one legal threshold/value | key, value, unit, source_reference, effective_from, effective_to |
@@ -61,10 +61,10 @@
 This section is the one authoritative list of these values. Module docs and code refer here; changing a value
 means telling the team (it is a contract). The **code** is what the database stores and the API sends
 (lowercase snake_case, via `str_enum()`); the **label** is display text only, shown by the frontend through
-`frontend/src/core/labels.ts`, which must match these tables. The migration that creates each column fixes its
+`frontend/src/lib/labels.js`, which must match these tables. The migration that creates each column fixes its
 CHECK constraint to exactly these codes.
 
-**`users.role`** (core/auth; `UserRole` in `backend/app/core/db/enums.py`; CHECK `ck_users_user_role`)
+**`users.role`** (core-auth; `UserRole` in `backend/app/models/enums.py`; CHECK `ck_users_user_role`)
 
 | Code | Label | Notes |
 |---|---|---|
@@ -104,7 +104,7 @@ state.
 Lifecycle: `requested → accepted/quoted → active → completed`, plus `declined` / `expired`.
 
 ## Cross-module dependencies to watch
-- `ca_has_active_access` (core/permissions) needs engagement status from marketplace → a marketplace
+- `ca_has_active_access` (`app/utils/decorators.py`) needs engagement status from marketplace → a marketplace
   service function, not a model import.
 - Compliance status "With CA" (compliance) comes from marketplace engagements (marketplace).
 - Documents (documents) are attached to compliance items (compliance) and used by ca_workspace.

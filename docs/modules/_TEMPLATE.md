@@ -7,7 +7,8 @@
 What this module does for users, in 2-4 sentences.
 
 ## What exists now
-What is actually in the code today (backend, frontend, tests, seed data) and where it lives. Only facts; plans
+What is actually in the code today (backend, frontend, tests, seed data) and which files hold it
+(`models/<module>.py`, `routes/<module>.py`, `api/<module>.js`, `pages/<role>/...`). Only facts; plans
 go in the sections below, marked "Planned".
 
 ## Tables
@@ -20,7 +21,7 @@ go in the sections below, marked "Planned".
 - `function_name(args) -> result`: what it guarantees
 
 ## Depends on
-Other modules/core pieces this module calls.
+Other modules and shared code (core-auth, core-infra, frontend-core) this module calls.
 
 ## Contracts (don't change without telling the team)
 Status values, codes, response shapes or behaviour other modules depend on. A PR that changes one says so at

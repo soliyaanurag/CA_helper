@@ -1,12 +1,43 @@
 # frontend-core: app shell, routing, layouts, design system, API client
 
 ## Purpose
-Everything in `frontend/src/core/`: the React app shell, route aggregation from `features/*/routes.tsx`, the four layouts (public, business, CA, admin), shadcn/ui components, the typed API client, the auth context and route guards, and (still to come) the notification tray and the floating assistant widget shell.
+The shared frontend code: the React app shell, the route table (`src/routes.jsx`), the layouts (public and the
+sidebar `AppShell` for the business, CA and admin areas), shadcn/ui components, the API client, the auth
+context and route guard, and (still to come) the notification tray and the floating assistant widget shell.
 
 ## What exists now
-Code: `frontend/src/core/`, `frontend/src/main.tsx`, `frontend/src/index.css`, frontend root configs (`vite.config.ts`, `tsconfig*.json`, `eslint.config.js`, `.prettierrc.json`, `components.json`, `Dockerfile`, `nginx.conf`).
-- **Works:** Vite + React + TypeScript app with Tailwind and shadcn/ui (`badge`, `button`, `card`, `input`, `label`); route aggregation picking up all 9 `features/*/routes.tsx`, where a module may give its area's home as an `index: true` route (otherwise `AreaIndexPage`) and a nav item with path `""` links to the area home; four layouts (`PublicLayout`, and `BusinessLayout` / `CaLayout` / `AdminLayout` sharing `AppShell` with sidebar nav, the user's name and a Log out button); areas `/business`, `/ca`, `/admin`, each wrapped in `RequireRole`; landing page with a Log in button and an API health badge; `/login` page (`core/pages/LoginPage.tsx`: React Hook Form + Zod, a clear message per API error code, redirect by role or back to the page the guard came from); auth (`core/auth/`: `AuthProvider`, `useAuth()`, `RequireRole`, `ROLE_HOME`; token in localStorage for now; Bearer header and logout-on-401 via an `api.use()` middleware); 404 page; TanStack Query client; typed openapi-fetch client (`api`, `baseUrl` = the page origin with no path, because generated paths already include `/api/v1`; `fetch` looked up per call so tests can stub it) with `useHealth()` (the landing badge tells "API up, database unavailable" (503) apart from "unreachable"); `unwrap()` + `ApiRequestError` + `errorMessage()` (`core/api/errors.ts`), which every query and the login use so failures carry the API's `code`, `message` and `requestId`; the three role areas are built by one loop over `ROLE_LAYOUTS` in `core/routes.tsx`, titles from `USER_ROLE_LABELS`; enum code → display label maps (`core/labels.ts`: `COMPLIANCE_STATUS_LABELS`, `ENGAGEMENT_STATUS_LABELS`, `USER_ROLE_LABELS`, `label()`); `ModulePlaceholder` used by every feature page. TypeScript `strict` is on in both tsconfigs. Node 22 and npm come from the conda env; every npm command runs through `conda run` (Makefile, pre-commit, `make setup`).
-- **Tests:** `src/core/routes.test.tsx` (4 Vitest tests: every module's routes are collected, a module page renders in its layout with nav links, a module's index route is the area home, module admin screens register in the admin area); `src/core/labels.test.ts` (3 tests: known code, unknown-code fallback, snake_case codes); `src/core/pages/LoginPage.test.tsx` (validation, error messages for 401/403/429, redirect by role for all three roles with the token sent, return to the guarded page); `src/core/auth/auth.test.tsx` (guard: not logged in → /login, wrong role → own home, logged in → away from /login; logout on 401 and with the button). `src/core/api/errors.test.ts` (unwrap success, standard error body, non-standard body, network message); `src/core/pages/HomePage.test.tsx` (health badge ok vs database down). Test helpers in `src/test/utils.tsx`: `fakeApi({"GET /api/v1/...": [status, body]})` stubs fetch, `loginAs(role)`, `renderApp(path)`.
+Code: `frontend/src/routes.jsx`, `main.jsx`, `index.css`, `api/client.js`, `api/health.js`, `components/`,
+`context/`, `hooks/`, `lib/`, `pages/HomePage.jsx`, `pages/LoginPage.jsx`, `pages/NotFoundPage.jsx`, frontend root
+configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.json`, `components.json`,
+`Dockerfile`, `nginx.conf`).
+- **Folders:** `api/` (API client + one hook file per module), `pages/` (`business/`, `ca/`, `admin/`, one
+  folder per role), `components/` (`ui/` from shadcn plus shared components), `context/` (`AuthProvider`),
+  `hooks/` (`useAuth`), `lib/` (`session`, `labels`, `queryClient`, `utils`), `test/` (Vitest setup and helpers).
+- **Works:** Vite + React app in plain JavaScript (`.js`/`.jsx`) with Tailwind and shadcn/ui (`badge`, `button`, `card`, `input`,
+  `label`); one explicit route table in `routes.jsx`: the public area (`/`, `/login`) in `PublicLayout`, and the
+  `/business`, `/ca`, `/admin` areas built by `roleArea(role, children)`, each wrapped in `RequireRole` and
+  rendered in `AppShell` (sidebar with the role's `NAV` links, the user's name and a Log out button, title from
+  `USER_ROLE_LABELS`); each area's home is its `index: true` dashboard page; landing page with a Log in button and
+  an API health badge; `/login` page (`pages/LoginPage.jsx`: React Hook Form + Zod, a clear message per API error
+  code, redirect by role or back to the page the guard came from); auth (`AuthProvider`, `useAuth()`,
+  `RequireRole`, `ROLE_HOME`; token in localStorage for now; Bearer header and logout-on-401 via an `api.use()`
+  middleware); 404 page; TanStack Query client (`lib/queryClient.js`); openapi-fetch client (`api`,
+  `baseUrl` = the page origin with no path, because every URL already includes `/api/v1`; `fetch` looked up
+  per call so tests can stub it) with `useHealth()` (the landing badge tells "API up, database unavailable" (503)
+  apart from "unreachable"); `unwrap()` + `ApiRequestError` + `errorMessage()` (`api/client.js`), which every
+  query and the login use so failures carry the API's `code`, `message` and `requestId`; enum code → display label
+  maps (`lib/labels.js`: `COMPLIANCE_STATUS_LABELS`, `ENGAGEMENT_STATUS_LABELS`, `USER_ROLE_LABELS`, `label()`);
+  `Placeholder` used by every page that is not built yet. `jsconfig.json` only tells the editor about the `@/` alias. Node 22 and
+  npm come from the conda env; every npm command runs through `conda run` (Makefile, pre-commit, `make setup`).
+- **Tests:** `src/routes.test.jsx` (every sidebar link is inside its role's area, a page renders in its layout
+  with the sidebar links, the dashboard is the area home, admin screens are served in the admin area);
+  `src/lib/labels.test.js` (known code, unknown-code fallback, snake_case codes); `src/pages/LoginPage.test.jsx`
+  (validation, error messages for 401/403/429, redirect by role for all three roles with the token sent, return
+  to the guarded page); `src/context/AuthProvider.test.jsx` (guard: not logged in → /login, wrong role → own
+  home, logged in → away from /login; logout on 401 and with the button); `src/api/client.test.js` (unwrap
+  success, standard error body, non-standard body, network message); `src/pages/HomePage.test.jsx` (health badge
+  ok vs database down). Test helpers in `src/test/utils.jsx`: `fakeApi({"GET /api/v1/...": [status, body]})`
+  stubs fetch, `loginAs(role)`, `renderApp(path)`.
 - **Not built yet:** signup, refresh-token cookie, notification tray, floating assistant widget.
 
 ## Tables
@@ -17,22 +48,27 @@ None (frontend). Calls `GET /api/health` on the landing page and `POST /api/v1/a
 
 ## Service functions other modules call
 Frontend exports other features use:
-- `api` from `@/core/api/client`: typed openapi-fetch client (`api.GET("/api/v1/...")`)
-- `unwrap()`, `ApiRequestError`, `errorMessage()` from `@/core/api/errors`: wrap every call as `unwrap(api.GET(...))`; show failures with `errorMessage(error)`; switch on `error.code` where a page needs to
-- `FeatureRoutes`, `NavItem`, `Area` types from `@/core/routing`
-- `ModulePlaceholder` from `@/core/components/ModulePlaceholder`
-- `useAuth()` (`user`, `login`, `logout`) from `@/core/auth/auth-context`; `RequireRole`, `ROLE_HOME`, `User`/`Role` types from `@/core/auth/...`; test helpers from `@/test/utils`
-- `label()` and the `*_LABELS` maps from `@/core/labels`: display text for enum codes (must match `docs/DATA_MODEL.md` "Status values")
-- shadcn/ui components from `@/core/components/ui/*` (add more with `conda run -n ca-helper --cwd frontend npx shadcn@latest add <name>`)
+- `api`, `unwrap()`, `ApiRequestError`, `errorMessage()` from `@/api/client`: wrap every call as
+  `unwrap(api.GET(...))`; show failures with `errorMessage(error)`; switch on `error.code` where a page needs to
+- `NAV` and `appRoutes` in `@/routes`: add every new page and sidebar link there
+- `NavItem` type and `AppShell` from `@/components/AppShell`; `Placeholder` from `@/components/Placeholder`
+- `useAuth()` (`user`, `login`, `logout`) from `@/hooks/useAuth`; `RequireRole` from `@/components/RequireRole`;
+  `ROLE_HOME`, `User`/`Role` types from `@/lib/session`; test helpers from `@/test/utils`
+- `label()` and the `*_LABELS` maps from `@/lib/labels`: display text for enum codes (must match
+  `docs/DATA_MODEL.md` "Status values")
+- shadcn/ui components from `@/components/ui/*` (add more with
+  `conda run -n ca-helper --cwd frontend npx shadcn@latest add <name>`)
 
 ## Depends on
-core-infra (OpenAPI spec via `make gen-api`), core-auth (auth context needs login/refresh endpoints).
+core-infra (API endpoints, Swagger at `/api/docs`), core-auth (auth context needs login/refresh endpoints).
 
 ## Contracts (don't change without telling the team)
-- Each feature exports `routes: FeatureRoutes` from `features/<module>/routes.tsx`; paths are relative to the area prefix (`/business`, `/ca`, `/admin`); a module may register its area's home as an `index: true` route; module admin screens live in `features/<module>/admin/` and register under `admin`
-- API types are generated into `src/core/api/generated/` (gitignored); never hand-write API types
-- Enum codes from the API are shown only through `label()` / the maps in `core/labels.ts`, never as raw codes
+- Every page is registered in `src/routes.jsx`; child paths are relative to the role's area (`/business`, `/ca`,
+  `/admin`), sidebar links in `NAV` are absolute; each area's home is its `index: true` route; admin screens live in
+  `pages/admin/`
+- Plain JavaScript only (`.js`/`.jsx`); API fields use the backend's snake_case names (Swagger at `/api/docs`)
+- Enum codes from the API are shown only through `label()` / the maps in `lib/labels.js`, never as raw codes
 
 ## Known issues
 - The session (access token) is in localStorage until the refresh-token cookie exists.
-- `npm run typecheck`, `lint`, `test` and `build` need `make gen-api` first (the Makefile targets do it for you).
+- No type checking: a renamed backend field is only caught by tests or at runtime, so keep API calls in `api/<m>.js`.

@@ -5,8 +5,8 @@ All scheduled user alerts (T-7/T-3/T-1 and overdue reminders by email + tray), p
 
 ## What exists now
 Skeleton only; no features yet.
-- Backend (`backend/app/modules/alerts/`): the `alerts` blueprint is registered under `/api` with no routes; `models.py`, `schemas.py` and `services.py` are empty; `seed()` does nothing; no `register_jobs`, so the worker runs no jobs; `tests/` is empty.
-- Frontend (`frontend/src/features/alerts/`): one placeholder page, "Notification settings" at `/app/alerts` (business nav), built from `ModulePlaceholder`; `api.ts` is empty.
+- Backend: no code yet (no blueprint, models, schemas or services). Create `routes/alerts.py`, `schemas/alerts.py`, `services/alerts_service.py` (and `models/alerts.py`) when the first feature lands, and add the blueprint to `BLUEPRINTS` (docs/PATTERNS.md). The worker runs no alerts jobs yet.
+- Frontend: one placeholder page, "Notification settings" at `/business/alerts` (business nav), `frontend/src/pages/business/AlertsPage.jsx`, built from `Placeholder`; no API hooks yet.
 
 ## Tables
 None yet. Planned:
@@ -24,7 +24,7 @@ None yet. Planned: `estimate_penalty(item_id)` (used by compliance).
 core-infra (worker, email, notifications), compliance (items and due dates).
 
 ## Contracts (don't change without telling the team)
-- Jobs registered via `register_jobs(scheduler)` with ids `alerts.*`
+- Jobs added in `build_scheduler()` (`backend/worker.py`) with ids `alerts.*`
 
 ## Known issues
 None yet.
