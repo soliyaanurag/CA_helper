@@ -105,6 +105,7 @@ function RequestForm({ caId, filings }) {
       total = total + priceOf(filing, chosen[filing.id]);
     }
   }
+  const nothingTicked = Object.keys(chosen).length === 0;
 
   async function onSend() {
     setError(null);
@@ -115,8 +116,7 @@ function RequestForm({ caId, filings }) {
       }
     }
     if (items.length === 0) {
-      setError("Tick at least one filing.");
-      return;
+      return; // the button is disabled until a filing is ticked
     }
 
     setSending(true);
@@ -136,9 +136,11 @@ function RequestForm({ caId, filings }) {
       <ul className="space-y-2">
         {filings.map((filing) => (
           <li key={filing.id} className="rounded-lg border p-3 text-sm">
-            <label className="flex items-center gap-2 font-medium">
+            <label htmlFor={"filing-" + filing.id} className="flex items-center gap-2 font-medium">
               <input
+                id={"filing-" + filing.id}
                 type="checkbox"
+                value={filing.id}
                 checked={Boolean(chosen[filing.id])}
                 disabled={filing.blocked_reason !== null}
                 onChange={() => toggle(filing)}
@@ -167,9 +169,14 @@ function RequestForm({ caId, filings }) {
           {error}
         </p>
       )}
-      <Button onClick={onSend} disabled={sending}>
-        {sending ? "Sending..." : "Send request"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={onSend} disabled={sending || nothingTicked}>
+          {sending ? "Sending..." : "Send request"}
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          {nothingTicked ? "Tick at least one filing. " : ""}The CA has 48 hours to respond.
+        </p>
+      </div>
     </div>
   );
 }

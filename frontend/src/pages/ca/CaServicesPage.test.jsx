@@ -93,6 +93,24 @@ describe("CA services & prices page", () => {
     });
   });
 
+  it.each(["-100", "0"])("refuses a price of %s next to its field and near Save", async (price) => {
+    loginAs("ca");
+    const fetchMock = api();
+    renderApp("/ca/services");
+
+    const user = userEvent.setup();
+    const box = await screen.findByLabelText("Price for GSTR-3B filing");
+    await user.clear(box);
+    await user.type(box, price);
+    await user.click(screen.getByRole("button", { name: "Save prices" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Fix 1 price: GSTR-3B filing.");
+    expect(box).toHaveAccessibleDescription("Enter a price from 1 to 10,00,000.");
+    expect(box).toHaveFocus();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
+  });
+
   it("checks prices before sending anything", async () => {
     loginAs("ca");
     const fetchMock = api();

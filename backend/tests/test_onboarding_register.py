@@ -126,3 +126,15 @@ def test_other_roles_are_forbidden(client, make_user, auth_headers, role):
 
 def test_requires_login(client, database):
     assert client.post(URL, json=FORM).status_code == 401
+
+
+def test_each_user_reads_only_their_own_business(client, owner, make_user, auth_headers):
+    other = make_user(role=UserRole.BUSINESS)
+    register(client, auth_headers(owner))
+    register(client, auth_headers(other), legal_name="Someone Else Traders")
+
+    mine = client.get(URL, headers=auth_headers(owner)).get_json()
+    theirs = client.get(URL, headers=auth_headers(other)).get_json()
+
+    assert mine["business"]["legal_name"] == "Asha Traders"
+    assert theirs["business"]["legal_name"] == "Someone Else Traders"

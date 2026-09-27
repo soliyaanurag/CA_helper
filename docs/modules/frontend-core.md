@@ -17,18 +17,24 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   route table in `routes.jsx`: the public area (`/`, `/login`) in `PublicLayout`, and the `/business`, `/ca`,
   `/admin` areas built by `roleArea(role, children)`, each wrapped in `RequireRole` and rendered in `AppShell`
   (sidebar with the role's `NAV` links, the user's name and a Log out button, title from `USER_ROLE_LABELS`); each
-  area's home is its `index: true` dashboard page; landing page with a Log in button and an API health badge;
+  area's home is its `index: true` dashboard page; landing page with Log in / Create an account buttons, three
+  audience cards that link to signup (role preselected through the location state `{role}`) or login, and an API
+  health badge shown only in development (`import.meta.env.DEV`) or when the API or database is down;
   `/login` page (`pages/LoginPage.jsx`: React Hook Form + Zod, a clear message per API error code, redirect by role
   or back to the page the guard came from); the account pages from core-auth (`/signup`, `/verify-email`,
   `/forgot-password`, `/reset-password` in the public area, `<area>/change-password` added to every area by
   `roleArea()` and linked from the `AppShell` sidebar); `FormCard` (a small centred card holding one form) and
-  `FormField` (label + input + validation message or hint, for React Hook Form) in `components/`; the shared Zod
+  `FormField` (label + input + validation message or hint, for React Hook Form; the message is linked to the input
+  with `aria-describedby`) in `components/`; the shared Zod
   rules `newPasswordSchema`, `codeSchema`, `emailSchema`, `passwordsMatch` in `lib/authRules.js`; auth (`AuthProvider`, `useAuth()`, `RequireRole`, `ROLE_HOME`; token in
   localStorage for now); 404 page; TanStack Query client (`lib/queryClient.js`); the API client `apiFetch(path,
   {method, body})` in `api/client.js` (full `/api/...` paths on the page's own origin, Vite forwards them to
   Flask; adds the Bearer token that `AuthProvider` hands over with `setAuth()`; parses JSON; throws
   `ApiRequestError` with the API's `status`, `code` and `message`; logs out on a 401 to a request that carried a
-  token) plus `errorMessage()`; `useHealth()` (plain `fetch`; the landing badge tells "API up, database
+  token; a request without an answer after `REQUEST_TIMEOUT_MS` (20 s) fails with code `TIMEOUT`, status 0) plus
+  `errorMessage()`; logout: the Log out button sets `loggedOutOnPurpose`, so the guard sends the user to `/login`
+  without remembering the page (the next login goes to the role's home), while an expired session (a 401) still
+  remembers it; `useHealth()` (plain `fetch`; the landing badge tells "API up, database
   unavailable" (503) apart from "unreachable"); enum code → display label map `USER_ROLE_LABELS` and `label()` in
   `lib/labels.js`; `Placeholder` used by every page that is not built yet. `jsconfig.json` only tells the editor
   about the `@/` alias. Node 22 and npm come from the conda env; every npm command runs through `conda run`
@@ -38,9 +44,11 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   `src/lib/labels.test.js` (known code, unknown-code fallback); `src/pages/LoginPage.test.jsx` (validation, error
   messages for 401/403/429, redirect by role for all three roles with the token sent, return to the guarded page);
   `src/context/AuthProvider.test.jsx` (guard: not logged in → /login, wrong role → own home, logged in → away from
-  /login; logout on 401 and with the button); `src/api/client.test.js` (JSON in and out, Bearer header, standard
-  and non-standard error bodies, logout on 401 only when a token was sent, network message);
-  `src/pages/HomePage.test.jsx` (health badge ok vs database down). Test helpers in `src/test/utils.jsx`:
+  /login; an admin on a business or CA page → `/admin`; logout on 401 and with the button; after the Log out
+  button the next login goes to the role's home; no request with the old token after logout);
+  `src/api/client.test.js` (JSON in and out, Bearer header, standard and non-standard error bodies, logout on
+  401 only when a token was sent, TIMEOUT after 20 s, network message); `src/pages/HomePage.test.jsx` (health
+  badge ok vs database down, hidden outside development unless something is down, audience card links). Test helpers in `src/test/utils.jsx`:
   `fakeApi({"GET /api/v1/...": [status, body]})` stubs fetch (`[204]` for an empty answer), `loginAs(role)`,
   `renderApp(path)` (`path` may be `{pathname, state}` to start with a location state). Account page tests: see
   `docs/modules/core-auth.md`.

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { errorMessage } from "@/api/client";
+import { ApiRequestError, errorMessage } from "@/api/client";
 import { CA_PROFILE_KEY, saveCaProfile, useCaProfile } from "@/api/marketplace";
 import { FormField } from "@/components/FormField";
 import { Badge } from "@/components/ui/badge";
@@ -116,6 +116,7 @@ function CaProfileForm({ profile }) {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(profileSchema),
@@ -130,7 +131,12 @@ function CaProfileForm({ profile }) {
       queryClient.setQueryData(CA_PROFILE_KEY, updated);
       setSaved(true);
     } catch (error) {
-      setServerError(errorMessage(error));
+      if (error instanceof ApiRequestError && error.code === "DUPLICATE_MEMBERSHIP_NO") {
+        // Show it on the field it is about, not at the bottom of the form.
+        setError("membership_no", { message: error.message }, { shouldFocus: true });
+      } else {
+        setServerError(errorMessage(error));
+      }
     }
   }
 
@@ -223,8 +229,12 @@ function CheckboxGroup({ legend, labels, error, ...inputProps }) {
       <legend className="text-sm font-medium">{legend}</legend>
       <div className="grid gap-2 sm:grid-cols-2">
         {Object.entries(labels).map(([code, text]) => (
-          <label key={code} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" value={code} {...inputProps} />
+          <label
+            key={code}
+            htmlFor={inputProps.name + "-" + code}
+            className="flex items-center gap-2 text-sm"
+          >
+            <input id={inputProps.name + "-" + code} type="checkbox" value={code} {...inputProps} />
             {text}
           </label>
         ))}

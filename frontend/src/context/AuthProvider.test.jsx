@@ -30,6 +30,20 @@ describe("route guards", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin"));
   });
+
+  it.each(["/business/compliance", "/ca/profile"])(
+    "send an admin who opens %s to the admin home",
+    async (path) => {
+      loginAs("admin");
+      fakeApi({ "GET /api/v1/admin/dashboard": [200, { message: "Welcome, Test admin" }] });
+      const router = renderApp(path);
+
+      expect(
+        await screen.findByRole("heading", { name: "Welcome, Test admin" }),
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/admin");
+    },
+  );
 });
 
 describe("session", () => {
@@ -57,5 +71,42 @@ describe("session", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(loadSession()).toBeNull();
+  });
+
+  it("sends the next login to the role's home, not back to the page logged out from", async () => {
+    const admin = loginAs("admin");
+    fakeApi({
+      "GET /api/v1/admin/dashboard": [200, { message: "Welcome, Test admin" }],
+      "POST /api/v1/auth/login": [200, { access_token: "new-token", user: admin }],
+    });
+    const router = renderApp("/admin/users");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Log out" }));
+    await screen.findByRole("heading", { name: "Log in" });
+    expect(router.state.location.state?.from).toBeUndefined();
+    await user.type(screen.getByLabelText("Email"), admin.email);
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/admin"));
+  });
+
+  // The guard replaces the page in the same render, so its queries cannot refetch
+  // with the old token. This keeps it that way.
+  it("sends no request with the old token after logging out", async () => {
+    loginAs("business");
+    const fetchMock = fakeApi({
+      "GET /api/v1/compliance/dashboard": [200, { message: "Welcome, Test business" }],
+    });
+    renderApp("/business");
+    await screen.findByRole("heading", { name: "Welcome, Test business" });
+    const callsBefore = fetchMock.mock.calls.length;
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Log out" }));
+    await screen.findByRole("heading", { name: "Log in" });
+
+    const after = fetchMock.mock.calls.slice(callsBefore);
+    expect(after.filter(([, init]) => init?.headers?.Authorization)).toEqual([]);
   });
 });

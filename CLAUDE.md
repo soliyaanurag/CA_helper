@@ -132,7 +132,10 @@ them with hand-made git sequences; if a command refuses, read its ERROR message 
 - Update the module doc: "What exists now", tables, endpoints, contracts, known issues. Data model or
   conventions changed → `docs/DATA_MODEL.md` / `docs/DECISIONS.md`.
 - Show a summary and **ask before `make pr`** (it pushes). It runs `make check` again, pushes and opens the PR from
-  `.github/pull_request_template.md`; fill in the template with `gh pr edit --body-file`. One task per PR.
+  `.github/pull_request_template.md`; fill in the template with
+  `gh api -X PATCH repos/soliyaanurag/CA_helper/pulls/<n> -F body=@<file>` (`gh pr edit` fails on the team's GitHub
+  CLI 2.45; add a reviewer with `gh api -X POST .../pulls/<n>/requested_reviewers -f 'reviewers[]=<login>'`).
+  One task per PR.
 - **Ask before `make merge`.** It merges only with no conflicts, green CI and a teammate's approval, always as a
   squash, then syncs main. Never merge on GitHub with "Create a merge commit".
 - After the merge, teammates run `make sync` on main.

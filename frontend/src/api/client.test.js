@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeApi } from "@/test/utils";
 
-import { ApiRequestError, apiFetch, errorMessage, setAuth } from "./client";
+import { ApiRequestError, apiFetch, errorMessage, REQUEST_TIMEOUT_MS, setAuth } from "./client";
 
 afterEach(() => setAuth(null, () => {}));
 
@@ -67,6 +67,26 @@ describe("apiFetch", () => {
 });
 
 describe("errorMessage", () => {
+  it("fails with a clear TIMEOUT error when the server does not answer", async () => {
+    vi.useFakeTimers();
+    // A fetch that only ends when it is aborted, like a hung server.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (path, init) =>
+          new Promise((resolve, reject) =>
+            init.signal.addEventListener("abort", () => reject(new DOMException("", "AbortError"))),
+          ),
+      ),
+    );
+
+    const call = apiFetch("/api/v1/x");
+    const failed = expect(call).rejects.toMatchObject({ code: "TIMEOUT", status: 0 });
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+    await failed;
+    vi.useRealTimers();
+  });
+
   it("explains network failures", () => {
     expect(errorMessage(new TypeError("Failed to fetch"))).toMatch(/Cannot reach the server/);
   });

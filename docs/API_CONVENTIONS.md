@@ -70,7 +70,8 @@ Every error response has the same body (built in `backend/app/errors.py`):
 - `details`: optional; for 422 it maps location (`json`, `query`, ...) → field → messages.
 - Never put PII or stack traces in error messages.
 - Frontend: every call goes through `apiFetch()` (`frontend/src/api/client.js`), which turns this body into an
-  `ApiRequestError` with `status`, `code` and `message`.
+  `ApiRequestError` with `status`, `code` and `message`. It also throws code `TIMEOUT` (status 0) when the API
+  gives no answer within 20 seconds; that code never comes from the API.
 
 ## Status codes
 | Code | When |

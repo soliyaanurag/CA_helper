@@ -3,6 +3,30 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-27: Audit bug fixes (PR 1)
+
+**What**
+- **ITR service follows the ITR form.** An ITR filing is priced and requested only with the catalog service of the
+  business's profile ITR form: ITR-3 → `itr_business`, ITR-4 → `itr_presumptive`, ITR-5/ITR-6 →
+  `itr_firm_company` (`ITR_SERVICE_CODES`). Before, every ITR service was offered and the page picked ITR-4, so an
+  LLP could request the presumptive service. The old test that expected every ITR service was replaced.
+- **A 20-second request timeout** in `apiFetch()`: a request without an answer fails with code `TIMEOUT` and a
+  clear message instead of hanging. The reported 30–45 s freezes could not be reproduced (API calls took under
+  12 ms through the Vite proxy, emails under 0.05 s, no render or redirect loops); the timeout makes the next one
+  visible.
+- **Logging out on purpose forgets the page.** The route guard remembers the page for the next login only after an
+  expired session, not after the Log out button, so a later login goes to the role's home (this was the "admin
+  lands on the last admin page" report).
+- **Seed keeps sample CAs consistent:** every sample CA specializes in each service they price, and the seed adds
+  missing specializations to sample profiles seeded earlier (never to the demo CA).
+- **Forms say what is wrong where it is wrong:** the price errors get a summary next to Save and focus moves to the
+  first wrong price; the duplicate membership number is a field error; checkboxes have ids, values and labels.
+  "Send request" stays disabled until a filing is ticked (replacing the "Tick at least one filing" error).
+- **The landing page's API badge** shows only in development or when the API or database is down; the audience
+  cards link to signup (role preselected) or login.
+
+**Why:** the browser audit; every fix is additive and keeps the existing endpoints, fields and codes.
+
 ## 2026-09-27: Engagements (MA9, MA10, MA11, MA13): quoted_price, filings "With CA", no expiry yet
 
 **What**
