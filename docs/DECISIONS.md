@@ -3,6 +3,23 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-26: CA price menu and typical price range (computed, never stored)
+
+**What**
+- A fixed **service catalog** (`service_catalog`, 13 seeded services, each with a unit such as "per return" or
+  "per month") that every CA prices against, so prices are comparable. The admin editor comes later.
+- Each CA sets a price per service they offer (`ca_services`, `Numeric(12,2)` rupees, 1 to 10,00,000). The menu is
+  saved as a whole (`PUT /api/v1/marketplace/ca-services`); unticked services are soft-deleted. Changing prices
+  does not send the profile back for verification. Prices are independent of the specialization tags.
+- The **typical range** (min / median / max) is **computed on each request** from the prices of verified CAs with
+  live accounts. It replaces the planned stored `typical_min` / `typical_max` columns.
+- A range is shown only once **3 CAs** offer the service (`MIN_CAS_FOR_RANGE`); below that, "Not enough data yet".
+- **Median**, not average. Prices are shown as the CA's listed fee, with no claim about GST.
+
+**Why:** typed-in "typical" prices would be invented numbers (the spirit of CLAUDE.md rule 3); computed ones always
+match what CAs actually charge. With one or two CAs a range says little and could reveal a single CA's fee. The
+median is not pulled up by one very expensive CA and is easy to explain ("the middle price").
+
 ## 2026-09-26: CA profiles: array columns for tags, CoP number instead of an upload (for now)
 
 **What**

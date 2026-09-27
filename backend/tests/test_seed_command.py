@@ -1,12 +1,12 @@
-"""`flask seed` inserts the demo users and CA profiles, once, without errors."""
+"""`flask seed` inserts the demo users, CA profiles, catalog and prices, once, without errors."""
 
 import pytest
 from sqlalchemy import func, select
 
-from app.models import CaProfile, User
+from app.models import CaProfile, CaService, CatalogService, User
 from app.models.enums import UserRole
 from app.models.marketplace import CaVerificationStatus
-from app.seed import SAMPLE_CAS
+from app.seed import SAMPLE_CAS, SAMPLE_PRICES, SERVICE_CATALOG
 from app.utils.passwords import verify_password
 
 DEMO_ENV = {
@@ -42,7 +42,7 @@ def run_seed(app):
 def test_seed_command_lists_what_it_seeded(app, database, demo_env):
     result = run_seed(app)
 
-    assert "Seeded: demo users, CA profiles" in result.output
+    assert "Seeded: demo users, CA profiles, service catalog, CA prices" in result.output
 
 
 def test_seed_creates_one_hashed_demo_user_per_role(app, database, demo_env):
@@ -63,6 +63,9 @@ def test_seed_is_idempotent(app, database, demo_env):
 
     assert database.session.scalar(select(func.count(User.id))) == 3 + len(SAMPLE_CAS)
     assert database.session.scalar(select(func.count(CaProfile.id))) == 1 + len(SAMPLE_CAS)
+    assert database.session.scalar(select(func.count(CatalogService.id))) == len(SERVICE_CATALOG)
+    price_count = sum(len(prices) for prices in SAMPLE_PRICES.values())
+    assert database.session.scalar(select(func.count(CaService.id))) == price_count
 
 
 def test_seed_gives_the_demo_ca_and_sample_cas_verified_profiles(app, database, demo_env):
