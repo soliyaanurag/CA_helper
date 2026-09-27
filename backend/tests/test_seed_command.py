@@ -42,7 +42,10 @@ def run_seed(app):
 def test_seed_command_lists_what_it_seeded(app, database, demo_env):
     result = run_seed(app)
 
-    assert "Seeded: demo users, CA profiles, service catalog, CA prices" in result.output
+    assert (
+        "Seeded: demo users, CA profiles, service catalog, CA prices, "
+        "rule thresholds, obligation templates" in result.output
+    )
 
 
 def test_seed_creates_one_hashed_demo_user_per_role(app, database, demo_env):

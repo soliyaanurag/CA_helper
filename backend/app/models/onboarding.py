@@ -112,6 +112,8 @@ class Business(SoftDeleteMixin, BaseModel):
     phone: Mapped[str] = mapped_column(EncryptedString())
     gst_registered: Mapped[bool] = mapped_column(Boolean)
     gstin: Mapped[str | None] = mapped_column(EncryptedString())  # required when gst_registered
+    # The business chose the GST composition scheme (a choice, so we ask; only if GST registered).
+    gst_composition: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     deducts_tds: Mapped[bool] = mapped_column(Boolean)
     tan: Mapped[str | None] = mapped_column(EncryptedString())  # required when deducts_tds
     pays_salary_above_limit: Mapped[bool] = mapped_column(Boolean)

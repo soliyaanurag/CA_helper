@@ -11,7 +11,8 @@ soft-deleting a row) lives in app/services/. See docs/PATTERNS.md, "Foundations"
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Boolean, DateTime, func, true
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,6 +23,11 @@ from app.extensions import db
 def utcnow() -> datetime:
     """Current time as a timezone-aware UTC datetime (CLAUDE.md rule 7)."""
     return datetime.now(UTC)
+
+
+def today_in_india() -> date:
+    """Today's date in India. Due dates and financial years are Indian dates."""
+    return datetime.now(ZoneInfo("Asia/Kolkata")).date()
 
 
 class TimestampMixin:

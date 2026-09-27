@@ -3,6 +3,32 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-27: Business registration, profile engine and filings
+
+**What**
+- **`businesses.gst_composition`** (boolean, default false; migration `onboarding: add gst_composition to
+  businesses`): the composition scheme is a choice the business makes, so the form asks for it. Without it CMP-08
+  and GSTR-4 could never apply. Allowed only when GST registered; above the composition limit the profile falls
+  back to a regular scheme and says why.
+- **Legal values are seeded with proposed, unverified values**, each marked `TODO_VERIFY` and listed with its
+  value in `docs/TODO_VERIFY.md` (11 rule thresholds, 9 obligation templates, effective from 1 April 2025). The
+  engine reads them from the tables, never from code; a test changes a threshold and sees the result change.
+- **Due-date rules are small JSON objects** read by `compliance_service.due_date()`: monthly `{"day": d}`,
+  quarterly `{"quarters": [[m, d] x 4]}`, yearly `{"month": m, "day": d}` plus `audit_month`/`audit_day`.
+  Template `applicability` maps profile column names to allowed values; `{}` = every business.
+- **Registration does everything in one commit:** save the business, compute the profile, create the filings
+  (onboarding calls `compliance_service.create_filings()`, which does not commit).
+- **Only filings still due are created**, for the current financial year: we cannot know whether older periods
+  were filed before the business joined.
+- **`current_business()`** in `utils/decorators.py` (next to `current_user()`) finds the logged-in user's business
+  (404 `BUSINESS_NOT_FOUND`). It lives in shared code so compliance does not import onboarding (onboarding already
+  imports compliance) and other modules can use it too.
+- **`today_in_india()`** in `models/base.py`: due dates and financial years use the Indian date.
+- `rule_version` is `"v1"`, a version of the profile logic, bumped when `compute_profile()` changes.
+
+**Why:** the marketplace's engagements need businesses and filings, and filings need the profile; this is the
+shortest path there (ON1, ON4–ON6, CO1–CO3), kept to plain functions that can be explained step by step.
+
 ## 2026-09-27: The complete schema up front
 
 **What**

@@ -10,6 +10,7 @@ Fixtures:
                  the user's email is verified unless you pass email_verified_at=None
     auth_headers auth_headers(user) -> {"Authorization": "Bearer <access token>"}
     mailbox      emails "sent" during the test (list of EmailMessage); emptied before each test
+    legal_rules  the seeded rule thresholds and obligation templates (app/seed.py), committed
 
 Rate-limit counters are cleared before every test (autouse), so login tests
 never hit the limit because of earlier tests.
@@ -31,6 +32,7 @@ from app.extensions import limiter
 from app.models import User
 from app.models.base import utcnow
 from app.models.enums import UserRole
+from app.seed import seed_obligation_templates, seed_rule_thresholds
 from app.services.auth_service import issue_access_token
 from app.utils.email import outbox
 from app.utils.passwords import hash_password
@@ -149,3 +151,11 @@ def auth_headers(app):
         return {"Authorization": f"Bearer {issue_access_token(user)}"}
 
     return _auth_headers
+
+
+@pytest.fixture()
+def legal_rules(database):
+    """The rule thresholds and obligation templates from app/seed.py, as after `make seed`."""
+    seed_rule_thresholds()
+    seed_obligation_templates()
+    database.session.commit()

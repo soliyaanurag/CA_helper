@@ -47,7 +47,7 @@ Column types are in the model files; this lists what each table is for and its k
 ### onboarding (`models/onboarding.py`)
 | Table | One row is... | Key fields |
 |---|---|---|
-| `businesses` (SD) | a registered business | user_id → users (**one live business per user**: `ux_businesses_user_id`), legal_name, entity_type, state, address, description, annual_turnover (an **amount**, `Numeric(12,2)`), investment_amount, pan (enc), phone (enc), gst_registered + gstin (enc), deducts_tds + tan (enc), pays_salary_above_limit, cin_llpin, udyam_number, nic_code_id → nic_codes. CHECKs: `gstin_when_gst_registered`, `tan_when_deducts_tds`, `cin_llpin_for_llp_and_company`, `amounts_not_negative` |
+| `businesses` (SD) | a registered business | user_id → users (**one live business per user**: `ux_businesses_user_id`), legal_name, entity_type, state, address, description, annual_turnover (an **amount**, `Numeric(12,2)`), investment_amount, pan (enc), phone (enc), gst_registered + gstin (enc), gst_composition (the business chose the composition scheme; default false), deducts_tds + tan (enc), pays_salary_above_limit, cin_llpin, udyam_number, nic_code_id → nic_codes. CHECKs: `gstin_when_gst_registered`, `tan_when_deducts_tds`, `cin_llpin_for_llp_and_company`, `amounts_not_negative` |
 | `regulatory_profiles` | the current computed profile of one business | business_id → businesses (unique, 1–1), msme_tier, gst_scheme, gst_registration_suggested, itr_form, presumptive_eligible, audit_applicable, files_24q, files_26q, roc_not_tracked, explanations (JSONB, a "why" per line), rule_version, computed_at. Recomputed in place |
 | `nic_codes` | an official NIC activity code | code (unique), description. Imported from the official list, never invented |
 | `rule_thresholds` | one legal threshold or value | key, value (`Numeric(18,4)`), unit (e.g. `inr`, `percent`), description, source_reference, effective_from, effective_to. Unique (key, effective_from) |
@@ -441,6 +441,10 @@ The same seven codes start `ca_profiles.specializations`, so "CAs for this form"
 **`regulatory_profiles.itr_form`** (`ItrForm`): `itr_3` ITR-3 · `itr_4` ITR-4 · `itr_5` ITR-5 · `itr_6` ITR-6
 
 **`obligation_templates.frequency`** (compliance; `Frequency`): `monthly` Monthly · `quarterly` Quarterly · `yearly` Yearly
+
+**`compliance_items.form_code`, `obligation_templates.form_code`** (`FormCode` in `backend/app/models/enums.py`): `itr` Income tax return (ITR) ·
+`gstr_1` GSTR-1 · `gstr_3b` GSTR-3B · `cmp_08` CMP-08 · `gstr_4` GSTR-4 · `tds_24q` TDS return 24Q (salaries) ·
+`tds_26q` TDS return 26Q (other payments)
 
 **`compliance_items.status`** (compliance; `ComplianceStatus` in `backend/app/models/compliance.py`)
 

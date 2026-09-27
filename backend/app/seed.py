@@ -10,7 +10,9 @@ A role whose variables are empty is skipped with a warning. The demo CA gets a
 verified practice profile, and four sample CAs (sample-ca-N@demo.local, random
 passwords nobody knows, so they cannot log in) fill the marketplace list. The
 service catalog is seeded here too (an admin editor comes later), and the four
-sample CAs get prices so some typical price ranges show up.
+sample CAs get prices so some typical price ranges show up. The legal rule
+thresholds and the obligation templates of the 7 forms are seeded too, all marked
+TODO_VERIFY until someone checks them (docs/TODO_VERIFY.md).
 
 Every seed function
 must be safe to re-run (it skips rows that already exist) and must not commit:
@@ -20,6 +22,7 @@ run_all_seeds() commits once at the end. Add a new table's seed function to SEED
 import logging
 import os
 import secrets
+from datetime import date
 from decimal import Decimal
 
 import click
@@ -27,9 +30,17 @@ from flask import Flask
 from sqlalchemy import select
 
 from app.extensions import db
-from app.models import CaProfile, CaService, CatalogService, User
+from app.models import (
+    CaProfile,
+    CaService,
+    CatalogService,
+    ObligationTemplate,
+    RuleThreshold,
+    User,
+)
 from app.models.base import utcnow
-from app.models.enums import UserRole
+from app.models.compliance import Frequency
+from app.models.enums import FormCode, UserRole
 from app.models.marketplace import CaVerificationStatus, ServiceUnit
 from app.services.auth_service import normalize_email
 from app.utils.passwords import hash_password
@@ -309,12 +320,230 @@ def seed_ca_prices() -> None:
                 )
 
 
+# --- Legal values (CLAUDE.md rule 3) ----------------------------------------------
+# NOT VERIFIED YET. Every value below is marked TODO_VERIFY and listed in
+# docs/TODO_VERIFY.md. When someone checks a value against the official source,
+# they update its row here (value + source) and in that file.
+
+RULES_FROM = date(2025, 4, 1)  # effective_from of every value below
+
+# (key, value, unit, description, source_reference)
+RULE_THRESHOLDS = [
+    (
+        "msme.micro.max_investment",
+        "25000000",
+        "inr",
+        "Micro: investment up to ₹2.5 crore",
+        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+    ),
+    (
+        "msme.micro.max_turnover",
+        "100000000",
+        "inr",
+        "Micro: turnover up to ₹10 crore",
+        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+    ),
+    (
+        "msme.small.max_investment",
+        "250000000",
+        "inr",
+        "Small: investment up to ₹25 crore",
+        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+    ),
+    (
+        "msme.small.max_turnover",
+        "1000000000",
+        "inr",
+        "Small: turnover up to ₹100 crore",
+        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+    ),
+    (
+        "msme.medium.max_investment",
+        "1250000000",
+        "inr",
+        "Medium: investment up to ₹125 crore",
+        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+    ),
+    (
+        "msme.medium.max_turnover",
+        "5000000000",
+        "inr",
+        "Medium: turnover up to ₹500 crore",
+        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+    ),
+    (
+        "gst.registration.min_turnover",
+        "2000000",
+        "inr",
+        "GST registration needed above ₹20 lakh (lower limit, for services)",
+        "TODO_VERIFY: CGST Act section 22 and notifications",
+    ),
+    (
+        "gst.qrmp.max_turnover",
+        "50000000",
+        "inr",
+        "Quarterly returns (QRMP) allowed up to ₹5 crore",
+        "TODO_VERIFY: QRMP scheme, CBIC",
+    ),
+    (
+        "gst.composition.max_turnover",
+        "15000000",
+        "inr",
+        "Composition scheme allowed up to ₹1.5 crore (goods)",
+        "TODO_VERIFY: CGST Act section 10 and notifications",
+    ),
+    (
+        "itr.presumptive_44ad.max_turnover",
+        "20000000",
+        "inr",
+        "Presumptive scheme (44AD) allowed up to ₹2 crore",
+        "TODO_VERIFY: Income-tax Act section 44AD",
+    ),
+    (
+        "itr.audit_44ab.min_turnover",
+        "10000000",
+        "inr",
+        "Tax audit needed above ₹1 crore",
+        "TODO_VERIFY: Income-tax Act section 44AB",
+    ),
+]
+
+
+def seed_rule_thresholds() -> None:
+    for key, value, unit, description, source in RULE_THRESHOLDS:
+        exists = db.session.scalar(
+            select(RuleThreshold.id).where(
+                RuleThreshold.key == key, RuleThreshold.effective_from == RULES_FROM
+            )
+        )
+        if not exists:
+            db.session.add(
+                RuleThreshold(
+                    key=key,
+                    value=Decimal(value),
+                    unit=unit,
+                    description=description,
+                    source_reference=source,
+                    effective_from=RULES_FROM,
+                )
+            )
+
+
+# How each form applies and when it is due. Due-date rules (compliance_service.due_date):
+#   monthly    {"day": 11}                       the 11th of the next month
+#   quarterly  {"quarters": [[7, 13], ...]}      [month, day] for Q1, Q2, Q3, Q4
+#   yearly     {"month": 7, "day": 31}           that date after the financial year ends
+#              (ITR also has "audit_month" / "audit_day" for businesses with a tax audit)
+# Applicability: every key must match the regulatory profile, e.g. {"gst_scheme": [...]};
+# {} means every business.
+# (form, name, frequency, applicability, due_date_rule, source_reference)
+OBLIGATION_TEMPLATES = [
+    (
+        FormCode.ITR,
+        "Income tax return",
+        Frequency.YEARLY,
+        {},
+        {"month": 7, "day": 31, "audit_month": 10, "audit_day": 31},
+        "TODO_VERIFY: Income-tax Act section 139(1)",
+    ),
+    (
+        FormCode.GSTR_1,
+        "GSTR-1 (monthly)",
+        Frequency.MONTHLY,
+        {"gst_scheme": ["regular_monthly"]},
+        {"day": 11},
+        "TODO_VERIFY: CGST Rules rule 59",
+    ),
+    (
+        FormCode.GSTR_1,
+        "GSTR-1 (quarterly, QRMP)",
+        Frequency.QUARTERLY,
+        {"gst_scheme": ["regular_qrmp"]},
+        {"quarters": [[7, 13], [10, 13], [1, 13], [4, 13]]},
+        "TODO_VERIFY: CGST Rules rule 59, QRMP",
+    ),
+    (
+        FormCode.GSTR_3B,
+        "GSTR-3B (monthly)",
+        Frequency.MONTHLY,
+        {"gst_scheme": ["regular_monthly"]},
+        {"day": 20},
+        "TODO_VERIFY: CGST Rules rule 61",
+    ),
+    (
+        FormCode.GSTR_3B,
+        "GSTR-3B (quarterly, QRMP)",
+        Frequency.QUARTERLY,
+        {"gst_scheme": ["regular_qrmp"]},
+        {"quarters": [[7, 22], [10, 22], [1, 22], [4, 22]]},
+        "TODO_VERIFY: CGST Rules rule 61, QRMP (22nd or 24th by state)",
+    ),
+    (
+        FormCode.CMP_08,
+        "CMP-08",
+        Frequency.QUARTERLY,
+        {"gst_scheme": ["composition"]},
+        {"quarters": [[7, 18], [10, 18], [1, 18], [4, 18]]},
+        "TODO_VERIFY: CGST Rules rule 62",
+    ),
+    (
+        FormCode.GSTR_4,
+        "GSTR-4",
+        Frequency.YEARLY,
+        {"gst_scheme": ["composition"]},
+        {"month": 4, "day": 30},
+        "TODO_VERIFY: CGST Rules rule 62",
+    ),
+    (
+        FormCode.TDS_24Q,
+        "TDS return 24Q (salaries)",
+        Frequency.QUARTERLY,
+        {"files_24q": [True]},
+        {"quarters": [[7, 31], [10, 31], [1, 31], [5, 31]]},
+        "TODO_VERIFY: Income-tax Rules rule 31A",
+    ),
+    (
+        FormCode.TDS_26Q,
+        "TDS return 26Q (other payments)",
+        Frequency.QUARTERLY,
+        {"files_26q": [True]},
+        {"quarters": [[7, 31], [10, 31], [1, 31], [5, 31]]},
+        "TODO_VERIFY: Income-tax Rules rule 31A",
+    ),
+]
+
+
+def seed_obligation_templates() -> None:
+    for form, name, frequency, applicability, rule, source in OBLIGATION_TEMPLATES:
+        exists = db.session.scalar(
+            select(ObligationTemplate.id).where(
+                ObligationTemplate.form_code == form,
+                ObligationTemplate.frequency == frequency,
+                ObligationTemplate.effective_from == RULES_FROM,
+            )
+        )
+        if not exists:
+            db.session.add(
+                ObligationTemplate(
+                    form_code=form,
+                    name=name,
+                    frequency=frequency,
+                    applicability=applicability,
+                    due_date_rule=rule,
+                    source_reference=source,
+                    effective_from=RULES_FROM,
+                )
+            )
+
+
 # (name, function) in dependency order: users first, other data may refer to them.
 SEEDS = [
     ("demo users", seed_demo_users),
     ("CA profiles", seed_ca_profiles),
     ("service catalog", seed_service_catalog),
     ("CA prices", seed_ca_prices),
+    ("rule thresholds", seed_rule_thresholds),
+    ("obligation templates", seed_obligation_templates),
 ]
 
 
