@@ -671,3 +671,29 @@ def test_another_business_cannot_act_on_an_engagement(
 
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == "ENGAGEMENT_NOT_FOUND"
+
+
+# --- Find a CA ranked for the business's own filings ------------------------------------
+
+
+def test_cas_offering_my_filings_come_first_with_their_prices(
+    client, make_business, add_filing, make_ca, make_user, auth_headers, database
+):
+    owner, business = make_business()
+    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
+    _, far_ca = make_ca({"tds_26q": "900"}, name="Aaron Far")  # none of my filings
+    _, near_ca = make_ca({"gstr_3b": "600"}, name="Zara Near")
+    far_ca.city = "Chennai"
+    database.session.commit()
+
+    ranked = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
+    unregistered = auth_headers(make_user(role=UserRole.BUSINESS))
+    plain = client.get(f"{BASE}/cas", headers=unregistered).get_json()["items"]
+
+    assert [row["full_name"] for row in ranked] == ["Zara Near", "Aaron Far"]
+    assert ranked[0]["my_prices"] == [{"form_code": "gstr_3b", "price": "600.00"}]
+    assert (ranked[0]["same_city"], ranked[1]["same_city"]) == (True, False)
+    assert ranked[1]["my_prices"] == []
+    # Before registering nothing changes: the usual order (experience, name), no ranking data.
+    assert [row["full_name"] for row in plain] == ["Aaron Far", "Zara Near"]
+    assert all(row["my_prices"] == [] and row["same_city"] is None for row in plain)

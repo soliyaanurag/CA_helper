@@ -32,6 +32,12 @@ class BaseConfig:
     # saving or reading an encrypted value fails with instructions.
     FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
 
+    # --- Uploaded files (app/utils/storage.py): encrypted, outside the repo's tracked files ---
+    UPLOAD_DIR = os.getenv("UPLOAD_DIR", "instance/uploads")  # relative to backend/
+    MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "5"))
+    # Flask refuses bigger requests (413) before reading them; 1 MB of room for the form.
+    MAX_CONTENT_LENGTH = (MAX_UPLOAD_MB + 1) * 1024 * 1024
+
     # --- Database ---
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}

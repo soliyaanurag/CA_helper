@@ -41,7 +41,11 @@ from app.models import (
 from app.models.base import utcnow
 from app.models.compliance import Frequency
 from app.models.enums import FormCode, UserRole
-from app.models.marketplace import CaVerificationStatus, ServiceUnit
+from app.models.marketplace import (  # noqa: F401 (SERVICE_SPECIALIZATIONS: used by tests)
+    SERVICE_SPECIALIZATIONS,
+    CaVerificationStatus,
+    ServiceUnit,
+)
 from app.services.auth_service import normalize_email
 from app.utils.passwords import hash_password
 
@@ -304,24 +308,6 @@ SAMPLE_PRICES = {
     },
 }
 
-
-# The specialization each catalog service belongs to: a CA who prices a service should
-# have it among their specializations (the sample CAs do; test_seed_command.py checks).
-SERVICE_SPECIALIZATIONS = {
-    "itr_presumptive": "itr",
-    "itr_business": "itr",
-    "itr_firm_company": "itr",
-    "gstr_1": "gstr_1",
-    "gstr_3b": "gstr_3b",
-    "cmp_08": "cmp_08",
-    "gstr_4": "gstr_4",
-    "tds_24q": "tds_24q",
-    "tds_26q": "tds_26q",
-    "gst_registration": "gst_registration",
-    "tax_audit": "tax_audit",
-    "bookkeeping": "accounting_bookkeeping",
-    "income_tax_notice": "income_tax_notices",
-}
 
 # The filing each catalog service is for, so a request can find the CA's price for a
 # filing. Services that are not one filing (GST registration, tax audit, ...) have none.

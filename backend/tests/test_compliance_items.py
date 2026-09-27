@@ -1,13 +1,14 @@
-"""Creating filings from the profile (compliance_service.create_filings, CO3) and listing them."""
+"""Creating and syncing filings from the profile (compliance_service, CO3) and listing them."""
 
 from datetime import date
 
 import pytest
 
 from app.models import Business, ComplianceItem, RegulatoryProfile, User
+from app.models.compliance import ComplianceStatus
 from app.models.enums import UserRole
 from app.models.onboarding import EntityType, GstScheme
-from app.services.compliance_service import create_filings
+from app.services.compliance_service import create_filings, sync_filings
 
 TODAY = date(2026, 9, 27)
 URL = "/api/v1/compliance/items"
@@ -62,10 +63,11 @@ def test_qrmp_business_with_tds(business, database):
     for item in items(database):
         by_form.setdefault(item.form_code, []).append(item.period_label)
     assert added == len(items(database))
-    # Only periods still due on 27 Sep 2026: Q2, Q3, Q4 (Q1 was due in July).
-    assert by_form["gstr_1"] == ["Q2 2026-27", "Q3 2026-27", "Q4 2026-27"]
-    assert by_form["gstr_3b"] == ["Q2 2026-27", "Q3 2026-27", "Q4 2026-27"]
-    assert by_form["tds_26q"] == ["Q2 2026-27", "Q3 2026-27", "Q4 2026-27"]
+    # Every quarter from 1 April (Q1 was due in July, so it is overdue on 27 Sep 2026).
+    quarters = ["Q1 2026-27", "Q2 2026-27", "Q3 2026-27", "Q4 2026-27"]
+    assert by_form["gstr_1"] == quarters
+    assert by_form["gstr_3b"] == quarters
+    assert by_form["tds_26q"] == quarters
     assert by_form["itr"] == ["FY 2026-27"]
     assert "tds_24q" not in by_form and "cmp_08" not in by_form
 
@@ -86,8 +88,9 @@ def test_monthly_business_gets_one_filing_per_month(business, database):
     database.session.commit()
 
     gstr_3b = [item for item in items(database) if item.form_code == "gstr_3b"]
-    assert gstr_3b[0].period_label == "Sep 2026"  # August's return was due before today
+    assert gstr_3b[0].period_label == "Apr 2026"  # from the start of the financial year
     assert gstr_3b[-1].period_label == "Mar 2027"
+    assert len(gstr_3b) == 12
 
 
 def test_composition_business(business, database):
@@ -125,3 +128,79 @@ def test_list_before_registering_is_404(client, make_user, auth_headers):
 
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == "BUSINESS_NOT_FOUND"
+
+
+# --- Past filings and syncing after a profile change ----------------------------------
+
+
+def by_key(database) -> dict:
+    """{(form, period label): filing} of the live filings."""
+    return {
+        (item.form_code, item.period_label): item
+        for item in items(database)
+        if item.deleted_at is None
+    }
+
+
+def test_filings_whose_due_date_passed_start_overdue(business, database):
+    create_filings(business.id, profile(), TODAY)
+    database.session.commit()
+
+    filings = by_key(database)
+    assert filings[("gstr_3b", "Q1 2026-27")].status == ComplianceStatus.OVERDUE
+    assert filings[("gstr_3b", "Q2 2026-27")].status == ComplianceStatus.UPCOMING
+
+
+def test_a_filing_that_no_longer_applies_is_soft_deleted(business, database):
+    create_filings(business.id, profile(), TODAY)
+    database.session.commit()
+
+    counts = sync_filings(business.id, profile(files_26q=False), TODAY)
+    database.session.commit()
+
+    assert counts["removed"] == 4
+    assert not any(form == "tds_26q" for form, _ in by_key(database))
+    deleted = database.session.query(ComplianceItem).filter_by(form_code="tds_26q").all()
+    assert len(deleted) == 4 and all(item.deleted_at is not None for item in deleted)
+
+
+def test_a_filing_that_applies_again_is_reactivated_not_inserted(business, database):
+    create_filings(business.id, profile(), TODAY)
+    database.session.commit()
+    sync_filings(business.id, profile(files_26q=False), TODAY)
+    database.session.commit()
+
+    counts = sync_filings(business.id, profile(), TODAY)
+    database.session.commit()
+
+    assert (counts["restored"], counts["added"]) == (4, 0)
+    assert database.session.query(ComplianceItem).filter_by(form_code="tds_26q").count() == 4
+
+
+def test_filed_and_ca_filings_are_kept(business, database):
+    create_filings(business.id, profile(), TODAY)
+    database.session.commit()
+    filings = by_key(database)
+    filings[("tds_26q", "Q1 2026-27")].status = ComplianceStatus.FILED
+    filings[("tds_26q", "Q2 2026-27")].status = ComplianceStatus.WITH_CA
+    requested = filings[("tds_26q", "Q3 2026-27")]  # in an open request
+    database.session.commit()
+
+    counts = sync_filings(business.id, profile(files_26q=False), TODAY, keep_ids={requested.id})
+    database.session.commit()
+
+    assert (counts["removed"], counts["kept_with_ca"]) == (1, 2)
+    left = {period for form, period in by_key(database) if form == "tds_26q"}
+    assert left == {"Q1 2026-27", "Q2 2026-27", "Q3 2026-27"}
+
+
+def test_an_audit_moves_the_itr_due_date(business, database):
+    create_filings(business.id, profile(), TODAY)
+    database.session.commit()
+    before = by_key(database)[("itr", "FY 2026-27")].due_date
+
+    counts = sync_filings(business.id, profile(other_audit_applicable=True), TODAY)
+    database.session.commit()
+
+    assert counts["moved"] == 1
+    assert by_key(database)[("itr", "FY 2026-27")].due_date > before

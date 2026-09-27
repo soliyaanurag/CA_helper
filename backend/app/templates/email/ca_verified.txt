@@ -1,0 +1,6 @@
+Hello {{ name }},
+
+Your CA Helper profile is verified. Businesses can now find you under "Find a CA"
+and send you requests.
+
+CA Helper

@@ -46,6 +46,21 @@ def encrypt(value: str) -> str:
     return _fernet().encrypt(value.encode()).decode()
 
 
+def encrypt_bytes(data: bytes) -> bytes:
+    """Encrypt a file's contents (app/utils/storage.py)."""
+    return _fernet().encrypt(data)
+
+
+def decrypt_bytes(token: bytes) -> bytes:
+    try:
+        return _fernet().decrypt(token)
+    except InvalidToken as error:
+        raise RuntimeError(
+            "A stored file cannot be decrypted: FIELD_ENCRYPTION_KEY is not the key it was "
+            "encrypted with."
+        ) from error
+
+
 def decrypt(token: str) -> str:
     try:
         return _fernet().decrypt(token.encode()).decode()

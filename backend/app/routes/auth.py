@@ -7,6 +7,7 @@
     POST /api/v1/auth/forgot-password        public, 3 per minute per IP
     POST /api/v1/auth/reset-password         public, 10 per minute per IP
     POST /api/v1/auth/change-password        any logged-in user, 10 per minute per IP
+    POST /api/v1/auth/accept-terms           any logged-in user (consent for older accounts)
     GET  /api/v1/auth/me                     any logged-in user
 
 Actions without data to return answer 204 (no body); the frontend shows its own
@@ -87,7 +88,11 @@ class Login(MethodView):
     @blp.alt_response(429, schema=ErrorSchema, description=TOO_MANY)
     def post(self, data):
         user = auth_service.authenticate(data["email"], data["password"])
-        return {"access_token": auth_service.issue_access_token(user), "user": user}
+        return {
+            "access_token": auth_service.issue_access_token(user),
+            "user": user,
+            "terms_accepted": user.terms_accepted_at is not None,
+        }
 
 
 @blp.route("/auth/forgot-password")
@@ -126,6 +131,15 @@ class ChangePassword(MethodView):
     def post(self, data):
         """Change the logged-in user's password (needs the current one)."""
         auth_service.change_password(current_user(), data["current_password"], data["new_password"])
+
+
+@blp.route("/auth/accept-terms")
+class AcceptTerms(MethodView):
+    @login_required
+    @blp.response(204)
+    def post(self):
+        """Agree to the Terms and Privacy Policy (for users who signed up before consent)."""
+        auth_service.accept_terms(current_user())
 
 
 @blp.route("/auth/me")

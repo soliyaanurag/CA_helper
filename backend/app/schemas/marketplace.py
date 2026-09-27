@@ -42,6 +42,8 @@ class CaProfileInputSchema(Schema):
     capacity = fields.Integer(required=True, validate=validate.Range(1, 1000))
     years_experience = fields.Integer(required=True, validate=validate.Range(0, 70))
     about = fields.String(load_default="", validate=validate.Length(max=500))
+    # Free (pro-bono) engagements the CA takes each month. Not sent -> the saved number stays.
+    pro_bono_slots_per_month = fields.Integer(load_default=None, validate=validate.Range(0, 1000))
 
     @post_load
     def _clean(self, data: dict, **kwargs) -> dict:
@@ -69,6 +71,15 @@ class CaProfileSchema(Schema):
     about = fields.String(required=True)
     verification_status = fields.Enum(CaVerificationStatus, by_value=True, required=True)
     updated_at = fields.DateTime(required=True)
+    pro_bono_slots_per_month = fields.Integer(required=True)
+    rejection_reason = fields.String(allow_none=True)  # set by an admin when rejecting
+    has_certificate = fields.Function(lambda profile: profile.cop_document_id is not None)
+
+
+class CertificateUploadSchema(Schema):
+    """POST /marketplace/ca-profile/certificate (multipart/form-data)."""
+
+    file = fields.Raw(required=True, metadata={"type": "string", "format": "binary"})
 
 
 class CaListArgsSchema(PageArgsSchema):
@@ -94,6 +105,15 @@ class CaListItemSchema(Schema):
     about = fields.String(required=True)
     # The CA's price for the `service` filter; null when no service is chosen.
     price = fields.Decimal(as_string=True, places=2, allow_none=True)
+    # For a registered business: the CA's price for each of its open filing forms (empty:
+    # they offer none), and whether the CA's city is in its address (null otherwise).
+    my_prices = fields.List(fields.Nested(lambda: MyPriceSchema()), required=True)
+    same_city = fields.Boolean(allow_none=True)
+
+
+class MyPriceSchema(Schema):
+    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    price = fields.Decimal(as_string=True, places=2, required=True)
 
 
 class CaListPageSchema(PageSchema):
@@ -117,6 +137,8 @@ class CatalogServiceSchema(Schema):
     name = fields.String(required=True)
     description = fields.String(required=True)
     unit = fields.Enum(ServiceUnit, by_value=True, required=True)
+    # The CA specialization this service belongs to (null: none).
+    specialization = fields.String(allow_none=True)
     ca_count = fields.Integer(required=True, metadata={"description": "Verified CAs offering it"})
     min_price = fields.Decimal(as_string=True, places=2, allow_none=True)
     median_price = fields.Decimal(as_string=True, places=2, allow_none=True)

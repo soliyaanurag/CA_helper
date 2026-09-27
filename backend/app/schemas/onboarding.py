@@ -13,8 +13,10 @@ from marshmallow import (
 )
 
 from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
+from app.utils.gstin import GST_STATES, gstin_error, state_code
 
-# Format checks only; checksums and cross-checks (GSTIN contains the PAN) come later (ON3).
+# Format checks; the GSTIN's check character, state code and PAN are checked in
+# _required_when() with app/utils/gstin.py.
 PAN_FORMAT = r"^[A-Z]{5}[0-9]{4}[A-Z]$"  # e.g. ABCDE1234F
 GSTIN_FORMAT = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$"  # e.g. 27ABCDE1234F1Z5
 TAN_FORMAT = r"^[A-Z]{4}[0-9]{5}[A-Z]$"  # e.g. MUMA12345B
@@ -38,11 +40,16 @@ def _amount() -> fields.Decimal:
 
 
 class BusinessInputSchema(Schema):
-    """POST /onboarding/business: the registration form."""
+    """POST and PUT /onboarding/business: the registration (and edit) form."""
 
     legal_name = _text(200)
     entity_type = fields.Enum(EntityType, by_value=True, required=True)
-    state = _text(50)
+    state = fields.String(
+        required=True,
+        validate=validate.OneOf(
+            [state["name"] for state in GST_STATES], error="Choose your state from the list."
+        ),
+    )
     address = _text(500)
     description = _text(1000)
     annual_turnover = _amount()
@@ -59,6 +66,10 @@ class BusinessInputSchema(Schema):
         load_default=None, validate=validate.Regexp(GSTIN_FORMAT, error="Enter a valid GSTIN.")
     )
     gst_composition = fields.Boolean(load_default=False)
+    # Regular scheme within the QRMP limit: quarterly returns (True) or monthly (False).
+    gst_qrmp = fields.Boolean(load_default=False)
+    # Partnerships and LLPs: are the accounts audited under another law?
+    accounts_audited_other_law = fields.Boolean(load_default=False)
     deducts_tds = fields.Boolean(required=True)
     tan = fields.String(
         load_default=None, validate=validate.Regexp(TAN_FORMAT, error="Enter a valid TAN.")
@@ -94,6 +105,11 @@ class BusinessInputSchema(Schema):
             "cin_llpin"
         ):
             errors["cin_llpin"] = ["Enter your CIN (company) or LLPIN (LLP)."]
+        # The fields' own checks passed (a bad value would be missing here).
+        if data.get("gst_registered") and data.get("gstin") and state_code(data.get("state", "")):
+            problem = gstin_error(data["gstin"], data.get("pan"), data["state"])
+            if problem:
+                errors["gstin"] = [problem]
         if errors:
             raise ValidationError(errors)
 
@@ -104,9 +120,13 @@ class BusinessInputSchema(Schema):
             data["gstin"] = None
         if not data["deducts_tds"]:
             data["tan"] = None
+        if not data["gst_registered"] or data["gst_composition"]:
+            data["gst_qrmp"] = False
+        if data["entity_type"] not in (EntityType.PARTNERSHIP, EntityType.LLP):
+            data["accounts_audited_other_law"] = False
         if data["entity_type"] not in (EntityType.LLP, EntityType.PRIVATE_LIMITED):
             data["cin_llpin"] = None
-        for key in ("legal_name", "state", "address", "description"):
+        for key in ("legal_name", "address", "description"):
             data[key] = data[key].strip()
         return data
 
@@ -127,11 +147,16 @@ class BusinessSchema(Schema):
     gst_registered = fields.Boolean(required=True)
     gstin = fields.String(allow_none=True)
     gst_composition = fields.Boolean(required=True)
+    gst_qrmp = fields.Boolean(required=True)
+    accounts_audited_other_law = fields.Boolean(required=True)
     deducts_tds = fields.Boolean(required=True)
     tan = fields.String(allow_none=True)
     pays_salary_above_limit = fields.Boolean(required=True)
     cin_llpin = fields.String(allow_none=True)
     udyam_number = fields.String(allow_none=True)
+    # True when the saved state is not in the state list (typed before the list existed):
+    # the form asks the user to choose it again.
+    state_needs_review = fields.Function(lambda business: state_code(business.state) is None)
 
 
 class RegulatoryProfileSchema(Schema):
@@ -143,6 +168,7 @@ class RegulatoryProfileSchema(Schema):
     itr_form = fields.Enum(ItrForm, by_value=True, required=True)
     presumptive_eligible = fields.Boolean(required=True)
     audit_applicable = fields.Boolean(required=True)
+    other_audit_applicable = fields.Boolean(required=True)
     files_24q = fields.Boolean(required=True)
     files_26q = fields.Boolean(required=True)
     roc_not_tracked = fields.Boolean(required=True)
@@ -154,3 +180,35 @@ class RegulatoryProfileSchema(Schema):
 class MyBusinessSchema(Schema):
     business = fields.Nested(BusinessSchema, required=True)
     profile = fields.Nested(RegulatoryProfileSchema, required=True)
+
+
+class ProfileChangeSchema(Schema):
+    """One profile line that changed: its code before and after (e.g. "regular_monthly")."""
+
+    line = fields.String(required=True)
+    old = fields.Raw(required=True)
+    new = fields.Raw(required=True)
+
+
+class FilingChangesSchema(Schema):
+    added = fields.Integer(required=True)
+    restored = fields.Integer(required=True)
+    removed = fields.Integer(required=True)
+    moved = fields.Integer(required=True)
+    kept_with_ca = fields.Integer(required=True)
+
+
+class BusinessChangesSchema(Schema):
+    profile = fields.List(fields.Nested(ProfileChangeSchema), required=True)
+    filings = fields.Nested(FilingChangesSchema, required=True)
+
+
+class MyBusinessUpdateSchema(MyBusinessSchema):
+    """PUT /onboarding/business: the saved business and profile, and what changed."""
+
+    changes = fields.Nested(BusinessChangesSchema, required=True)
+
+
+class GstStateSchema(Schema):
+    name = fields.String(required=True)
+    code = fields.String(required=True)  # the first two digits of a GSTIN from this state

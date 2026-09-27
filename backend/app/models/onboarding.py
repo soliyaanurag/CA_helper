@@ -114,6 +114,12 @@ class Business(SoftDeleteMixin, BaseModel):
     gstin: Mapped[str | None] = mapped_column(EncryptedString())  # required when gst_registered
     # The business chose the GST composition scheme (a choice, so we ask; only if GST registered).
     gst_composition: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # A regular-scheme business within the QRMP limit chose quarterly returns (QRMP).
+    gst_qrmp: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Partnerships and LLPs: their accounts are audited under another law (their answer).
+    accounts_audited_other_law: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     deducts_tds: Mapped[bool] = mapped_column(Boolean)
     tan: Mapped[str | None] = mapped_column(EncryptedString())  # required when deducts_tds
     pays_salary_above_limit: Mapped[bool] = mapped_column(Boolean)
@@ -138,7 +144,13 @@ class RegulatoryProfile(BaseModel):
     gst_registration_suggested: Mapped[bool] = mapped_column(Boolean)
     itr_form: Mapped[ItrForm] = mapped_column(str_enum(ItrForm))
     presumptive_eligible: Mapped[bool] = mapped_column(Boolean)
+    # Tax audit under section 44AB (from turnover).
     audit_applicable: Mapped[bool] = mapped_column(Boolean)
+    # Accounts audited under another law (companies always; partnerships and LLPs if they say so).
+    # Either audit moves the ITR due date.
+    other_audit_applicable: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     files_24q: Mapped[bool] = mapped_column(Boolean)
     files_26q: Mapped[bool] = mapped_column(Boolean)
     # LLPs and companies: ROC/MCA filings exist but are not tracked (a notice in the UI).

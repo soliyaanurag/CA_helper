@@ -27,6 +27,7 @@ app/services/marketplace_service.py and returns its result as JSON.
 
 from flask_smorest import Blueprint
 
+from app.errors import ErrorSchema
 from app.models.enums import UserRole
 from app.schemas.marketplace import (
     CaDetailSchema,
@@ -36,6 +37,7 @@ from app.schemas.marketplace import (
     CaProfileSchema,
     CaServiceMenuSchema,
     CatalogServiceSchema,
+    CertificateUploadSchema,
     EngagementRequestInputSchema,
     EngagementSchema,
     QuoteInputSchema,
@@ -68,13 +70,25 @@ def save_my_profile(data):
     return marketplace_service.save_own_profile(user, **data)
 
 
+# The logged-in CA uploads their Certificate of Practice (PDF, JPG or PNG). The profile
+# then waits for an admin check (`pending`).
+@blp.route("/marketplace/ca-profile/certificate", methods=["POST"])
+@roles_required(UserRole.CA)
+@blp.arguments(CertificateUploadSchema, location="files")
+@blp.response(200, CaProfileSchema)
+@blp.alt_response(400, schema=ErrorSchema, description="FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, ...")
+@blp.alt_response(404, schema=ErrorSchema, description="CA_PROFILE_NOT_FOUND (save it first)")
+def upload_certificate(files):
+    return marketplace_service.save_certificate(current_user(), files["file"])
+
+
 # A business sees the verified CAs, with optional filters and pages.
 @blp.route("/marketplace/cas", methods=["GET"])
 @roles_required(UserRole.BUSINESS)
 @blp.arguments(CaListArgsSchema, location="query")
 @blp.response(200, CaListPageSchema)
 def list_cas(filters):
-    return marketplace_service.list_verified_cas(**filters)
+    return marketplace_service.list_verified_cas(**filters, user=current_user())
 
 
 # A business opens one CA's page: details plus every service they offer with its price.

@@ -83,6 +83,24 @@ CA_SPECIALIZATIONS = (
     "startup_msme_advisory",
 )
 
+# The specialization each catalog service (by code) belongs to. A CA who prices a service
+# should have its specialization; the services page warns otherwise.
+SERVICE_SPECIALIZATIONS = {
+    "itr_presumptive": "itr",
+    "itr_business": "itr",
+    "itr_firm_company": "itr",
+    "gstr_1": "gstr_1",
+    "gstr_3b": "gstr_3b",
+    "cmp_08": "cmp_08",
+    "gstr_4": "gstr_4",
+    "tds_24q": "tds_24q",
+    "tds_26q": "tds_26q",
+    "gst_registration": "gst_registration",
+    "tax_audit": "tax_audit",
+    "bookkeeping": "accounting_bookkeeping",
+    "income_tax_notice": "income_tax_notices",
+}
+
 CA_LANGUAGES = (
     "english",
     "hindi",

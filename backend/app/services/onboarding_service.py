@@ -1,7 +1,9 @@
 """Business logic for onboarding: registering a business and working out its regulatory profile.
 
 register_business(user, data) -> dict     save the business, compute its profile, create its filings
+update_business(business, data) -> dict   edit: recompute profile, sync filings, say what changed
 get_my_business(business) -> dict         the business with its profile
+list_states() -> list[dict]               the states / UTs for the form, with their GST codes
 compute_profile(business, today) -> dict  the profile values plus a "why" for each (ON5, ON6)
 get_business(business_id) -> Business     one business by id (used by marketplace)
 get_itr_form(business) -> str | None      its profile's ITR form, e.g. "itr_5" (used by marketplace)
@@ -14,7 +16,7 @@ import logging
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.errors import ApiError
 from app.extensions import db
@@ -22,11 +24,13 @@ from app.models import Business, RegulatoryProfile, RuleThreshold, User
 from app.models.base import today_in_india, utcnow
 from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.services import compliance_service
+from app.utils.gstin import GST_STATES
+from app.utils.money import format_inr
 
 log = logging.getLogger(__name__)
 
 # Which version of the profile logic below produced a profile. Change it when the logic changes.
-RULE_VERSION = "v1"
+RULE_VERSION = "v2"  # v2: QRMP is the user's choice; the audit line is split in two
 
 
 def _threshold(key: str, today: date) -> Decimal:
@@ -46,8 +50,8 @@ def _threshold(key: str, today: date) -> Decimal:
 
 
 def _rupees(amount: Decimal) -> str:
-    """An amount for the "why" texts, e.g. ₹20,000,000 (whole rupees, commas every 3 digits)."""
-    return f"₹{amount:,.0f}"
+    """An amount for the "why" texts in the Indian format, e.g. ₹2,00,00,000."""
+    return format_inr(amount)
 
 
 def compute_profile(business: Business, today: date) -> dict:
@@ -98,15 +102,23 @@ def compute_profile(business: Business, today: date) -> dict:
         note = ""
         if business.gst_composition:
             note = f"Composition is not allowed above {_rupees(composition_limit)}. "
-        if turnover <= qrmp_limit:
+        if turnover > qrmp_limit:
+            gst_scheme = GstScheme.REGULAR_MONTHLY
+            why["gst_scheme"] = (
+                f"{note}Turnover is above {_rupees(qrmp_limit)}, so returns are monthly "
+                "(quarterly QRMP is not allowed)."
+            )
+        elif business.gst_qrmp:
             gst_scheme = GstScheme.REGULAR_QRMP
             why["gst_scheme"] = (
-                f"{note}Turnover is within {_rupees(qrmp_limit)}, so returns are quarterly (QRMP)."
+                f"{note}You chose quarterly returns (QRMP), allowed because turnover is within "
+                f"{_rupees(qrmp_limit)}."
             )
         else:
             gst_scheme = GstScheme.REGULAR_MONTHLY
             why["gst_scheme"] = (
-                f"{note}Turnover is above {_rupees(qrmp_limit)}, so returns are monthly."
+                f"{note}You chose monthly returns. Quarterly (QRMP) is also allowed within "
+                f"{_rupees(qrmp_limit)}."
             )
 
     # 3. Presumptive scheme (section 44AD): individuals, proprietors and partnership firms.
@@ -121,12 +133,10 @@ def compute_profile(business: Business, today: date) -> dict:
         presumptive_eligible = False
         why["presumptive_eligible"] = f"Turnover is above {_rupees(presumptive_limit)}."
 
-    # 4. Tax audit (it moves the ITR due date later).
+    # 4. Audits (either one moves the ITR due date later).
+    # 4a. Tax audit under section 44AB, from turnover.
     audit_limit = _threshold("itr.audit_44ab.min_turnover", today)
-    if entity == EntityType.PRIVATE_LIMITED:
-        audit_applicable = True
-        why["audit_applicable"] = "A company's accounts are always audited."
-    elif presumptive_eligible:
+    if presumptive_eligible:
         audit_applicable = False
         why["audit_applicable"] = "No tax audit when you use the presumptive scheme."
     elif turnover > audit_limit:
@@ -135,6 +145,22 @@ def compute_profile(business: Business, today: date) -> dict:
     else:
         audit_applicable = False
         why["audit_applicable"] = f"Turnover is within {_rupees(audit_limit)}."
+
+    # 4b. Accounts audited under another law: companies always; partnerships and LLPs
+    # answer the question on the form (whether it applies depends on their own rules).
+    if entity == EntityType.PRIVATE_LIMITED:
+        other_audit_applicable = True
+        why["other_audit_applicable"] = "A company's accounts are always audited (company law)."
+    elif entity in (EntityType.PARTNERSHIP, EntityType.LLP):
+        other_audit_applicable = business.accounts_audited_other_law
+        why["other_audit_applicable"] = (
+            "You said your accounts are audited under another law."
+            if other_audit_applicable
+            else "You said your accounts are not audited under another law."
+        )
+    else:
+        other_audit_applicable = False
+        why["other_audit_applicable"] = "Individuals and proprietors: only the tax audit applies."
 
     # 5. ITR form.
     if entity == EntityType.PRIVATE_LIMITED:
@@ -178,6 +204,7 @@ def compute_profile(business: Business, today: date) -> dict:
         "itr_form": itr_form,
         "presumptive_eligible": presumptive_eligible,
         "audit_applicable": audit_applicable,
+        "other_audit_applicable": other_audit_applicable,
         "files_24q": files_24q,
         "files_26q": files_26q,
         "roc_not_tracked": roc_not_tracked,
@@ -213,6 +240,68 @@ def register_business(user: User, data: dict) -> dict:
     return {"business": business, "profile": profile}
 
 
+# The profile lines compared in the "What changed" summary after an edit.
+COMPARED_LINES = (
+    "msme_tier",
+    "gst_scheme",
+    "itr_form",
+    "presumptive_eligible",
+    "audit_applicable",
+    "other_audit_applicable",
+    "files_24q",
+    "files_26q",
+)
+
+
+def _code(value):
+    """An enum's code, or the value itself (True / False)."""
+    return getattr(value, "value", value)
+
+
+def update_business(business: Business, data: dict) -> dict:
+    """Save the edited form, recompute the profile in place and sync this year's filings
+    (one commit). Returns the business, the profile and what changed:
+    {"profile": [{"line", "old", "new"}], "filings": {added, restored, removed, moved,
+    kept_with_ca}}. Filings in an open CA engagement are never removed.
+    """
+    # Imported here: marketplace_service imports this module (a top-level import would loop).
+    from app.services import marketplace_service
+
+    for field, value in data.items():
+        setattr(business, field, value)
+
+    today = today_in_india()
+    profile = db.session.scalar(
+        select(RegulatoryProfile).where(RegulatoryProfile.business_id == business.id)
+    )
+    old = {line: _code(getattr(profile, line)) for line in COMPARED_LINES}
+    for field, value in compute_profile(business, today).items():
+        setattr(profile, field, value)
+    profile.computed_at = utcnow()
+
+    filing_ids = [filing.id for filing in compliance_service.list_filings(business)]
+    keep = marketplace_service.open_filing_ids(filing_ids)
+    filings = compliance_service.sync_filings(business.id, profile, today, keep)
+    db.session.commit()
+
+    changed = []
+    for line in COMPARED_LINES:
+        new = _code(getattr(profile, line))
+        if new != old[line]:
+            changed.append({"line": line, "old": old[line], "new": new})
+    log.info("Business %s updated: %d profile lines changed", business.id, len(changed))
+    return {
+        "business": business,
+        "profile": profile,
+        "changes": {"profile": changed, "filings": filings},
+    }
+
+
+def list_states() -> list[dict]:
+    """The states and union territories with their GST codes (reference data)."""
+    return GST_STATES
+
+
 def get_my_business(business: Business) -> dict:
     """The business together with its regulatory profile."""
     profile = db.session.scalar(
@@ -234,3 +323,15 @@ def get_itr_form(business: Business) -> str | None:
     if profile is None:
         return None
     return profile.itr_form.value
+
+
+def count_businesses() -> int:
+    """How many live businesses are registered (admin dashboard)."""
+    return db.session.scalar(select(func.count(Business.id)).where(Business.deleted_at.is_(None)))
+
+
+def business_of_user(user: User) -> Business | None:
+    """The user's live business, or None before registration (used by marketplace)."""
+    return db.session.scalar(
+        select(Business).where(Business.user_id == user.id, Business.deleted_at.is_(None))
+    )
