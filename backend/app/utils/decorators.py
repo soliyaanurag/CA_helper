@@ -23,15 +23,28 @@ from functools import wraps
 from typing import Any
 
 from flask_jwt_extended import get_current_user, verify_jwt_in_request
+from sqlalchemy import select
 
 from app.errors import ApiError
-from app.models import User
+from app.extensions import db
+from app.models import Business, User
 from app.models.enums import UserRole
 
 
 def current_user() -> User:
     """The logged-in, active user of this request. Call only behind @roles_required."""
     return get_current_user()
+
+
+def current_business() -> Business:
+    """The logged-in business user's registered business. Call only behind
+    @roles_required(UserRole.BUSINESS). 404 BUSINESS_NOT_FOUND before registration."""
+    business = db.session.scalar(
+        select(Business).where(Business.user_id == current_user().id, Business.deleted_at.is_(None))
+    )
+    if business is None:
+        raise ApiError(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+    return business
 
 
 def roles_required(*roles: UserRole) -> Callable:
