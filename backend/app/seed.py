@@ -112,7 +112,7 @@ SAMPLE_CAS = [
             "cop_number": "COP-900002",
             "city": "Ahmedabad",
             "languages": ["english", "hindi", "gujarati"],
-            "specializations": ["gstr_1", "gstr_3b", "cmp_08", "gstr_4", "gst_registration"],
+            "specializations": ["gstr_1", "gstr_3b", "cmp_08", "gstr_4", "gst_registration", "itr"],
             "capacity": 40,
             "years_experience": 6,
             "about": "GST for traders: registration, monthly and composition returns.",
@@ -126,7 +126,12 @@ SAMPLE_CAS = [
             "cop_number": "COP-900003",
             "city": "Kolkata",
             "languages": ["english", "bengali", "hindi"],
-            "specializations": ["itr", "accounting_bookkeeping", "startup_msme_advisory"],
+            "specializations": [
+                "itr",
+                "accounting_bookkeeping",
+                "startup_msme_advisory",
+                "gstr_3b",
+            ],
             "capacity": 15,
             "years_experience": 3,
             "about": "Bookkeeping and ITR for first-time founders and gig workers.",
@@ -140,7 +145,7 @@ SAMPLE_CAS = [
             "cop_number": "COP-900004",
             "city": "Bengaluru",
             "languages": ["english", "kannada", "telugu"],
-            "specializations": ["company_llp_compliance", "tax_audit", "itr", "tds_26q"],
+            "specializations": ["company_llp_compliance", "tax_audit", "itr", "tds_26q", "gstr_3b"],
             "capacity": 20,
             "years_experience": 15,
             "about": "Audits and compliance for LLPs and private limited companies.",
@@ -156,6 +161,18 @@ def _add_verified_profile(user_id, fields: dict) -> None:
     db.session.add(
         CaProfile(user_id=user_id, verification_status=CaVerificationStatus.VERIFIED, **fields)
     )
+
+
+def _add_missing_specializations(user_id, specializations: list) -> None:
+    """Give an existing sample profile the specializations SAMPLE_CAS now lists. Does not commit.
+
+    Sample CAs cannot log in, so nobody else edits their profiles; this keeps databases
+    seeded before a specialization was added in step with SAMPLE_CAS.
+    """
+    profile = db.session.scalar(select(CaProfile).where(CaProfile.user_id == user_id))
+    missing = [code for code in specializations if code not in profile.specializations]
+    if missing:
+        profile.specializations = profile.specializations + missing
 
 
 def seed_ca_profiles() -> None:
@@ -177,6 +194,7 @@ def seed_ca_profiles() -> None:
             db.session.add(user)
             db.session.flush()  # gives user.id
         _add_verified_profile(user.id, fields)
+        _add_missing_specializations(user.id, fields["specializations"])
 
 
 # The standard services every CA prices against: (code, name, description, unit).
@@ -286,6 +304,24 @@ SAMPLE_PRICES = {
     },
 }
 
+
+# The specialization each catalog service belongs to: a CA who prices a service should
+# have it among their specializations (the sample CAs do; test_seed_command.py checks).
+SERVICE_SPECIALIZATIONS = {
+    "itr_presumptive": "itr",
+    "itr_business": "itr",
+    "itr_firm_company": "itr",
+    "gstr_1": "gstr_1",
+    "gstr_3b": "gstr_3b",
+    "cmp_08": "cmp_08",
+    "gstr_4": "gstr_4",
+    "tds_24q": "tds_24q",
+    "tds_26q": "tds_26q",
+    "gst_registration": "gst_registration",
+    "tax_audit": "tax_audit",
+    "bookkeeping": "accounting_bookkeeping",
+    "income_tax_notice": "income_tax_notices",
+}
 
 # The filing each catalog service is for, so a request can find the CA's price for a
 # filing. Services that are not one filing (GST registration, tax audit, ...) have none.

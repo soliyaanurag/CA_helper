@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from app.models import CaProfile, CaService, CatalogService, User
 from app.models.enums import UserRole
 from app.models.marketplace import CaVerificationStatus
-from app.seed import SAMPLE_CAS, SAMPLE_PRICES, SERVICE_CATALOG
+from app.seed import SAMPLE_CAS, SAMPLE_PRICES, SERVICE_CATALOG, SERVICE_SPECIALIZATIONS
 from app.utils.passwords import verify_password
 
 DEMO_ENV = {
@@ -96,3 +96,29 @@ def test_seed_skips_roles_without_demo_variables(app, database, demo_env, monkey
 
     roles = {user.role for user in demo_users(database)}
     assert roles == {UserRole.BUSINESS, UserRole.ADMIN}
+
+
+def test_sample_cas_specialize_in_every_service_they_price(app, database, demo_env):
+    run_seed(app)
+
+    for email, prices in SAMPLE_PRICES.items():
+        profile = database.session.scalar(
+            select(CaProfile).join(CaProfile.user).where(User.email == email)
+        )
+        for code in prices:
+            assert SERVICE_SPECIALIZATIONS[code] in profile.specializations, (email, code)
+
+
+def test_seed_adds_new_specializations_to_existing_sample_profiles(app, database, demo_env):
+    run_seed(app)
+    profile = database.session.scalar(
+        select(CaProfile).join(CaProfile.user).where(User.email == "sample-ca-2@demo.local")
+    )
+    profile.specializations = ["gstr_1"]  # as seeded by an older version
+    database.session.commit()
+
+    run_seed(app)
+
+    database.session.refresh(profile)
+    assert profile.specializations[0] == "gstr_1"
+    assert "itr" in profile.specializations
