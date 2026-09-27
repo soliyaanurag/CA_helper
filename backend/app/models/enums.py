@@ -17,6 +17,7 @@
 """
 
 import re
+from collections.abc import Iterable
 from enum import StrEnum
 
 import sqlalchemy as sa
@@ -58,6 +59,16 @@ def str_enum(enum_cls: type[StrEnum], name: str | None = None) -> sa.Enum:
     )
 
 
+def only_codes(column: str, codes: Iterable[str]) -> sa.CheckConstraint:
+    """CHECK that every item of an array column is one of `codes` (`<@` = "is contained in").
+
+    For list columns such as `ca_profiles.specializations` or `regulatory_changes.form_codes`,
+    stored as Postgres arrays of codes. The constraint is named `ck_<table>_known_<column>`.
+    """
+    allowed = ", ".join(f"'{code}'" for code in codes)
+    return sa.CheckConstraint(f"{column} <@ ARRAY[{allowed}]::varchar[]", name=f"known_{column}")
+
+
 # --- Shared enums ---------------------------------------------------------------
 # Enums used by more than one model live here; an enum used by one model only can
 # live in that model's file. Codes and labels: docs/DATA_MODEL.md, "Status values".
@@ -69,3 +80,16 @@ class UserRole(StrEnum):
     BUSINESS = "business"
     CA = "ca"
     ADMIN = "admin"
+
+
+class FormCode(StrEnum):
+    """The seven filings tracked in v1 (docs/SCOPE.md). Used by compliance, alerts,
+    marketplace and regulatory tables; content lives in content/forms/<FORM>/."""
+
+    ITR = "itr"
+    GSTR_1 = "gstr_1"
+    GSTR_3B = "gstr_3b"
+    CMP_08 = "cmp_08"
+    GSTR_4 = "gstr_4"
+    TDS_24Q = "tds_24q"
+    TDS_26Q = "tds_26q"

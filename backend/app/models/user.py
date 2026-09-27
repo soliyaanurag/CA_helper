@@ -21,3 +21,5 @@ class User(SoftDeleteMixin, BaseModel):
     role: Mapped[UserRole] = mapped_column(str_enum(UserRole))
     # Set when the user enters the code we emailed them; login is refused while it is empty.
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the user accepted the terms (set by signup in a later task; empty until then).
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

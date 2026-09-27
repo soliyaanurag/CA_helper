@@ -83,6 +83,9 @@ def _schema(app):
             f"Cannot reach the test database at {safe_url}. Is `make infra` running?\n{exc}"
         )
 
+    # kb_chunks.embedding needs the pgvector extension (the migration creates it too).
+    with _db.engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     _db.create_all()
     yield _db
     _db.session.remove()
