@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -147,8 +147,26 @@ describe("CA profile page", () => {
     const user = await fillForm();
     await user.click(screen.getByRole("button", { name: "Save profile" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Another CA has already registered this membership number.",
+    const field = screen.getByLabelText("ICAI membership number");
+    await waitFor(() =>
+      expect(field).toHaveAccessibleDescription(
+        "Another CA has already registered this membership number.",
+      ),
     );
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("labels specializations and languages in words", async () => {
+    loginAs("ca");
+    fakeApi({ [`GET ${URL}`]: NOT_FOUND });
+    renderApp("/ca/profile");
+
+    expect(await screen.findByRole("checkbox", { name: "GSTR-1" })).toHaveAttribute(
+      "id",
+      "specializations-gstr_1",
+    );
+    expect(screen.getByRole("checkbox", { name: "Hindi" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "gstr_1" })).not.toBeInTheDocument();
   });
 });

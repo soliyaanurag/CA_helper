@@ -93,6 +93,8 @@ function PriceMenu({ services, menu, verified }) {
   const queryClient = useQueryClient();
   const [rows, setRows] = useState(startingRows(services, menu));
   const [errors, setErrors] = useState({});
+  // Shown next to Save: the rows above may be far up the page (13 services).
+  const [errorSummary, setErrorSummary] = useState(null);
   const [serverError, setServerError] = useState(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,11 +107,13 @@ function PriceMenu({ services, menu, verified }) {
   async function onSave(event) {
     event.preventDefault();
     setServerError(null);
+    setErrorSummary(null);
     setSaved(false);
 
     // Check every ticked row and collect what to send.
     const items = [];
     const newErrors = {};
+    const wrongNames = [];
     for (const service of services) {
       const row = rows[service.id];
       if (!row.offered) {
@@ -118,12 +122,17 @@ function PriceMenu({ services, menu, verified }) {
       const price = Number(row.price);
       if (row.price === "" || isNaN(price) || price < MIN_PRICE || price > MAX_PRICE) {
         newErrors[service.id] = PRICE_ERROR;
+        wrongNames.push(service.name);
       } else {
         items.push({ service_id: service.id, price: row.price });
       }
     }
     setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) {
+    if (wrongNames.length > 0) {
+      const count = wrongNames.length === 1 ? "1 price" : wrongNames.length + " prices";
+      setErrorSummary("Fix " + count + ": " + wrongNames.join(", ") + ".");
+      // Move to the first wrong price, which may be out of view.
+      document.getElementById(priceId(Object.keys(newErrors)[0]))?.focus();
       return;
     }
 
@@ -158,6 +167,11 @@ function PriceMenu({ services, menu, verified }) {
           />
         ))}
       </ul>
+      {errorSummary && (
+        <p role="alert" className="text-sm text-destructive">
+          {errorSummary}
+        </p>
+      )}
       {serverError && (
         <p role="alert" className="text-sm text-destructive">
           {serverError}
@@ -175,6 +189,11 @@ function PriceMenu({ services, menu, verified }) {
   );
 }
 
+// The id of a service's price box (the error summary moves the focus there).
+function priceId(serviceId) {
+  return "price-" + serviceId;
+}
+
 function ServiceRow({ service, row, error, onChange }) {
   let hint = null;
   if (row.offered && row.price !== "") {
@@ -183,8 +202,9 @@ function ServiceRow({ service, row, error, onChange }) {
 
   return (
     <li className="space-y-2 rounded-lg border p-3">
-      <label className="flex items-center gap-2 font-medium">
+      <label htmlFor={"offer-" + service.id} className="flex items-center gap-2 font-medium">
         <input
+          id={"offer-" + service.id}
           type="checkbox"
           checked={row.offered}
           onChange={(event) => onChange({ offered: event.target.checked })}
@@ -195,7 +215,9 @@ function ServiceRow({ service, row, error, onChange }) {
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span>₹</span>
         <Input
+          id={priceId(service.id)}
           aria-label={"Price for " + service.name}
+          aria-describedby={error ? priceId(service.id) + "-error" : undefined}
           inputMode="decimal"
           className="w-32"
           value={row.price}
@@ -207,7 +229,11 @@ function ServiceRow({ service, row, error, onChange }) {
         <span className="text-muted-foreground">Typical: {typicalRangeText(service)}</span>
         {hint && <span className="font-medium">{hint}</span>}
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p id={priceId(service.id) + "-error"} className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </li>
   );
 }

@@ -103,19 +103,36 @@ describe("Request this CA page", () => {
     });
   });
 
-  it("asks for at least one filing", async () => {
+  it("keeps Send disabled until a filing is ticked, and says why", async () => {
     loginAs("business");
-    const fetchMock = fakeApi({
+    fakeApi({
       [`GET ${CA_URL}`]: [200, CA],
       [`GET ${FILINGS_URL}`]: [200, FILINGS],
     });
     renderApp(`/business/marketplace/${CA_ID}/request`);
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Send request" }));
+    const send = await screen.findByRole("button", { name: "Send request" });
+    expect(send).toBeDisabled();
+    expect(screen.getByText(/Tick at least one filing\./)).toBeInTheDocument();
+    expect(screen.getByText(/The CA has 48 hours to respond\./)).toBeInTheDocument();
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Tick at least one filing.");
-    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+    await userEvent.setup().click(screen.getByLabelText(/GSTR-3B Aug 2026/));
+
+    expect(send).toBeEnabled();
+    expect(screen.queryByText(/Tick at least one filing/)).not.toBeInTheDocument();
+  });
+
+  it("names every checkbox after its filing", async () => {
+    loginAs("business");
+    fakeApi({
+      [`GET ${CA_URL}`]: [200, CA],
+      [`GET ${FILINGS_URL}`]: [200, FILINGS],
+    });
+    renderApp(`/business/marketplace/${CA_ID}/request`);
+
+    const checkbox = await screen.findByRole("checkbox", { name: /GSTR-3B Aug 2026/ });
+    expect(checkbox).toHaveAttribute("value", "f1");
+    expect(screen.queryByRole("checkbox", { name: "on" })).not.toBeInTheDocument();
   });
 
   it("shows the API's error, e.g. a filing someone just requested", async () => {
