@@ -23,7 +23,9 @@ is not built: an unanswered request stays `requested` (its `expires_at` is set, 
   ITR-3, ITR-4 and GSTR-3B reach three CAs and show a range. The demo CA gets no prices (set them on `/ca/services`).
   `SERVICE_FORM_CODES` fills `service_catalog.form_code` on every seed (existing rows too): the 9 filing
   services get their form (all three ITR services → `itr`); GST registration, tax audit, bookkeeping and notices
-  stay empty.
+  stay empty. Every sample CA specializes in each service they price (`SERVICE_SPECIALIZATIONS`, checked by
+  `tests/test_seed_command.py`); the seed adds specializations missing from sample profiles seeded earlier (sample
+  CAs cannot log in, so nobody else edits them). The demo CA's profile is never changed by the seed.
 - **Frontend:** `pages/ca/CaProfilePage.jsx` at `/ca/profile` (CA nav "My profile"): the form, the verification
   status and what it means. `pages/ca/CaDashboardPage.jsx` shows a reminder card until the profile is verified.
   `pages/ca/CaServicesPage.jsx` at `/ca/services` (CA nav "Services & prices"): tick a service, enter the fee,
@@ -88,7 +90,7 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 | GET | `/api/v1/marketplace/ca-services` | ca | `{items: [{service_id, price}]}`: the CA's current menu (empty without a profile) |
 | PUT | `/api/v1/marketplace/ca-services` | ca | body `{items: [{service_id, price}]}` replaces the menu → the saved menu; price 1 to 10,00,000; 404 `CA_PROFILE_NOT_FOUND`, 400 `UNKNOWN_SERVICE` (not in the active catalog) |
 
-| GET | `/api/v1/marketplace/cas/<id>/requestable-filings` | business | the business's filings, soonest due first: `{id, form_code, period_label, due_date, status, options: [{service_id, name, price}], blocked_reason}`; `options` are this CA's services for that form; `blocked_reason` is null, "Already filed.", "Already requested from a CA or with a CA." or "This CA has not listed a price for this filing." · 404 `CA_NOT_FOUND`, `BUSINESS_NOT_FOUND` |
+| GET | `/api/v1/marketplace/cas/<id>/requestable-filings` | business | the business's filings, soonest due first: `{id, form_code, period_label, due_date, status, options: [{service_id, name, price}], blocked_reason}`; `options` are this CA's services for that form, and for an ITR filing only the one service of the business's ITR form (`ITR_SERVICE_CODES`); `blocked_reason` is null, "Already filed.", "Already requested from a CA or with a CA.", "This CA has not listed a price for the ITR of your business type." or "This CA has not listed a price for this filing." · 404 `CA_NOT_FOUND`, `BUSINESS_NOT_FOUND` |
 | POST | `/api/v1/marketplace/engagements` | business | body `{ca_profile_id, items: [{compliance_item_id, service_id}]}` (at least one) → 201 the engagement (`requested`; `listed_price` copied from the CA's menu; `expires_at` = +48 h); the CA is emailed · 404 `CA_NOT_FOUND` / `FILING_NOT_FOUND`, 400 `DUPLICATE_FILING` / `SERVICE_NOT_OFFERED`, 409 `FILING_ALREADY_FILED` / `FILING_ALREADY_REQUESTED` |
 | GET | `/api/v1/marketplace/my-engagements` | business | its engagements, newest first · 404 `BUSINESS_NOT_FOUND` |
 | GET | `/api/v1/marketplace/ca-engagements` | ca | their engagements, newest first (empty without a profile) |
@@ -129,11 +131,16 @@ MA12), documents (CoP upload, later).
 - Engagement status codes: `requested → active` (CA accepts the listed prices) or `requested → quoted → active`
   (business accepts the quote), then `completed`; plus `declined`, `expired` (48 hours), `cancelled` (by the
   business). No `accepted`. Open = `requested`, `quoted`, `active`; at most one open engagement per filing
+- **ITR service by ITR form:** an ITR filing is priced and requested only with the catalog service of the
+  business's profile ITR form (`ITR_SERVICE_CODES` in `marketplace_service.py`): `itr_3` → `itr_business`,
+  `itr_4` → `itr_presumptive`, `itr_5` and `itr_6` → `itr_firm_company`. Any other ITR service is refused with
+  400 `SERVICE_NOT_OFFERED`. The form comes from `onboarding_service.get_itr_form()`.
 - `ca_profiles` and `service_catalog` are never re-inserted after soft delete. Removing then re-adding
   reactivates the existing row (keeps `user_id`/`membership_no`/`code` unique). Same as `ca_services`, whose
   rows `save_own_menu()` already reactivates.
 
 ## Known issues
+- Engagements requested before the ITR fix keep the ITR service they were created with.
 - Nothing soft-deletes a CA profile or a catalog service yet. The planned admin "remove" and the admin catalog
   editor must follow the rule above: inserting a new row for the same user, membership number or code fails on
   the plain UNIQUE constraint.

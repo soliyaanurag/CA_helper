@@ -41,6 +41,8 @@ Planned: edit + re-check (ON8), NIC suggestion; admin editors at `/api/v1/admin/
 - `compute_profile(business, today) -> dict`: the profile values with explanations (no database writes).
 - `get_my_business(business) -> {business, profile}`.
 - `get_business(business_id) -> Business | None`: one business by id (marketplace shows its name on engagements).
+- `get_itr_form(business) -> str | None`: the profile's ITR form code, e.g. `"itr_5"` (marketplace picks the ITR
+  service for it).
 - The logged-in user's business: `current_business()` in `app.utils.decorators` (core-auth).
 
 ## Depends on

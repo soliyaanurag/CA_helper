@@ -26,7 +26,7 @@ Signup with email OTP verification, login (refused until the email is verified),
 - **Config:** `JWT_ACCESS_TOKEN_EXPIRES` from `JWT_ACCESS_TOKEN_MINUTES` (default 60).
 - **OpenAPI:** bearer auth is the global default (`API_SPEC_OPTIONS["security"]`). Public endpoints opt out with `@blp.doc(security=[])`.
 - **Frontend** (`frontend/src/`):
-  - `context/AuthProvider.jsx` (session in localStorage; TODO: move to a refresh cookie). It hands the token and `logout` to `apiFetch()` (`setAuth()` in `api/client.js`), which adds the Bearer header and logs out on any 401 to a request that carried a token.
+  - `context/AuthProvider.jsx` (session in localStorage; TODO: move to a refresh cookie). It hands the token and `endSession` to `apiFetch()` (`setAuth()` in `api/client.js`), which adds the Bearer header and ends the session on any 401 to a request that carried a token. `logout()` (the Log out button) also sets `loggedOutOnPurpose`, so `RequireRole` sends the user to `/login` without remembering the page; after an expired session it does remember it.
   - `useAuth()` in `hooks/useAuth.js`; `login()` throws `ApiRequestError` (`api/client.js`) with the API error code.
   - `api/auth.js`: `signup()`, `verifyEmail()`, `resendVerificationCode()`, `forgotPassword()`, `resetPassword()`, `changePassword()` (plain async functions around `apiFetch()`).
   - Public pages: `pages/LoginPage.jsx` (`/login`; links to signup and forgot password; on `EMAIL_NOT_VERIFIED` links to `/verify-email`; shows a `notice` passed in the location state), `SignupPage.jsx` (`/signup`), `VerifyEmailPage.jsx` (`/verify-email`), `ForgotPasswordPage.jsx` (`/forgot-password`), `ResetPasswordPage.jsx` (`/reset-password`). The email moves between them in the location state, never in the URL.
