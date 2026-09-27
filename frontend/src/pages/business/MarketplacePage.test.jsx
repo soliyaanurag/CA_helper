@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -110,5 +110,29 @@ describe("Find a CA page", () => {
     renderApp("/business/marketplace");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Something broke.");
+  });
+
+  it("ranks for my filings: prices, same city, and greyed CAs offering none", async () => {
+    loginAs("business");
+    fakeApi({
+      [`GET ${URL}`]: page([
+        ca({
+          full_name: "Zara Near",
+          my_prices: [{ form_code: "gstr_3b", price: "600.00" }],
+          same_city: true,
+        }),
+        ca({ full_name: "Aaron Far", my_prices: [], same_city: false }),
+      ]),
+    });
+    renderApp("/business/marketplace");
+
+    const near = (await screen.findByRole("heading", { name: "Zara Near" })).closest("a");
+    const far = screen.getByRole("heading", { name: "Aaron Far" }).closest("a");
+    expect(within(near).getByLabelText("Prices for your filings")).toHaveTextContent(
+      "GSTR-3B from ₹600",
+    );
+    expect(within(near).getByText("Same city")).toBeInTheDocument();
+    expect(within(far).getByText("Offers none of your filings.")).toBeInTheDocument();
+    expect(far.firstChild).toHaveClass("opacity-60");
   });
 });

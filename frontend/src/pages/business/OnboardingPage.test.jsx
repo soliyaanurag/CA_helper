@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
 
 const URL = "/api/v1/onboarding/business";
+const STATES = [
+  { name: "Gujarat", code: "24" },
+  { name: "Maharashtra", code: "27" },
+];
+const STATES_ROUTE = { "GET /api/v1/onboarding/states": [200, STATES] };
 const NOT_FOUND = [404, { error: { code: "BUSINESS_NOT_FOUND", message: "Register first." } }];
 
 const SAVED = {
@@ -42,7 +47,7 @@ async function fillForm() {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Business name"), "Asha Traders");
   await user.selectOptions(screen.getByLabelText("Type of business"), "proprietorship");
-  await user.type(screen.getByLabelText("State"), "Maharashtra");
+  await user.selectOptions(screen.getByLabelText("State"), "Maharashtra");
   await user.type(screen.getByLabelText("Mobile number"), "9876543210");
   await user.type(screen.getByLabelText("Annual turnover (₹)"), "4500000");
   await user.type(screen.getByLabelText("Investment in plant & machinery (₹)"), "800000");
@@ -55,7 +60,7 @@ async function fillForm() {
 describe("business profile page", () => {
   it("shows the registration form before the business is registered", async () => {
     loginAs("business");
-    fakeApi({ [`GET ${URL}`]: NOT_FOUND });
+    fakeApi({ ...STATES_ROUTE, [`GET ${URL}`]: NOT_FOUND });
     renderApp("/business/onboarding");
 
     expect(await screen.findByText("Register your business")).toBeInTheDocument();
@@ -64,7 +69,7 @@ describe("business profile page", () => {
 
   it("asks for the GSTIN only when GST registered", async () => {
     loginAs("business");
-    fakeApi({ [`GET ${URL}`]: NOT_FOUND });
+    fakeApi({ ...STATES_ROUTE, [`GET ${URL}`]: NOT_FOUND });
     renderApp("/business/onboarding");
     const user = userEvent.setup();
 
@@ -76,7 +81,11 @@ describe("business profile page", () => {
 
   it("registers and then shows the profile with the reasons", async () => {
     loginAs("business");
-    const fetchMock = fakeApi({ [`GET ${URL}`]: NOT_FOUND, [`POST ${URL}`]: [201, SAVED] });
+    const fetchMock = fakeApi({
+      ...STATES_ROUTE,
+      [`GET ${URL}`]: NOT_FOUND,
+      [`POST ${URL}`]: [201, SAVED],
+    });
     renderApp("/business/onboarding");
     await screen.findByText("Register your business");
 
@@ -94,14 +103,125 @@ describe("business profile page", () => {
 
   it("shows the saved profile", async () => {
     loginAs("business");
-    fakeApi({ [`GET ${URL}`]: [200, SAVED] });
+    fakeApi({ ...STATES_ROUTE, [`GET ${URL}`]: [200, SAVED] });
     renderApp("/business/onboarding");
 
     expect(await screen.findByText("Asha Traders")).toBeInTheDocument();
-    expect(screen.getByText("Micro")).toBeInTheDocument();
+    // The MSME tier line of the profile (the summary chips repeat it).
+    expect(screen.getByText("MSME tier").parentElement).toHaveTextContent("Micro");
     expect(screen.getByRole("link", { name: "compliance calendar" })).toHaveAttribute(
       "href",
       "/business/compliance",
     );
+  });
+
+  it("checks the GSTIN's check character, state code and PAN before sending", async () => {
+    loginAs("business");
+    const fetchMock = fakeApi({ ...STATES_ROUTE, [`GET ${URL}`]: NOT_FOUND });
+    renderApp("/business/onboarding");
+    await screen.findByText("Register your business");
+
+    const user = await fillForm();
+    await user.click(screen.getByLabelText("GST registered"));
+    await user.type(screen.getByLabelText("GSTIN"), "24ABCDE1234F1Z6"); // valid, but Gujarat's
+    await user.click(screen.getByRole("button", { name: "Register business" }));
+
+    expect(await screen.findByText(/the code of Maharashtra is 27/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("sends the QRMP choice", async () => {
+    loginAs("business");
+    const fetchMock = fakeApi({
+      ...STATES_ROUTE,
+      [`GET ${URL}`]: NOT_FOUND,
+      [`POST ${URL}`]: [201, SAVED],
+    });
+    renderApp("/business/onboarding");
+    await screen.findByText("Register your business");
+
+    const user = await fillForm();
+    await user.click(screen.getByLabelText("GST registered"));
+    await user.type(screen.getByLabelText("GSTIN"), "27ABCDE1234F1Z0");
+    await user.click(screen.getByLabelText("Quarterly (QRMP)"));
+    await user.click(screen.getByRole("button", { name: "Register business" }));
+
+    await screen.findByText("Your regulatory profile");
+    const [, init] = fetchMock.mock.calls.find(([, options]) => options?.method === "POST");
+    expect(JSON.parse(init.body)).toMatchObject({ gst_qrmp: true, gstin: "27ABCDE1234F1Z0" });
+  });
+
+  it("asks partnerships and LLPs about an audit under another law", async () => {
+    loginAs("business");
+    fakeApi({ ...STATES_ROUTE, [`GET ${URL}`]: NOT_FOUND });
+    renderApp("/business/onboarding");
+    const user = userEvent.setup();
+
+    await user.selectOptions(await screen.findByLabelText("Type of business"), "proprietorship");
+    expect(screen.queryByLabelText(/audited under another law/)).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Type of business"), "llp");
+    expect(screen.getByLabelText(/audited under another law/)).toBeInTheDocument();
+  });
+
+  it("edits the details and shows what changed", async () => {
+    loginAs("business");
+    const business = {
+      ...SAVED.business,
+      address: "Pune",
+      description: "Retail shop",
+      investment_amount: "800000.00",
+      pan: "ABCDE1234F",
+      phone: "9876543210",
+      gst_registered: true,
+      gstin: "27ABCDE1234F1Z0",
+      gst_composition: false,
+      gst_qrmp: true,
+      accounts_audited_other_law: false,
+      deducts_tds: false,
+      tan: null,
+      pays_salary_above_limit: false,
+      cin_llpin: null,
+      udyam_number: null,
+      state_needs_review: false,
+    };
+    const updated = {
+      business: { ...business, gst_qrmp: false },
+      profile: { ...SAVED.profile, gst_scheme: "regular_monthly" },
+      changes: {
+        profile: [{ line: "gst_scheme", old: "regular_qrmp", new: "regular_monthly" }],
+        filings: { added: 16, restored: 0, removed: 0, moved: 8, kept_with_ca: 0 },
+      },
+    };
+    const fetchMock = fakeApi({
+      ...STATES_ROUTE,
+      [`GET ${URL}`]: [200, { ...SAVED, business }],
+      [`PUT ${URL}`]: [200, updated],
+    });
+    renderApp("/business/onboarding");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Edit details" }));
+    expect(screen.getByLabelText("State")).toHaveValue("Maharashtra");
+    await user.click(screen.getByLabelText("Monthly"));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const summary = await screen.findByRole("status");
+    expect(summary).toHaveTextContent("GST scheme: Regular (quarterly, QRMP) → Regular (monthly)");
+    expect(summary).toHaveTextContent("16 filings added");
+    const [, init] = fetchMock.mock.calls.find(([, options]) => options?.method === "PUT");
+    const sent = JSON.parse(init.body);
+    expect(sent.gst_qrmp).toBe(false);
+    expect(sent).not.toHaveProperty("id"); // only the form's own fields
+  });
+
+  it("shows the profile summary chips", async () => {
+    loginAs("business");
+    fakeApi({ ...STATES_ROUTE, [`GET ${URL}`]: [200, SAVED] });
+    renderApp("/business/onboarding");
+
+    const chips = await screen.findByRole("list", { name: "Profile summary" });
+    expect(chips).toHaveTextContent("Micro");
+    expect(chips).toHaveTextContent("QRMP");
+    expect(chips).toHaveTextContent("ITR-4");
   });
 });

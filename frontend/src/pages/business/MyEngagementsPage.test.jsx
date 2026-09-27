@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ENGAGEMENT_ID, engagement } from "@/test/engagementData";
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
@@ -98,5 +98,33 @@ describe("business: My engagements page", () => {
     for (const name of ["Accept quote", "Reject quote", "Withdraw request"]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
+  });
+});
+
+describe("engagement card timeline", () => {
+  it("shows where a request is and when it expires", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-09-27T21:30:00Z") });
+    loginAs("business");
+    // Requested; expires at 2026-09-29T04:30Z, 31 hours after "now".
+    fakeApi({ "GET /api/v1/marketplace/my-engagements": [200, [engagement()]] });
+    renderApp("/business/engagements");
+
+    const progress = await screen.findByRole("list", { name: "Progress" });
+    expect(progress).toHaveTextContent("● Requested→ ○ Active→ ○ Completed");
+    expect(within(progress).getByText(/Requested/)).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText(/expires in 31 h/)).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("shows how a declined request ended, with no countdown", async () => {
+    loginAs("business");
+    fakeApi({
+      "GET /api/v1/marketplace/my-engagements": [200, [engagement({ status: "declined" })]],
+    });
+    renderApp("/business/engagements");
+
+    const progress = await screen.findByRole("list", { name: "Progress" });
+    expect(progress).toHaveTextContent("✓ Requested→ ● Declined");
+    expect(screen.queryByText(/expires in/)).not.toBeInTheDocument();
   });
 });

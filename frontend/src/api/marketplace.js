@@ -32,6 +32,14 @@ export function saveCaProfile(profile) {
   return apiFetch("/api/v1/marketplace/ca-profile", { method: "PUT", body: profile });
 }
 
+// Uploads the Certificate of Practice (a PDF, JPG or PNG File). Returns the saved profile,
+// now waiting for an admin check.
+export function uploadCertificate(file) {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch("/api/v1/marketplace/ca-profile/certificate", { method: "POST", body: form });
+}
+
 // The list of verified CAs for the "Find a CA" page.
 // filters = { specialization, language, city, service, page }; empty filters are not sent.
 // With a service chosen, each CA in the list has their `price` for it.

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -12,6 +12,7 @@ const GST = {
   id: "11111111-1111-4111-8111-111111111111",
   code: "gstr_3b",
   name: "GSTR-3B filing",
+  specialization: "gstr_3b",
   description: "Summary GST return.",
   unit: "per_return",
   ca_count: 3,
@@ -23,6 +24,7 @@ const AUDIT = {
   id: "22222222-2222-4222-8222-222222222222",
   code: "tax_audit",
   name: "Tax audit",
+  specialization: "tax_audit",
   description: "Audit for one year.",
   unit: "per_year",
   ca_count: 1,
@@ -30,7 +32,18 @@ const AUDIT = {
   median_price: null,
   max_price: null,
 };
-const PROFILE = { id: "p1", verification_status: "verified" };
+const PROFILE = {
+  id: "p1",
+  verification_status: "verified",
+  membership_no: "123456",
+  cop_number: "COP-1",
+  city: "Pune",
+  languages: ["english"],
+  specializations: ["gstr_3b"],
+  capacity: 10,
+  years_experience: 5,
+  about: "",
+};
 
 function api(extra = {}) {
   return fakeApi({
@@ -152,5 +165,23 @@ describe("CA services & prices page", () => {
         "Businesses see your prices once an admin has verified your profile.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("warns about a priced service outside the specializations and adds it in one click", async () => {
+    loginAs("ca");
+    const fetchMock = api({
+      [`PUT ${PROFILE_URL}`]: [200, { ...PROFILE, specializations: ["gstr_3b", "tax_audit"] }],
+    });
+    renderApp("/ca/services");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByLabelText("Tax audit")); // its specialization is missing
+    const warning = screen.getByRole("note");
+    expect(warning).toHaveTextContent("Tax audit");
+    await user.click(screen.getByRole("button", { name: "Add to specializations" }));
+
+    await waitFor(() => expect(screen.queryByRole("note")).not.toBeInTheDocument());
+    const [, init] = fetchMock.mock.calls.find(([, options]) => options?.method === "PUT");
+    expect(JSON.parse(init.body).specializations).toEqual(["gstr_3b", "tax_audit"]);
   });
 });

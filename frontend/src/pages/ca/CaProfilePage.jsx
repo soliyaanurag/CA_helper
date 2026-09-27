@@ -1,16 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { ApiRequestError, errorMessage } from "@/api/client";
-import { CA_PROFILE_KEY, saveCaProfile, useCaProfile } from "@/api/marketplace";
+import { CA_PROFILE_KEY, saveCaProfile, uploadCertificate, useCaProfile } from "@/api/marketplace";
 import { FormField } from "@/components/FormField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 import {
   CA_LANGUAGE_LABELS,
   CA_SPECIALIZATION_LABELS,
@@ -27,6 +29,11 @@ const profileSchema = z.object({
   specializations: z.array(z.string()).min(1, "Choose at least one specialization."),
   capacity: z.coerce.number().int().min(1, "Enter a number from 1 to 1000.").max(1000),
   years_experience: z.coerce.number().int().min(0, "Enter a number from 0 to 70.").max(70),
+  pro_bono_slots_per_month: z.coerce
+    .number()
+    .int()
+    .min(0, "Enter a number from 0 to 1000.")
+    .max(1000, "Enter a number from 0 to 1000."),
   about: z.string().trim().max(500, "Use at most 500 characters."),
 });
 
@@ -38,6 +45,7 @@ const EMPTY_FORM = {
   specializations: [],
   capacity: "",
   years_experience: "",
+  pro_bono_slots_per_month: 0,
   about: "",
 };
 
@@ -57,6 +65,9 @@ const STATUS_TEXT = {
   rejected:
     "An admin could not confirm your numbers. Correct your details and save to ask for a new check.",
 };
+
+// Changing one of these fields sends a verified profile back for a new check (backend rule).
+const IDENTITY_FIELDS = ["membership_no", "cop_number"];
 
 /**
  * /ca/profile: the CA's practice profile. Saving it (first time, or with a new
@@ -78,7 +89,9 @@ export function CaProfilePage() {
       {profile.isSuccess && (
         <>
           <StatusCard profile={profile.data} />
+          <CertificateCard profile={profile.data} />
           <CaProfileForm profile={profile.data} />
+          {profile.data && <PreviewCard profile={profile.data} />}
         </>
       )}
     </div>
@@ -103,7 +116,118 @@ function StatusCard({ profile }) {
             ? STATUS_TEXT[status]
             : "Complete your profile. An admin checks your membership and CoP numbers before businesses can see you."}
         </CardDescription>
+        {status === "rejected" && profile.rejection_reason && (
+          <p className="text-sm">
+            <span className="font-medium">The admin's reason: </span>
+            {profile.rejection_reason}
+          </p>
+        )}
       </CardHeader>
+    </Card>
+  );
+}
+
+/** Upload the Certificate of Practice: an admin checks it before verifying the CA. */
+function CertificateCard({ profile }) {
+  const queryClient = useQueryClient();
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  async function onUpload(event) {
+    event.preventDefault();
+    setError(null);
+    setDone(false);
+    setSending(true);
+    try {
+      const updated = await uploadCertificate(file);
+      queryClient.setQueryData(CA_PROFILE_KEY, updated);
+      setDone(true);
+    } catch (uploadError) {
+      setError(errorMessage(uploadError));
+    }
+    setSending(false);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Certificate of Practice</CardTitle>
+        <CardDescription>
+          {!profile
+            ? "Save your profile first, then upload your certificate."
+            : profile.has_certificate
+              ? "Uploaded. Uploading a new one sends your profile back for verification."
+              : "Upload your Certificate of Practice (PDF, JPG or PNG, up to 5 MB). An admin checks it before verifying you."}
+        </CardDescription>
+      </CardHeader>
+      {profile && (
+        <CardContent>
+          <form className="flex flex-wrap items-center gap-3" onSubmit={onUpload}>
+            <Label htmlFor="certificate" className="sr-only">
+              Certificate file
+            </Label>
+            <Input
+              id="certificate"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="w-auto"
+              onChange={(event) => setFile(event.target.files[0] ?? null)}
+            />
+            <Button type="submit" disabled={!file || sending}>
+              {sending ? "Uploading..." : "Upload certificate"}
+            </Button>
+          </form>
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          {done && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Certificate uploaded. An admin will check it.
+            </p>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+/** How the saved profile looks on the businesses' "Find a CA" page. */
+function PreviewCard({ profile }) {
+  const { user } = useAuth();
+  return (
+    <Card>
+      <CardHeader>
+        <CardDescription>Preview: how businesses see you</CardDescription>
+        <CardTitle>{user?.full_name}</CardTitle>
+        <CardDescription>
+          {profile.city} · {profile.years_experience}{" "}
+          {profile.years_experience === 1 ? "year" : "years"} of experience · ICAI no.{" "}
+          {profile.membership_no}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div className="flex flex-wrap gap-1">
+          {profile.specializations.map((code) => (
+            <Badge key={code} variant="outline">
+              {label(CA_SPECIALIZATION_LABELS, code)}
+            </Badge>
+          ))}
+        </div>
+        <p>
+          <span className="text-muted-foreground">Languages: </span>
+          {profile.languages.map((code) => label(CA_LANGUAGE_LABELS, code)).join(", ")}
+        </p>
+        {profile.about && <p>{profile.about}</p>}
+        {profile.verification_status !== "verified" && (
+          <p className="text-xs text-muted-foreground">
+            Businesses see this once an admin has verified you.
+          </p>
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -117,11 +241,17 @@ function CaProfileForm({ profile }) {
     register,
     handleSubmit,
     setError,
+    control,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(profileSchema),
     defaultValues: startingValues(profile),
   });
+  // A verified CA changing a number is told before saving that it needs a new check.
+  const typed = useWatch({ control, name: IDENTITY_FIELDS });
+  const needsNewCheck =
+    profile?.verification_status === "verified" &&
+    IDENTITY_FIELDS.some((name, index) => typed[index] !== profile[name]);
 
   async function onSubmit(values) {
     setServerError(null);
@@ -179,7 +309,22 @@ function CaProfileForm({ profile }) {
               error={errors.capacity}
               {...register("capacity")}
             />
+            <FormField
+              id="pro_bono_slots_per_month"
+              label="Free (pro-bono) slots per month"
+              type="number"
+              min={0}
+              hint="Engagements you take for free each month, for eligible businesses (0 = none)."
+              error={errors.pro_bono_slots_per_month}
+              {...register("pro_bono_slots_per_month")}
+            />
           </div>
+          {needsNewCheck && (
+            <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+              You changed your membership or CoP number: after saving, your profile goes back to an
+              admin for verification and you leave the marketplace until then.
+            </p>
+          )}
           <CheckboxGroup
             legend="Specializations"
             labels={CA_SPECIALIZATION_LABELS}
@@ -257,6 +402,7 @@ function startingValues(profile) {
     specializations: profile.specializations,
     capacity: profile.capacity,
     years_experience: profile.years_experience,
+    pro_bono_slots_per_month: profile.pro_bono_slots_per_month ?? 0,
     about: profile.about,
   };
 }

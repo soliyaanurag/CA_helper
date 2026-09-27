@@ -4,7 +4,9 @@ import { Link } from "react-router";
 
 import { errorMessage } from "@/api/client";
 import {
+  CA_PROFILE_KEY,
   CA_SERVICES_KEY,
+  saveCaProfile,
   saveCaServices,
   useCaProfile,
   useCaServices,
@@ -13,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { label, SERVICE_UNIT_LABELS } from "@/lib/labels";
+import { CA_SPECIALIZATION_LABELS, label, SERVICE_UNIT_LABELS } from "@/lib/labels";
 import { comparedToMedian, typicalRangeText } from "@/lib/money";
 
 // The same limits as CaServicePriceSchema in backend/app/schemas/marketplace.py.
@@ -57,6 +59,7 @@ export function CaServicesPage() {
       <PriceMenu
         services={services.data}
         menu={menu.data}
+        profile={profile.data}
         verified={profile.data.verification_status === "verified"}
       />
     );
@@ -89,7 +92,7 @@ function startingRows(services, menu) {
   return rows;
 }
 
-function PriceMenu({ services, menu, verified }) {
+function PriceMenu({ services, menu, profile, verified }) {
   const queryClient = useQueryClient();
   const [rows, setRows] = useState(startingRows(services, menu));
   const [errors, setErrors] = useState({});
@@ -156,6 +159,7 @@ function PriceMenu({ services, menu, verified }) {
           Businesses see your prices once an admin has verified your profile.
         </p>
       )}
+      <SpecializationWarning services={services} rows={rows} profile={profile} />
       <ul className="space-y-3">
         {services.map((service) => (
           <ServiceRow
@@ -186,6 +190,61 @@ function PriceMenu({ services, menu, verified }) {
         {saving ? "Saving..." : "Save prices"}
       </Button>
     </form>
+  );
+}
+
+/**
+ * A CA who prices a service should have its specialization (so businesses filtering by
+ * it find them). Lists the ticked services whose specialization is missing, with a
+ * button that adds them all to the profile.
+ */
+function SpecializationWarning({ services, rows, profile }) {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState(null);
+  const [adding, setAdding] = useState(false);
+
+  const missing = [];
+  for (const service of services) {
+    const code = service.specialization;
+    if (rows[service.id].offered && code && !profile.specializations.includes(code)) {
+      if (!missing.includes(code)) missing.push(code);
+    }
+  }
+  if (missing.length === 0) return null;
+
+  async function onAdd() {
+    setError(null);
+    setAdding(true);
+    try {
+      const updated = await saveCaProfile({
+        membership_no: profile.membership_no,
+        cop_number: profile.cop_number,
+        city: profile.city,
+        languages: profile.languages,
+        specializations: [...profile.specializations, ...missing],
+        capacity: profile.capacity,
+        years_experience: profile.years_experience,
+        about: profile.about,
+      });
+      queryClient.setQueryData(CA_PROFILE_KEY, updated);
+    } catch (addError) {
+      setError(errorMessage(addError));
+    }
+    setAdding(false);
+  }
+
+  return (
+    <div role="note" className="space-y-2 rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+      <p>
+        You price services that are not among your specializations:{" "}
+        {missing.map((code) => label(CA_SPECIALIZATION_LABELS, code)).join(", ")}. Businesses
+        filtering by specialization will not find you for them.
+      </p>
+      <Button type="button" size="sm" variant="outline" onClick={onAdd} disabled={adding}>
+        {adding ? "Adding..." : "Add to specializations"}
+      </Button>
+      {error && <p className="text-destructive">{error}</p>}
+    </div>
   );
 }
 

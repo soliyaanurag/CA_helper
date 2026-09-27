@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 
+import { acceptTerms as sendAcceptTerms } from "@/api/auth";
 import { apiFetch, setAuth } from "@/api/client";
 import { AuthContext } from "@/hooks/useAuth";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
@@ -40,16 +41,35 @@ export function AuthProvider({ children }) {
       method: "POST",
       body: { email, password },
     });
-    const next = { accessToken: data.access_token, user: data.user };
+    // termsAccepted: false for a user who signed up before consent was asked (asked once).
+    const next = {
+      accessToken: data.access_token,
+      user: data.user,
+      termsAccepted: data.terms_accepted,
+    };
     saveSession(next);
     setLoggedOutOnPurpose(false);
     setSession(next);
     return data.user;
   }, []);
 
+  const acceptTerms = useCallback(async () => {
+    await sendAcceptTerms();
+    const next = { ...loadSession(), termsAccepted: true };
+    saveSession(next);
+    setSession(next);
+  }, []);
+
   const value = useMemo(
-    () => ({ user: session?.user ?? null, login, logout, loggedOutOnPurpose }),
-    [session, login, logout, loggedOutOnPurpose],
+    () => ({
+      user: session?.user ?? null,
+      termsAccepted: session?.termsAccepted,
+      login,
+      logout,
+      acceptTerms,
+      loggedOutOnPurpose,
+    }),
+    [session, login, logout, acceptTerms, loggedOutOnPurpose],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

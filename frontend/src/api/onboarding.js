@@ -32,3 +32,18 @@ export function useMyBusiness() {
 export function registerBusiness(form) {
   return apiFetch("/api/v1/onboarding/business", { method: "POST", body: form });
 }
+
+// Edits the business. The backend recomputes the profile and syncs this year's filings.
+// Returns { business, profile, changes: { profile: [{line, old, new}], filings: {...} } }.
+export function updateBusiness(form) {
+  return apiFetch("/api/v1/onboarding/business", { method: "PUT", body: form });
+}
+
+// The states and union territories with their GST codes, for the form's dropdown.
+export function useGstStates() {
+  return useQuery({
+    queryKey: ["onboarding", "states"],
+    queryFn: () => apiFetch("/api/v1/onboarding/states"),
+    staleTime: Infinity, // reference data: it does not change while the app is open
+  });
+}

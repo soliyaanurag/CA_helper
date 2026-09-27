@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router";
 
+import { AcceptTermsGate } from "@/components/AcceptTermsGate";
 import { useAuth } from "@/hooks/useAuth";
 import { ROLE_HOME } from "@/lib/session";
 
@@ -8,11 +9,12 @@ import { ROLE_HOME } from "@/lib/session";
  * - Not logged in -> /login, and back here after logging in; except after the Log out
  *   button, when the next login goes to that role's home.
  * - Logged in with another role -> that role's own home.
+ * - Signed up before consent was asked -> the consent step first (once).
  * The backend checks the role again on every request; this only keeps users
  * from landing on pages that would fail.
  */
 export function RequireRole({ role, children }) {
-  const { user, loggedOutOnPurpose } = useAuth();
+  const { user, loggedOutOnPurpose, termsAccepted } = useAuth();
   const location = useLocation();
 
   if (!user) {
@@ -21,6 +23,9 @@ export function RequireRole({ role, children }) {
   }
   if (user.role !== role) {
     return <Navigate to={ROLE_HOME[user.role]} replace />;
+  }
+  if (termsAccepted === false) {
+    return <AcceptTermsGate />; // asked once, for accounts from before consent
   }
   return children;
 }

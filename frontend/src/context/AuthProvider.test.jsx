@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { loadSession } from "@/lib/session";
-import { fakeApi, loginAs, renderApp } from "@/test/utils";
+import { fakeApi, loginAs, renderApp, testUser } from "@/test/utils";
 
 describe("route guards", () => {
   it("send a visitor who is not logged in to /login", async () => {
@@ -108,5 +108,47 @@ describe("session", () => {
 
     const after = fetchMock.mock.calls.slice(callsBefore);
     expect(after.filter(([, init]) => init?.headers?.Authorization)).toEqual([]);
+  });
+});
+
+describe("consent", () => {
+  it("asks a user from before consent once, then shows the app", async () => {
+    const user = testUser("business");
+    const fetchMock = fakeApi({
+      "POST /api/v1/auth/login": [200, { access_token: "t", user, terms_accepted: false }],
+      "POST /api/v1/auth/accept-terms": [204],
+      "GET /api/v1/compliance/dashboard": [200, { message: "Welcome, Test business" }],
+    });
+    renderApp("/login");
+    const person = userEvent.setup();
+    await person.type(screen.getByLabelText("Email"), user.email);
+    await person.type(screen.getByLabelText("Password"), "secret");
+    await person.click(screen.getByRole("button", { name: "Log in" }));
+
+    await person.click(await screen.findByRole("button", { name: "I agree" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Welcome, Test business" }),
+    ).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([path]) => path === "/api/v1/auth/accept-terms")).toBe(true);
+    expect(loadSession().termsAccepted).toBe(true);
+  });
+
+  it("does not ask a user who already accepted", async () => {
+    const user = testUser("business");
+    fakeApi({
+      "POST /api/v1/auth/login": [200, { access_token: "t", user, terms_accepted: true }],
+      "GET /api/v1/compliance/dashboard": [200, { message: "Welcome, Test business" }],
+    });
+    renderApp("/login");
+    const person = userEvent.setup();
+    await person.type(screen.getByLabelText("Email"), user.email);
+    await person.type(screen.getByLabelText("Password"), "secret");
+    await person.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Welcome, Test business" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "I agree" })).not.toBeInTheDocument();
   });
 });
