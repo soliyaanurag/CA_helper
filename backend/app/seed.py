@@ -287,16 +287,32 @@ SAMPLE_PRICES = {
 }
 
 
+# The filing each catalog service is for, so a request can find the CA's price for a
+# filing. Services that are not one filing (GST registration, tax audit, ...) have none.
+SERVICE_FORM_CODES = {
+    "itr_presumptive": FormCode.ITR,
+    "itr_business": FormCode.ITR,
+    "itr_firm_company": FormCode.ITR,
+    "gstr_1": FormCode.GSTR_1,
+    "gstr_3b": FormCode.GSTR_3B,
+    "cmp_08": FormCode.CMP_08,
+    "gstr_4": FormCode.GSTR_4,
+    "tds_24q": FormCode.TDS_24Q,
+    "tds_26q": FormCode.TDS_26Q,
+}
+
+
 def seed_service_catalog() -> None:
     sort_order = 1
     for code, name, description, unit in SERVICE_CATALOG:
-        exists = db.session.scalar(select(CatalogService.id).where(CatalogService.code == code))
-        if not exists:
-            db.session.add(
-                CatalogService(
-                    code=code, name=name, description=description, unit=unit, sort_order=sort_order
-                )
+        service = db.session.scalar(select(CatalogService).where(CatalogService.code == code))
+        if service is None:
+            service = CatalogService(
+                code=code, name=name, description=description, unit=unit, sort_order=sort_order
             )
+            db.session.add(service)
+        # Set every time: databases seeded before this column existed get it too.
+        service.form_code = SERVICE_FORM_CODES.get(code)
         sort_order = sort_order + 1
 
 

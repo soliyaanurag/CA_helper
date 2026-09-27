@@ -12,9 +12,12 @@ import { BusinessDashboardPage } from "@/pages/business/BusinessDashboardPage";
 import { CompliancePage } from "@/pages/business/CompliancePage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { MarketplacePage } from "@/pages/business/MarketplacePage";
+import { MyEngagementsPage } from "@/pages/business/MyEngagementsPage";
 import { TypicalFeesPage } from "@/pages/business/TypicalFeesPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
+import { RequestCaPage } from "@/pages/business/RequestCaPage";
 import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
+import { CaEngagementsPage } from "@/pages/ca/CaEngagementsPage";
 import { CaProfilePage } from "@/pages/ca/CaProfilePage";
 import { CaServicesPage } from "@/pages/ca/CaServicesPage";
 import { CaWorkspacePage } from "@/pages/ca/CaWorkspacePage";
@@ -41,6 +44,7 @@ export const NAV = {
     { label: "Document vault", path: "/business/documents" },
     { label: "Find a CA", path: "/business/marketplace" },
     { label: "Typical fees", path: "/business/fees" },
+    { label: "My engagements", path: "/business/engagements" },
     { label: "Notification settings", path: "/business/alerts" },
     { label: "AI assistant", path: "/business/assistant" },
   ],
@@ -48,6 +52,7 @@ export const NAV = {
     { label: "Dashboard", path: "/ca" },
     { label: "My profile", path: "/ca/profile" },
     { label: "Services & prices", path: "/ca/services" },
+    { label: "My engagements", path: "/ca/engagements" },
     { label: "My clients", path: "/ca/clients" },
   ],
   admin: [
@@ -95,6 +100,8 @@ export const appRoutes = [
     { path: "documents", element: <DocumentsPage /> },
     { path: "marketplace", element: <MarketplacePage /> },
     { path: "marketplace/:caId", element: <CaDetailPage /> },
+    { path: "marketplace/:caId/request", element: <RequestCaPage /> },
+    { path: "engagements", element: <MyEngagementsPage /> },
     { path: "fees", element: <TypicalFeesPage /> },
     { path: "alerts", element: <AlertsPage /> },
     { path: "assistant", element: <AssistantPage /> },
@@ -103,6 +110,7 @@ export const appRoutes = [
     { index: true, element: <CaDashboardPage /> },
     { path: "profile", element: <CaProfilePage /> },
     { path: "services", element: <CaServicesPage /> },
+    { path: "engagements", element: <CaEngagementsPage /> },
     { path: "clients", element: <CaWorkspacePage /> },
   ]),
   roleArea("admin", [

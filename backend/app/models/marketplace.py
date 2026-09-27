@@ -228,6 +228,9 @@ class EngagementItem(BaseModel):
             "listed_price >= 0 AND (agreed_price IS NULL OR agreed_price >= 0)",
             name="prices_not_negative",
         ),
+        CheckConstraint(
+            "quoted_price IS NULL OR quoted_price >= 0", name="quoted_price_not_negative"
+        ),
     )
 
     engagement_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("engagements.id"), index=True)
@@ -237,6 +240,8 @@ class EngagementItem(BaseModel):
     service_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("service_catalog.id"))
     # The CA's price from their menu when requested (0 for pro bono), in rupees.
     listed_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    # The CA's revised price when they send a quote; empty unless the CA quoted.
+    quoted_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     # The price both sides accepted (the listed price, or the quote); empty until then.
     agreed_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
 

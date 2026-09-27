@@ -33,6 +33,10 @@ Planned: date-range and status filters on `/items` (CO4), `/items/{id}` (CO5), a
 ## Service functions other modules call
 - `create_filings(business_id, profile, today) -> int`: add the missing filings of the current financial year (does not commit). Used by onboarding.
 - `list_filings(business) -> list[ComplianceItem]`.
+- `get_filings_by_ids(filing_ids, lock=False) -> {id: ComplianceItem}`: live filings by id; `lock=True` is
+  `SELECT ... FOR UPDATE` until the caller commits (does not commit). Used by marketplace (engagements).
+- `mark_filings_with_ca(filing_ids)`: status `with_ca`, filing path `ca` (does not commit). Called by marketplace
+  when an engagement becomes `active` (the CA accepts, or the business accepts a quote).
 - `due_date(template, period_end, quarter, audit) -> date`, `financial_year_start(day)`, `periods_of_year(frequency, fy_start)`.
 
 ## Depends on

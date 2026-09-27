@@ -8,6 +8,19 @@
     GET  /api/v1/marketplace/ca-services  CA only        the services the CA offers, with prices
     PUT  /api/v1/marketplace/ca-services  CA only        replace the CA's price menu
 
+Engagements (a business working with a CA):
+    GET  /api/v1/marketplace/cas/<id>/requestable-filings  business  its filings + CA prices
+    POST /api/v1/marketplace/engagements                   business  send a request
+    GET  /api/v1/marketplace/my-engagements                business  its engagements
+    GET  /api/v1/marketplace/ca-engagements                CA        their engagements
+    POST /api/v1/marketplace/engagements/<id>/accept       CA        accept at the listed prices
+    POST /api/v1/marketplace/engagements/<id>/quote        CA        send new prices with a reason
+    POST /api/v1/marketplace/engagements/<id>/decline      CA        decline the request
+    POST /api/v1/marketplace/engagements/<id>/complete     CA        mark the work as done
+    POST /api/v1/marketplace/engagements/<id>/accept-quote business  accept the CA's quote
+    POST /api/v1/marketplace/engagements/<id>/reject-quote business  reject the CA's quote
+    POST /api/v1/marketplace/engagements/<id>/withdraw     business  withdraw an unanswered request
+
 Each route only checks who is calling, reads the input, calls one function in
 app/services/marketplace_service.py and returns its result as JSON.
 """
@@ -23,9 +36,13 @@ from app.schemas.marketplace import (
     CaProfileSchema,
     CaServiceMenuSchema,
     CatalogServiceSchema,
+    EngagementRequestInputSchema,
+    EngagementSchema,
+    QuoteInputSchema,
+    RequestableFilingSchema,
 )
 from app.services import marketplace_service
-from app.utils.decorators import current_user, login_required, roles_required
+from app.utils.decorators import current_business, current_user, login_required, roles_required
 
 # A blueprint is a group of routes. app/routes/__init__.py adds it to the app
 # under /api/v1, so "/marketplace/cas" becomes "/api/v1/marketplace/cas".
@@ -93,3 +110,106 @@ def get_my_services():
 def save_my_services(data):
     user = current_user()
     return marketplace_service.save_own_menu(user, data["items"])
+
+
+# --- Engagements -------------------------------------------------------------------
+
+
+# The business sees its filings, each with this CA's price, before sending a request.
+@blp.route("/marketplace/cas/<uuid:ca_id>/requestable-filings", methods=["GET"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, RequestableFilingSchema(many=True))
+def list_requestable_filings(ca_id):
+    business = current_business()
+    return marketplace_service.list_requestable_filings(business, ca_id)
+
+
+# The business sends a request to a CA for some of its filings.
+@blp.route("/marketplace/engagements", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.arguments(EngagementRequestInputSchema)
+@blp.response(201, EngagementSchema)
+def send_request(data):
+    business = current_business()
+    return marketplace_service.create_request(business, data["ca_profile_id"], data["items"])
+
+
+# The business sees all its engagements.
+@blp.route("/marketplace/my-engagements", methods=["GET"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, EngagementSchema(many=True))
+def list_my_engagements():
+    business = current_business()
+    return marketplace_service.list_business_engagements(business)
+
+
+# The CA sees all their engagements.
+@blp.route("/marketplace/ca-engagements", methods=["GET"])
+@roles_required(UserRole.CA)
+@blp.response(200, EngagementSchema(many=True))
+def list_ca_engagements():
+    user = current_user()
+    return marketplace_service.list_ca_engagements(user)
+
+
+# --- CA actions on a request ---
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/accept", methods=["POST"])
+@roles_required(UserRole.CA)
+@blp.response(200, EngagementSchema)
+def accept_request(engagement_id):
+    user = current_user()
+    return marketplace_service.accept_request(user, engagement_id)
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/quote", methods=["POST"])
+@roles_required(UserRole.CA)
+@blp.arguments(QuoteInputSchema)
+@blp.response(200, EngagementSchema)
+def send_quote(data, engagement_id):
+    user = current_user()
+    return marketplace_service.send_quote(user, engagement_id, data["reason"], data["prices"])
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/decline", methods=["POST"])
+@roles_required(UserRole.CA)
+@blp.response(200, EngagementSchema)
+def decline_request(engagement_id):
+    user = current_user()
+    return marketplace_service.decline_request(user, engagement_id)
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/complete", methods=["POST"])
+@roles_required(UserRole.CA)
+@blp.response(200, EngagementSchema)
+def complete_engagement(engagement_id):
+    user = current_user()
+    return marketplace_service.complete_engagement(user, engagement_id)
+
+
+# --- Business actions on a request ---
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/accept-quote", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, EngagementSchema)
+def accept_quote(engagement_id):
+    business = current_business()
+    return marketplace_service.accept_quote(business, engagement_id)
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/reject-quote", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, EngagementSchema)
+def reject_quote(engagement_id):
+    business = current_business()
+    return marketplace_service.reject_quote(business, engagement_id)
+
+
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/withdraw", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, EngagementSchema)
+def withdraw_request(engagement_id):
+    business = current_business()
+    return marketplace_service.withdraw_request(business, engagement_id)

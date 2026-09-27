@@ -5,16 +5,25 @@ CA signup/practice profile, verification (Certificate of Practice), the marketpl
 
 ## What exists now
 CA practice profiles (MA1), verification by numbers (MA2, the certificate upload comes later), the list of
-verified CAs businesses browse, the CA price menu (MA5) and the typical price range per service (MA6).
+verified CAs businesses browse, the CA price menu (MA5), the typical price range per service (MA6), and
+engagements: sending a request (MA9), the CA's answer and the business's decision on a quote (MA10), the
+lifecycle up to `completed` (MA11) and each side's "My engagements" page (MA13). The 48-hour expiry job (MA12)
+is not built: an unanswered request stays `requested` (its `expires_at` is set, ready for MA12).
 - **Backend:** models `CaProfile` + `CaVerificationStatus`, `CA_SPECIALIZATIONS`, `CA_LANGUAGES`,
   `CatalogService` + `ServiceUnit`, `CaService` in `app/models/marketplace.py`; schemas in `app/schemas/marketplace.py` (the list uses the shared
   `app/schemas/pagination.py`); logic in `app/services/marketplace_service.py`; routes in
   `app/routes/marketplace.py` (in `BLUEPRINTS`). Migrations
-  `…_marketplace_add_ca_profiles.py`, `…_marketplace_add_service_catalog_and_ca_.py`.
+  `…_marketplace_add_ca_profiles.py`, `…_marketplace_add_service_catalog_and_ca_.py`,
+  `…_marketplace_add_engagement_items_quoted_.py` (`engagement_items.quoted_price` + its CHECK).
+  Engagement emails: `app/templates/email/engagement_{requested,accepted,quoted,declined}.txt` (the CA on a new
+  request; the business when the CA accepts, quotes or declines).
 - **Seed:** `seed_ca_profiles()` in `app/seed.py`: the demo CA gets a verified profile; four sample verified CAs
   (`sample-ca-1..4@demo.local`, cannot log in) fill the list. `seed_service_catalog()` adds the 13 catalog
   services (`SERVICE_CATALOG`); `seed_ca_prices()` gives the four sample CAs made-up prices (`SAMPLE_PRICES`), so
   ITR-3, ITR-4 and GSTR-3B reach three CAs and show a range. The demo CA gets no prices (set them on `/ca/services`).
+  `SERVICE_FORM_CODES` fills `service_catalog.form_code` on every seed (existing rows too): the 9 filing
+  services get their form (all three ITR services → `itr`); GST registration, tax audit, bookkeeping and notices
+  stay empty.
 - **Frontend:** `pages/ca/CaProfilePage.jsx` at `/ca/profile` (CA nav "My profile"): the form, the verification
   status and what it means. `pages/ca/CaDashboardPage.jsx` shows a reminder card until the profile is verified.
   `pages/ca/CaServicesPage.jsx` at `/ca/services` (CA nav "Services & prices"): tick a service, enter the fee,
@@ -29,11 +38,25 @@ verified CAs businesses browse, the CA price menu (MA5) and the typical price ra
   `api/marketplace.js` (`useCaProfile` → `null` before the first save, `saveCaProfile`, `useVerifiedCas`,
   `useVerifiedCa`, `useServices`, `useCaServices`, `saveCaServices`); labels in `lib/labels.js`; `formatRupees`,
   `typicalRangeText`, `comparedToMedian` in `lib/money.js`.
+  Engagements: the CA page has a "Request this CA" button → `pages/business/RequestCaPage.jsx` at
+  `/business/marketplace/:caId/request` (tick filings, pick the service when the CA has several for one filing,
+  total, send; blocked filings say why); `pages/business/MyEngagementsPage.jsx` at `/business/engagements`
+  (business nav "My engagements": Quote to review / Waiting for the CA / Active / Finished; accept or reject a
+  quote, withdraw); `pages/ca/CaEngagementsPage.jsx` at `/ca/engagements` (CA nav "My engagements": New requests
+  / Active / Quote sent / Finished; accept, send a quote with a price per filing and a reason, decline, mark as
+  completed). Both use `components/EngagementCard.jsx` (filings, listed / quoted / agreed prices and totals).
+  Hooks `useRequestableFilings`, `sendRequest`, `useMyEngagements` (→ `null` before registration),
+  `useCaEngagements`, `engagementAction(id, action, body)`; `ENGAGEMENT_STATUS_LABELS`; `lib/dates.js`
+  (`formatDate`, `formatDateTime` in Indian time).
 - **Tests:** `tests/test_marketplace_ca_profile.py`, `tests/test_marketplace_ca_list.py`,
-  `tests/test_marketplace_services.py`, `tests/test_marketplace_ca_detail.py`, `tests/test_seed_command.py`;
-  `CaProfilePage.test.jsx`, `CaServicesPage.test.jsx`, `MarketplacePage.test.jsx`, `CaDetailPage.test.jsx`, `TypicalFeesPage.test.jsx`, `lib/money.test.js`.
-- **Not yet:** Certificate of Practice upload + OCR, the admin verify/reject screen, the admin catalog editor,
-  requests/engagements (a "Request this CA" button on the CA page), pro-bono, ratings (a section on the CA page).
+  `tests/test_marketplace_services.py`, `tests/test_marketplace_ca_detail.py`,
+  `tests/test_marketplace_engagements.py`, `tests/test_seed_command.py`; `CaProfilePage.test.jsx`,
+  `CaServicesPage.test.jsx`, `MarketplacePage.test.jsx`, `CaDetailPage.test.jsx`, `TypicalFeesPage.test.jsx`,
+  `RequestCaPage.test.jsx`, `MyEngagementsPage.test.jsx`, `CaEngagementsPage.test.jsx` (sample data in
+  `test/engagementData.js`), `lib/money.test.js`.
+- **Not yet:** MA12 (the expiry job and re-matching email), Certificate of Practice upload + OCR, the admin
+  verify/reject screen, the admin catalog editor, CA capacity limits, pro-bono, ratings (a section on the CA
+  page), the in-app notification tray (engagement news is email only).
 
 ## Tables
 - `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
@@ -42,7 +65,8 @@ verified CAs businesses browse, the CA price menu (MA5) and the typical price ra
   code uses them yet. The existing names stay: `about` is the bio, `capacity` the max active clients.
   `CaProfile.user` names its foreign key (`foreign_keys=[user_id]`) because the table now has two links to `users`.
 - `service_catalog` (`CatalogService`): the standard services every CA prices against (seeded; config data). New
-  `form_code` (null for services that are not one filing), not seeded yet.
+  `form_code`: the filing a service is for (seeded from `SERVICE_FORM_CODES`; null for services that are not one
+  filing). A request uses it to find the CA's price for a filing.
 - `ca_services`: one CA's price for one catalog service (soft-deleted when the CA stops offering it)
 
 Created by `schema: complete data model`, not used by any service yet (model file `app/models/marketplace.py`):
@@ -64,14 +88,34 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 | GET | `/api/v1/marketplace/ca-services` | ca | `{items: [{service_id, price}]}`: the CA's current menu (empty without a profile) |
 | PUT | `/api/v1/marketplace/ca-services` | ca | body `{items: [{service_id, price}]}` replaces the menu → the saved menu; price 1 to 10,00,000; 404 `CA_PROFILE_NOT_FOUND`, 400 `UNKNOWN_SERVICE` (not in the active catalog) |
 
-`city` matches any part of the city name, any case. Money is sent as a string with two decimals (`"750.00"`). Planned: requests/engagements under
-`/api/v1/marketplace/...`; admin verification and the service catalog under `/api/v1/admin/...`.
+| GET | `/api/v1/marketplace/cas/<id>/requestable-filings` | business | the business's filings, soonest due first: `{id, form_code, period_label, due_date, status, options: [{service_id, name, price}], blocked_reason}`; `options` are this CA's services for that form; `blocked_reason` is null, "Already filed.", "Already requested from a CA or with a CA." or "This CA has not listed a price for this filing." · 404 `CA_NOT_FOUND`, `BUSINESS_NOT_FOUND` |
+| POST | `/api/v1/marketplace/engagements` | business | body `{ca_profile_id, items: [{compliance_item_id, service_id}]}` (at least one) → 201 the engagement (`requested`; `listed_price` copied from the CA's menu; `expires_at` = +48 h); the CA is emailed · 404 `CA_NOT_FOUND` / `FILING_NOT_FOUND`, 400 `DUPLICATE_FILING` / `SERVICE_NOT_OFFERED`, 409 `FILING_ALREADY_FILED` / `FILING_ALREADY_REQUESTED` |
+| GET | `/api/v1/marketplace/my-engagements` | business | its engagements, newest first · 404 `BUSINESS_NOT_FOUND` |
+| GET | `/api/v1/marketplace/ca-engagements` | ca | their engagements, newest first (empty without a profile) |
+| POST | `/api/v1/marketplace/engagements/<id>/accept` | ca | `requested` → `active`; agreed = listed; the filings become "With CA"; the business is emailed |
+| POST | `/api/v1/marketplace/engagements/<id>/quote` | ca | body `{reason, prices: [{engagement_item_id, price}]}` (a price 0 to 10,00,000 for every filing, 400 `QUOTE_INCOMPLETE` otherwise) → `quoted`; the business is emailed with the reason |
+| POST | `/api/v1/marketplace/engagements/<id>/decline` | ca | `requested` → `declined`; the business is emailed |
+| POST | `/api/v1/marketplace/engagements/<id>/complete` | ca | `active` → `completed` (no check that the filings are filed yet) |
+| POST | `/api/v1/marketplace/engagements/<id>/accept-quote` | business | `quoted` → `active`; agreed = quoted; the filings become "With CA" |
+| POST | `/api/v1/marketplace/engagements/<id>/reject-quote` | business | `quoted` → `cancelled` |
+| POST | `/api/v1/marketplace/engagements/<id>/withdraw` | business | `requested` → `cancelled` |
+
+Every engagement response is `{id, status, ca_profile_id, ca_name, business_name, quote_reason, requested_at,
+expires_at, responded_at, activated_at, completed_at, items: [{id, compliance_item_id, form_code, period_label,
+due_date, service_name, listed_price, quoted_price, agreed_price}]}`. Every action answers 404
+`ENGAGEMENT_NOT_FOUND` for an engagement of another CA or business, and 409 `INVALID_STATUS` from the wrong
+status.
+
+`city` matches any part of the city name, any case. Money is sent as a string with two decimals (`"750.00"`).
+Planned: admin verification and the service catalog under `/api/v1/admin/...`.
 
 ## Service functions other modules call
 None yet. Planned: `has_active_engagement(ca_id, business_id)` (used by `ca_has_active_access`), `engagement_status_for(item_id)` (used by compliance).
 
 ## Depends on
-core-auth (users, roles), compliance (form codes, items), documents (CoP upload), core-infra (worker for 48h expiry).
+core-auth (users, roles, `current_business()`), compliance (`list_filings`, `get_filings_by_ids`,
+`mark_filings_with_ca`), onboarding (`get_business`), core-infra (`send_email`; the worker for the 48 h expiry,
+MA12), documents (CoP upload, later).
 
 ## Contracts (don't change without telling the team)
 - Unverified CAs never appear in listings (`list_verified_cas()` filters on `verified` and a live account)

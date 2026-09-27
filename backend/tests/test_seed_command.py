@@ -67,6 +67,15 @@ def test_seed_is_idempotent(app, database, demo_env):
     assert database.session.scalar(select(func.count(User.id))) == 3 + len(SAMPLE_CAS)
     assert database.session.scalar(select(func.count(CaProfile.id))) == 1 + len(SAMPLE_CAS)
     assert database.session.scalar(select(func.count(CatalogService.id))) == len(SERVICE_CATALOG)
+    # Each filing service knows its form (a request uses it to find the CA's price).
+    gstr_3b = database.session.scalar(
+        select(CatalogService).where(CatalogService.code == "gstr_3b")
+    )
+    tax_audit = database.session.scalar(
+        select(CatalogService).where(CatalogService.code == "tax_audit")
+    )
+    assert gstr_3b.form_code == "gstr_3b"
+    assert tax_audit.form_code is None
     price_count = sum(len(prices) for prices in SAMPLE_PRICES.values())
     assert database.session.scalar(select(func.count(CaService.id))) == price_count
 

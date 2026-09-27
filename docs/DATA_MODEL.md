@@ -80,7 +80,7 @@ Column types are in the model files; this lists what each table is for and its k
 | `service_catalog` (SD) | a standard service every CA prices against | code (unique, e.g. `gstr_3b`), name, description, unit (`service_unit`), sort_order, form_code (null for services that are not one filing, e.g. tax audit). Class `CatalogService`. No stored typical prices: computed from `ca_services` |
 | `ca_services` (SD) | one CA's price for one catalog service (N–N) | ca_profile_id, service_id, price (> 0). Unique (ca_profile_id, service_id): unticking soft-deletes, ticking again reactivates the same row |
 | `engagements` | one business working with one CA | business_id → businesses, ca_profile_id → ca_profiles (both indexed), status, is_pro_bono, quote_reason (required when quoted), requested_at, responded_at, expires_at, activated_at, completed_at. A business may have several CAs at once |
-| `engagement_items` | one filing in an engagement | engagement_id, compliance_item_id, service_id → service_catalog, listed_price, agreed_price (null until agreed). Unique (engagement, item) |
+| `engagement_items` | one filing in an engagement | engagement_id, compliance_item_id, service_id → service_catalog, listed_price, quoted_price (the CA's quote; null unless quoted; CHECK `ck_engagement_items_quoted_price_not_negative` ≥ 0), agreed_price (null until agreed). Unique (engagement, item) |
 | `ratings` | the business's review of one engagement | engagement_id (unique), stars (CHECK 1–5), review. Deleted normally |
 | `client_invites` | a CA's invitation to an existing client | ca_profile_id, email (indexed), token_hash (SHA-256, unique; the token is never stored), status, expires_at, accepted_business_id → businesses |
 | `pro_bono_requests` | a business in the pro-bono queue | business_id, status, note, engagement_id → engagements (unique; null while queued) |
@@ -250,6 +250,7 @@ erDiagram
         uuid id PK
         uuid engagement_id FK
         uuid compliance_item_id FK
+        numeric quoted_price
         numeric agreed_price
     }
     ratings {

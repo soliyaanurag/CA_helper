@@ -120,6 +120,17 @@ export const COMPLIANCE_STATUS_LABELS = {
   overdue: "Overdue",
 };
 
+/** Where an engagement between a business and a CA stands (engagements.status). */
+export const ENGAGEMENT_STATUS_LABELS = {
+  requested: "Requested",
+  quoted: "Quote sent",
+  active: "Active",
+  completed: "Completed",
+  declined: "Declined",
+  expired: "Expired",
+  cancelled: "Cancelled",
+};
+
 /** The label for `code`, or the code itself if the map has no entry (never crash on a new value). */
 export function label(labels, code) {
   return labels[code] ?? code;
