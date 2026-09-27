@@ -9,8 +9,9 @@ Skeleton only; no features yet.
 - Frontend: one placeholder page, "Regulatory news" at `/admin/regulatory` (admin nav), `frontend/src/pages/admin/RegulatoryAdminPage.jsx`, built from `Placeholder`; no API hooks yet.
 
 ## Tables
-None yet. Planned:
-- `news_sources` (config), `news_articles`, `regulatory_changes` (extracted change + approval status)
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/regulatory.py`.
+- `news_sources` (config), `news_articles` (unique url and content hash), `regulatory_changes` (extracted change, form codes, admin review)
+- `regulatory_change_matches`: businesses affected by an approved change (N–N, notified time)
 
 ## Endpoints
 None yet. Planned: admin approval at `/api/v1/admin/regulatory/...`.

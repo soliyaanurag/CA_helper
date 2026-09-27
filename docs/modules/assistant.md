@@ -10,9 +10,9 @@ Skeleton only; no features yet.
 - The Gemini wrapper it needs (`app/utils/gemini_client.py`) does not exist yet.
 
 ## Tables
-None yet. Planned:
-- `kb_chunks`: source, title, url, text, `embedding vector(N)` (pgvector)
-- `chat_messages`: per-user history
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/assistant.py`.
+- `kb_chunks`: our content and official FAQs in chunks, `embedding vector(768)` (pgvector); no user data, no vector index yet
+- `chat_messages`: per-user history with citations; soft delete
 
 ## Endpoints
 None yet. Planned: `/api/v1/assistant/...` (ask).

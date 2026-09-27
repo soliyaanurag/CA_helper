@@ -9,8 +9,8 @@ Only the admin dashboard stub; no admin features yet.
 - Frontend: `pages/admin/AdminDashboardPage.jsx` is the admin area home (`/admin`, index route, nav "Dashboard"), using `useAdminDashboard()` from `api/admin.js`; placeholder "Users & CAs" page at `/admin/users` (`pages/admin/AdminUsersPage.jsx`). The sidebar layout (`AppShell`) is in frontend core.
 
 ## Tables
-None yet. Planned:
-- `admin_audit_log`: admin, action, target, details, timestamp
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/admin.py`.
+- `admin_audit_log`: admin, action, target type + id (no FK), details; append-only
 
 ## Endpoints
 | Method | Path | Who | Returns |

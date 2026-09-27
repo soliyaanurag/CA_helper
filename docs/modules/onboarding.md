@@ -10,11 +10,11 @@ Skeleton only; no features yet.
 - No legal values exist yet; what needs verifying is listed in `docs/TODO_VERIFY.md`.
 
 ## Tables
-None yet. Planned:
-- `businesses`: profile fields; PAN/GSTIN/TAN/phone as `EncryptedString` + blind index
-- `regulatory_profiles`: computed profile lines + explanations + rule version
-- `rule_thresholds` (config): value, `source_reference`, `effective_from`, `effective_to`
-- `nic_codes`: reference data from the official NIC list
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/onboarding.py`.
+- `businesses`: one live business per business user; PAN, GSTIN, TAN and phone encrypted (`EncryptedString`, not searchable, no blind index); `annual_turnover` is an amount; CHECKs for GSTIN, TAN and CIN/LLPIN
+- `regulatory_profiles`: the current computed profile (1–1), with a "why" per line (`explanations`) and `rule_version`
+- `nic_codes`: the official NIC list (reference data, imported, never invented)
+- `rule_thresholds` (config): value, unit, `source_reference`, `effective_from`, `effective_to`; unique (key, effective_from)
 
 ## Endpoints
 None yet. Planned: `/api/v1/onboarding/...` (registration, profile, re-check); admin editors at `/api/v1/admin/onboarding/...` (the rule-threshold editor is planned together with the compliance admin editors).

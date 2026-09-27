@@ -14,8 +14,9 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
   **separate worker process**.
 - Frontend: React + Vite + **JavaScript (`.js`/`.jsx`, no TypeScript)**, React Router, TanStack Query, Tailwind +
   shadcn/ui, React Hook Form + Zod, `apiFetch()` (fields per Swagger at `/api/docs`), Vitest + RTL.
-- Added with their features, not installed yet: pgvector, google-genai (Gemini), Fernet + HMAC blind index, Tesseract +
-  PyMuPDF (never pdfplumber as well), a calendar and a chart library (ask which first).
+- Installed for the schema: `cryptography` (Fernet, `EncryptedString`; no blind index) and `pgvector` (`vector(768)`).
+  Added with their features, not installed yet: google-genai (Gemini), Tesseract + PyMuPDF (never pdfplumber as
+  well), a calendar and a chart library (ask which first).
 - Run: `make infra` (Postgres + Mailpit in Docker), `make dev-backend` (`python main.py`), `make dev-worker`,
   `make dev-frontend` (Vite forwards `/api` to Flask); all read the root `.env`. `make help` lists every target.
   People may run the servers by hand (README "Quick start"); Claude always uses Make targets or `conda run`.
@@ -27,11 +28,11 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 ## Folder map
 ```
 backend/app/__init__.py      create_app() · config.py extensions.py errors.py seed.py (`flask seed`)
-backend/app/models/          base.py (BaseModel, mixins) enums.py <m>.py · __init__.py imports every model
+backend/app/models/          base.py (BaseModel, mixins) enums.py <m>.py (one per module) · __init__.py imports all
 backend/app/schemas/         <m>.py (marshmallow request/response shapes)
 backend/app/services/        <m>_service.py (business logic, all DB access)
 backend/app/routes/          <m>.py (one Blueprint each) · __init__.py: BLUEPRINTS list, /api/v1 prefix
-backend/app/utils/           decorators.py (role checks) jwt_handlers.py passwords.py
+backend/app/utils/           decorators.py (role checks) jwt_handlers.py passwords.py email.py encryption.py
 backend/tests/               test_*.py · conftest.py shared pytest fixtures
 backend/main.py              dev server entrypoint (`python main.py`)
 backend/worker.py            APScheduler entrypoint (every job listed in build_scheduler())
@@ -78,9 +79,16 @@ infrastructure, tooling or abstraction layers without asking.
    Unconfirmed values get `TODO_VERIFY` in `source_reference` and a row in `docs/TODO_VERIFY.md`.
 4. **Sensitive fields are encrypted:** PAN, GSTIN, TAN, phone and uploaded files use `EncryptedString` and
    encrypted file storage. Passwords are hashed (argon2), never encrypted.
-5. **Access control on every endpoint** via shared role decorators. A CA reads a business's data only through
-   `ca_has_active_access(ca_id, business_id)`.
-6. **Soft delete only** (`is_active` / `deleted_at`).
+5. **Access control on every endpoint** via shared role decorators (full rules: `docs/DATA_MODEL.md` "Access
+   rules"). A business sees all its own data. A CA with a requested/quoted engagement sees only a profile summary
+   and the requested filings (no PAN/GSTIN/TAN, no documents); with an **active** engagement, the full profile but
+   only that engagement's filings and the documents linked to them; afterwards nothing but their own rating. Admins
+   see metadata, never document contents. Decide it only through the marketplace functions
+   `ca_has_active_access(ca_profile_id, business_id)`, `open_engagement_item_ids(ca_profile_id, business_id)` and
+   `ca_can_access_document(ca_profile_id, document_id)`.
+6. **Soft delete only for entities** (`is_active` / `deleted_at`); pure link/one-off rows (checklist ticks,
+   item-document links, ratings) are deleted normally. A soft-deleted table whose UNIQUE row must be creatable again
+   uses a partial unique index on live rows (`WHERE deleted_at IS NULL`).
 7. **Money:** `Decimal`, stored `Numeric(12,2)` rupees. **Time:** store UTC, display Asia/Kolkata.
    Financial year = April–March.
 8. **Secrets only in `.env`** (gitignored). Every new variable goes into `.env.example` with a comment.

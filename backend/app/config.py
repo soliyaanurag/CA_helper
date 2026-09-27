@@ -28,6 +28,10 @@ class BaseConfig:
     # Access tokens only for now (no refresh token yet); lifetime in minutes.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "60")))
 
+    # Fernet key for encrypted columns (app/utils/encryption.py). No fallback: without it,
+    # saving or reading an encrypted value fails with instructions.
+    FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
+
     # --- Database ---
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
@@ -85,6 +89,8 @@ class TestingConfig(BaseConfig):
     # Rate limiting stays ON so the login limit is tested; tests/conftest.py
     # clears the in-memory counters before every test.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=60)
+    # A fixed test-only key, so a developer's .env cannot change test behaviour.
+    FIELD_ENCRYPTION_KEY = "Z5radg25qAqquvqRiPO960hRLtJmVhE0P3dYa_T1Mk8="
     # Tests read emails from app.utils.email.outbox; nothing reaches Mailpit.
     MAIL_SUPPRESS_SEND = True
     # Fixed here so a developer's .env cannot change test behaviour.

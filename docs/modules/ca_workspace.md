@@ -9,9 +9,9 @@ Only the CA dashboard stub; no workspace features yet.
 - Frontend: `pages/ca/CaDashboardPage.jsx` is the CA area home (`/ca`, index route, nav "Dashboard"), using `useCaDashboard()` from `api/caWorkspace.js`; placeholder "My clients" page at `/ca/clients` (`pages/ca/CaWorkspacePage.jsx`).
 
 ## Tables
-None yet. Planned:
-- `document_requests`: engagement/item, requested doc type, message, status (shown as client to-dos)
-- `ca_notes`: private notes per client
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/ca_workspace.py`.
+- `document_requests`: a CA's request for one document for one filing of an engagement (shown as a client to-do)
+- `ca_notes`: a CA's private notes per client; soft delete
 
 ## Endpoints
 | Method | Path | Who | Returns |

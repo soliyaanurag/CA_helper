@@ -39,9 +39,12 @@ else
 import re, secrets
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+
 text = Path(".env.example").read_text()
 for key in ("SECRET_KEY", "JWT_SECRET_KEY"):
     text = re.sub(rf"^{key}=.*$", f"{key}={secrets.token_urlsafe(48)}", text, flags=re.M)
+text = re.sub(r"^FIELD_ENCRYPTION_KEY=.*$", f"FIELD_ENCRYPTION_KEY={Fernet.generate_key().decode()}", text, flags=re.M)
 Path(".env").write_text(text)
 '
   echo "Created .env with random secrets."

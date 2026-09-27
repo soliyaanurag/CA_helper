@@ -36,13 +36,22 @@ verified CAs businesses browse, the CA price menu (MA5) and the typical price ra
   requests/engagements (a "Request this CA" button on the CA page), pro-bono, ratings (a section on the CA page).
 
 ## Tables
-- `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`)
-- `service_catalog`: the standard services every CA prices against (seeded; config data)
+- `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
+  `schema: complete data model` migration added `pro_bono_slots_per_month` (≥ 0), `rejection_reason`,
+  `verified_at`, `verified_by_id` (the admin) and `cop_document_id` (the Certificate of Practice document); no
+  code uses them yet. The existing names stay: `about` is the bio, `capacity` the max active clients.
+  `CaProfile.user` names its foreign key (`foreign_keys=[user_id]`) because the table now has two links to `users`.
+- `service_catalog` (`CatalogService`): the standard services every CA prices against (seeded; config data). New
+  `form_code` (null for services that are not one filing), not seeded yet.
 - `ca_services`: one CA's price for one catalog service (soft-deleted when the CA stops offering it)
 
-Planned:
-- `engagements`: business, CA, form/item, status, quote + reason, expiry
-- `ratings`, `client_invites`
+Created by `schema: complete data model`, not used by any service yet (model file `app/models/marketplace.py`):
+- `engagements`: business + CA, status (`requested`, `quoted`, `active`, `completed`, `declined`, `expired`,
+  `cancelled`; no `accepted`), pro bono, quote reason, requested/responded/expires/activated/completed times
+- `engagement_items`: the filings of an engagement, with service, listed and agreed price; unique per engagement
+- `ratings` (1–5 stars, one per engagement), `client_invites` (token hash only), `pro_bono_requests`
+- **Invariant for the engagement service (not enforceable in the database):** a compliance item is in at most one
+  open engagement (`requested`, `quoted`, `active`).
 
 ## Endpoints
 | Method | Path | Who | Returns |
@@ -73,8 +82,16 @@ core-auth (users, roles), compliance (form codes, items), documents (CoP upload)
   3 CAs; median, not average; computed on every request, never stored or typed in
 - Service codes (`service_catalog.code`) are what `?service=` and future links use (e.g. from a compliance item);
   unit codes: `docs/DATA_MODEL.md`
-- Engagement status codes: `requested → accepted/quoted → active → completed` (plus `declined`/`expired`)
+- Engagement status codes: `requested → active` (CA accepts the listed prices) or `requested → quoted → active`
+  (business accepts the quote), then `completed`; plus `declined`, `expired` (48 hours), `cancelled` (by the
+  business). No `accepted`. Open = `requested`, `quoted`, `active`; at most one open engagement per filing
+- `ca_profiles` and `service_catalog` are never re-inserted after soft delete. Removing then re-adding
+  reactivates the existing row (keeps `user_id`/`membership_no`/`code` unique). Same as `ca_services`, whose
+  rows `save_own_menu()` already reactivates.
 
 ## Known issues
+- Nothing soft-deletes a CA profile or a catalog service yet. The planned admin "remove" and the admin catalog
+  editor must follow the rule above: inserting a new row for the same user, membership number or code fails on
+  the plain UNIQUE constraint.
 - No admin screen yet: a newly signed-up CA stays `pending` and is not listed. For local testing, verify by hand:
   `docker compose exec db psql -U ca_helper -d ca_helper -c "UPDATE ca_profiles SET verification_status = 'verified'"`

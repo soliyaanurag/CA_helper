@@ -17,9 +17,13 @@ Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.0.54
 Flask-Migrate==4.1.0
 psycopg[binary]==3.3.6
+# The vector(768) column type for the assistant's knowledge base (Postgres extension `vector`).
+pgvector==0.5.0
 
 # --- Security ---
 argon2-cffi==25.1.0
+# Fernet encryption of PAN, GSTIN, TAN and phone (app/utils/encryption.py).
+cryptography==50.0.1
 
 # --- Background jobs (worker process only) ---
 APScheduler==3.11.3
