@@ -2,10 +2,13 @@
 
 from marshmallow import Schema, ValidationError, fields, post_load, validate
 
+from app.models.compliance import ComplianceStatus
+from app.models.enums import FormCode
 from app.models.marketplace import (
     CA_LANGUAGES,
     CA_SPECIALIZATIONS,
     CaVerificationStatus,
+    EngagementStatus,
     ServiceUnit,
 )
 from app.schemas.pagination import PageArgsSchema, PageSchema
@@ -156,3 +159,98 @@ class CaDetailSchema(Schema):
     years_experience = fields.Integer(required=True)
     about = fields.String(required=True)
     services = fields.List(fields.Nested(CaOfferedServiceSchema), required=True)
+
+
+# --- Engagements ---------------------------------------------------------------------
+
+
+def _money(**kwargs) -> fields.Decimal:
+    """Rupees, sent as a string with two decimals ("750.00")."""
+    return fields.Decimal(as_string=True, places=2, **kwargs)
+
+
+class FilingServiceOptionSchema(Schema):
+    """One of the CA's services that can do a filing, with the CA's price."""
+
+    service_id = fields.UUID(required=True)
+    name = fields.String(required=True)
+    price = _money(required=True)
+
+
+class RequestableFilingSchema(Schema):
+    """One of the business's filings on the "Request this CA" page."""
+
+    id = fields.UUID(required=True)
+    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    period_label = fields.String(required=True)
+    due_date = fields.Date(required=True)
+    status = fields.Enum(ComplianceStatus, by_value=True, required=True)
+    options = fields.List(fields.Nested(FilingServiceOptionSchema), required=True)
+    # Why it cannot be picked ("Already filed." ...); null when it can.
+    blocked_reason = fields.String(allow_none=True)
+
+
+class RequestItemInputSchema(Schema):
+    compliance_item_id = fields.UUID(required=True)
+    service_id = fields.UUID(required=True)
+
+
+class EngagementRequestInputSchema(Schema):
+    """POST /marketplace/engagements: the CA and the filings the business picked."""
+
+    ca_profile_id = fields.UUID(required=True)
+    items = fields.List(
+        fields.Nested(RequestItemInputSchema),
+        required=True,
+        validate=validate.Length(min=1, error="Choose at least one filing."),
+    )
+
+
+class EngagementItemSchema(Schema):
+    """One filing in an engagement, with its prices."""
+
+    id = fields.UUID(required=True)
+    compliance_item_id = fields.UUID(required=True)
+    form_code = fields.Enum(FormCode, by_value=True, allow_none=True)
+    period_label = fields.String(allow_none=True)
+    due_date = fields.Date(allow_none=True)
+    service_name = fields.String(required=True)
+    listed_price = _money(required=True)
+    quoted_price = _money(allow_none=True)
+    agreed_price = _money(allow_none=True)
+
+
+class EngagementSchema(Schema):
+    """One engagement between a business and a CA."""
+
+    id = fields.UUID(required=True)
+    status = fields.Enum(EngagementStatus, by_value=True, required=True)
+    ca_profile_id = fields.UUID(required=True)
+    ca_name = fields.String(required=True)
+    business_name = fields.String(required=True)
+    quote_reason = fields.String(allow_none=True)
+    requested_at = fields.DateTime(required=True)
+    expires_at = fields.DateTime(allow_none=True)
+    responded_at = fields.DateTime(allow_none=True)
+    activated_at = fields.DateTime(allow_none=True)
+    completed_at = fields.DateTime(allow_none=True)
+    items = fields.List(fields.Nested(EngagementItemSchema), required=True)
+
+
+class QuotePriceInputSchema(Schema):
+    engagement_item_id = fields.UUID(required=True)
+    price = _money(
+        required=True,
+        validate=validate.Range(min=0, max=MAX_PRICE, error="Enter a price from 0 to 10,00,000."),
+    )
+
+
+class QuoteInputSchema(Schema):
+    """POST /marketplace/engagements/<id>/quote: a new price per filing and why."""
+
+    reason = fields.String(required=True, validate=[validate.Length(1, 1000), _not_blank])
+    prices = fields.List(
+        fields.Nested(QuotePriceInputSchema),
+        required=True,
+        validate=validate.Length(min=1, error="Enter the new prices."),
+    )

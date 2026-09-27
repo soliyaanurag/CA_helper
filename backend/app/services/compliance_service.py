@@ -5,6 +5,8 @@ periods_of_year(frequency, fy_start) -> list        the months / quarters / year
 due_date(template, period_end, quarter, audit)      when one filing is due (CO2)
 create_filings(business_id, profile, today) -> int  add the missing filings of this FY (CO3)
 list_filings(business) -> list[ComplianceItem]      one business's filings, soonest first
+get_filings_by_ids(ids, lock) -> dict               filings by id (used by marketplace)
+mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
 get_dashboard(user) -> dict                         the business home page (welcome text for now)
 
 How forms and due dates work: each row of `obligation_templates` says which
@@ -20,7 +22,7 @@ from sqlalchemy import or_, select
 
 from app.extensions import db
 from app.models import ComplianceItem, ObligationTemplate, RegulatoryProfile, User
-from app.models.compliance import ComplianceStatus, Frequency
+from app.models.compliance import ComplianceStatus, FilingPath, Frequency
 
 
 def financial_year_start(day: date) -> date:
@@ -175,3 +177,30 @@ def get_dashboard(user: User) -> dict:
     penalty estimator come later.
     """
     return {"message": f"Welcome, {user.full_name}"}
+
+
+# --- Used by the marketplace module (engagements) ------------------------------------
+
+
+def get_filings_by_ids(filing_ids, lock: bool = False) -> dict:
+    """{id: ComplianceItem} for the live filings among `filing_ids`. Does not commit.
+
+    lock=True locks the rows until the caller commits (SELECT ... FOR UPDATE), so two
+    requests at the same moment cannot both reserve the same filing.
+    """
+    stmt = select(ComplianceItem).where(
+        ComplianceItem.id.in_(filing_ids), ComplianceItem.deleted_at.is_(None)
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    filings = {}
+    for filing in db.session.scalars(stmt):
+        filings[filing.id] = filing
+    return filings
+
+
+def mark_filings_with_ca(filing_ids) -> None:
+    """A CA now handles these filings: status "With CA", path "ca". Does not commit."""
+    for filing in get_filings_by_ids(filing_ids).values():
+        filing.status = ComplianceStatus.WITH_CA
+        filing.filing_path = FilingPath.CA

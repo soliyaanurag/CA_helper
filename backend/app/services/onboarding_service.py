@@ -3,6 +3,7 @@
 register_business(user, data) -> dict     save the business, compute its profile, create its filings
 get_my_business(business) -> dict         the business with its profile
 compute_profile(business, today) -> dict  the profile values plus a "why" for each (ON5, ON6)
+get_business(business_id) -> Business     one business by id (used by marketplace)
 
 The profile is computed from legal thresholds stored in `rule_thresholds` (read
 with _threshold()); no legal number is written in this file (CLAUDE.md rule 3).
@@ -217,3 +218,8 @@ def get_my_business(business: Business) -> dict:
         select(RegulatoryProfile).where(RegulatoryProfile.business_id == business.id)
     )
     return {"business": business, "profile": profile}
+
+
+def get_business(business_id) -> Business | None:
+    """One business by id (used by the marketplace module to show its name)."""
+    return db.session.get(Business, business_id)

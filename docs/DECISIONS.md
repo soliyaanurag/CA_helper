@@ -3,6 +3,30 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-27: Engagements (MA9, MA10, MA11, MA13): quoted_price, filings "With CA", no expiry yet
+
+**What**
+- A request is one `engagements` row plus one `engagement_items` row per filing. Each item keeps three prices:
+  `listed_price` (copied from the CA's menu when requested, so later menu changes do not alter it), the new
+  column **`quoted_price`** (the CA's quote, until the business decides) and `agreed_price` (set when the
+  engagement becomes `active`: the listed price if the CA accepted, the quoted price if the business accepted a
+  quote). A quote needs a price for every filing and a reason.
+- The business chooses the service per filing (the CA's services whose
+  `service_catalog.form_code` matches the filing; several only for ITR). `form_code` is now seeded.
+- **One open engagement per filing** (`requested`, `quoted`, `active`) is checked in
+  `marketplace_service.create_request()`, with the filing rows locked (`SELECT ... FOR UPDATE`) during the check.
+- When an engagement becomes `active`, its filings are set to status `with_ca`, path `ca`, through a new
+  compliance service function (`mark_filings_with_ca`), not by marketplace touching the compliance table.
+- The business can withdraw an unanswered request and reject a quote; both end as `cancelled` (no extra status).
+  The CA can mark an `active` engagement `completed`; it does not yet check that the filings are filed.
+- Notifications are emails only: the CA on a new request, the business when the CA accepts, quotes or declines.
+- **MA12 (expiry) is not built**: `expires_at` is set to 48 hours after the request, but nothing expires it yet.
+
+**Why:** a separate `quoted_price` keeps each price column meaning one thing (a quote is not agreed until the
+business accepts). Locking the filings stops two quick requests from both reserving the same filing, which the
+database alone cannot prevent (the status lives on `engagements`). Going through compliance's service keeps the
+modules separate (CLAUDE.md rule 9).
+
 ## 2026-09-27: Business registration, profile engine and filings
 
 **What**

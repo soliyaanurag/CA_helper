@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router";
 import { errorMessage } from "@/api/client";
 import { useVerifiedCa } from "@/api/marketplace";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CA_LANGUAGE_LABELS,
@@ -54,6 +55,10 @@ function CaDetails({ ca }) {
           experience · ICAI no. {ca.membership_no}
         </p>
       </div>
+
+      <Button asChild>
+        <Link to={"/business/marketplace/" + ca.id + "/request"}>Request this CA</Link>
+      </Button>
 
       <Card>
         <CardHeader>

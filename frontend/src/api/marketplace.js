@@ -87,3 +87,70 @@ export function useCaServices() {
 export function saveCaServices(items) {
   return apiFetch("/api/v1/marketplace/ca-services", { method: "PUT", body: { items } });
 }
+
+// --- Engagements (a business working with a CA) ---
+
+// Names in the query cache. Pages refresh them after an action.
+export const MY_ENGAGEMENTS_KEY = ["marketplace", "my-engagements"];
+export const CA_ENGAGEMENTS_KEY = ["marketplace", "ca-engagements"];
+
+// The business's filings with this CA's prices, for the "Request this CA" page.
+// Returns null if the business is not registered yet (the backend answers 404).
+async function fetchRequestableFilings(caId) {
+  try {
+    return await apiFetch("/api/v1/marketplace/cas/" + caId + "/requestable-filings");
+  } catch (error) {
+    if (error.code === "BUSINESS_NOT_FOUND") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function useRequestableFilings(caId) {
+  return useQuery({
+    queryKey: ["marketplace", "requestable-filings", caId],
+    queryFn: () => fetchRequestableFilings(caId),
+  });
+}
+
+// Sends a request to a CA. items = [{ compliance_item_id, service_id }].
+export function sendRequest(caId, items) {
+  return apiFetch("/api/v1/marketplace/engagements", {
+    method: "POST",
+    body: { ca_profile_id: caId, items },
+  });
+}
+
+// The business's engagements, newest first. Null if the business is not registered yet.
+async function fetchMyEngagements() {
+  try {
+    return await apiFetch("/api/v1/marketplace/my-engagements");
+  } catch (error) {
+    if (error.code === "BUSINESS_NOT_FOUND") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function useMyEngagements() {
+  return useQuery({ queryKey: MY_ENGAGEMENTS_KEY, queryFn: fetchMyEngagements });
+}
+
+// The CA's engagements, newest first.
+export function useCaEngagements() {
+  return useQuery({
+    queryKey: CA_ENGAGEMENTS_KEY,
+    queryFn: () => apiFetch("/api/v1/marketplace/ca-engagements"),
+  });
+}
+
+// One action on an engagement, e.g. engagementAction(id, "accept") or
+// engagementAction(id, "quote", { reason, prices }). Returns the updated engagement.
+export function engagementAction(engagementId, action, body) {
+  return apiFetch("/api/v1/marketplace/engagements/" + engagementId + "/" + action, {
+    method: "POST",
+    body,
+  });
+}
