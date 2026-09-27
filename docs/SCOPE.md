@@ -28,7 +28,7 @@ LLPs and companies get GST, ITR and TDS tracked, plus a notice that ROC/MCA fili
 Tax audit applicability is computed in the profile (it changes the ITR due date); there is no audit form page.
 
 ## Business side
-1. **Registration.** Mandatory: name, email, phone, entity type, state, business description, annual turnover range,
+1. **Registration.** Mandatory: name, email, phone, entity type, state, business description, annual turnover (amount),
    investment in plant/machinery/equipment, PAN, "GST registered?". Conditional: GSTIN (if GST registered),
    TAN / "deducts TDS?", "pays salaries above the taxable limit?", CIN/LLPIN (company/LLP). Optional: Udyam number.
    Email OTP verification. Optional OCR auto-fill from an uploaded GST certificate or PAN.
@@ -72,7 +72,8 @@ Tax audit applicability is computed in the profile (it changes the ITR due date)
 
 ## Admin
 - Verify, suspend or remove users and CAs.
-- Edit configuration data: rule thresholds, obligation templates, checklists, instruction pages, service catalog.
+- Edit configuration data: rule thresholds, obligation templates, penalty rules and the service catalog.
+  Explanations, instructions and checklists live in `content/` files (changed in the repo, not from the UI).
 - Approve flagged regulatory news before alerts are sent.
 - **No** database-structure changes from the UI.
 

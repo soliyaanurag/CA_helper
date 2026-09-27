@@ -10,8 +10,9 @@ Skeleton only; no features yet.
 - The encrypted storage and OCR helpers it needs (`app/utils/storage.py`, `app/utils/ocr.py`) do not exist yet, nor do their packages (pytesseract, PyMuPDF) or the Tesseract binary in the conda env.
 
 ## Tables
-None yet. Planned:
-- `documents`: owner business, uploader, FY, period, type, storage key, mime, size, sha256, OCR status/fields, soft delete
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/documents.py`.
+- `documents`: file metadata, owned by a user (business user, or CA for the Certificate of Practice) and uploaded by a user (can differ); OCR status and fields; soft delete
+- `compliance_item_documents`: which documents serve which filings (N–N, per checklist key or `general`); unlinking deletes the row
 
 ## Endpoints
 None yet. Planned: `/api/v1/documents/...` (upload, list, download).

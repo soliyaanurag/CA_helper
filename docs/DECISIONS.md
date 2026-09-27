@@ -3,6 +3,45 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+## 2026-09-27: The complete schema up front
+
+**What**
+- **Every v1 table exists now**, in one migration (`schema: complete data model`): 27 new tables and new columns
+  on `users`, `ca_profiles` and `service_catalog`, one models file per module. No services, routes or pages; each
+  module builds its logic on these tables and changes columns with its own migration.
+- **Annual turnover is an amount** (`businesses.annual_turnover`, `Numeric(12,2)`), not a range. A CA sees only a
+  turnover bracket computed from it before an engagement is active.
+- **No blind index.** PAN, GSTIN, TAN and phone are Fernet-encrypted (`EncryptedString`, key
+  `FIELD_ENCRYPTION_KEY`, no dev fallback). We never look a business up by them, so they are not searchable and not
+  unique (two businesses can share a PAN).
+- **Documents are owned by a user**, not a business (`owner_id`), so a CA's Certificate of Practice is a document
+  too; `uploaded_by_id` can differ (a CA uploading a client's acknowledgement). A file can serve several filings
+  through `compliance_item_documents`.
+- **Engagement statuses without "accepted":** `requested → active` when the CA takes the listed price, or
+  `requested → quoted → active` when the business accepts a quote; plus `declined`, `expired`, `cancelled`,
+  `completed`. A business may have several CAs at once.
+- **One open engagement per filing:** a compliance item is in at most one `requested`, `quoted` or `active`
+  engagement. The database cannot enforce this (the status is on the engagement); the marketplace service will.
+- **Content stays in files:** explanations, instructions and checklists live in `content/forms/<FORM>/`; rows store
+  keys only (`checklist_key`). The admin edits rules, templates, penalty rules and the service catalog.
+- **Soft delete vs UNIQUE:** a soft-deleted row still counts for a plain UNIQUE. Pure link or one-off rows
+  (`checklist_ticks`, `compliance_item_documents`, `ratings`) are deleted normally; `businesses (user_id)` and
+  `compliance_items (business_id, form_code, period_start)` use partial unique indexes on live rows
+  (`WHERE deleted_at IS NULL`). CLAUDE.md rule 6 says so.
+- **Aman's marketplace names stay:** `about` (the bio), `capacity` (max active clients), `cop_number`,
+  `years_experience`, class `CatalogService` with `unit` and `sort_order`. Only columns were added.
+  `CaProfile.user` now names its foreign key, because `verified_by_id` is a second link to `users`.
+- **No seed data in this PR** (exception to "new table → seed data"): the reference tables hold legal values
+  (thresholds, due-date rules, penalties) that must not be invented, and the NIC list must be imported from the
+  official source. Each module seeds its own tables when it is built.
+- `notifications` belongs to alerts (it was planned under core-infra). The array-code CHECK helper moved to
+  `models/enums.py` as `only_codes()`. `terms_accepted_at` stays empty until signup sets it (a later task).
+- New packages: `cryptography==50.0.1`, `pgvector==0.5.0` (no other dependencies). The migration and the test
+  fixtures create the Postgres extension `vector`.
+
+**Why:** the team builds modules in parallel; with every table, relationship and status agreed first, modules no
+longer race to add migrations or disagree on names, and the access rules can be written down once.
+
 ## 2026-09-26: CA price menu and typical price range (computed, never stored)
 
 **What**

@@ -10,10 +10,10 @@ Only the business dashboard stub; no compliance features yet.
 - Form content: `content/forms/<FORM>/` holds a TODO template (explanation, instructions, checklist) for each of the 7 forms; nothing reads it yet.
 
 ## Tables
-None yet. Planned:
-- `obligation_templates` (config): form code, applicability, frequency, due-date rule, `source_reference`, `effective_from/to`
-- `compliance_items`: business, form, period, FY, due date, status, path (self/CA), filed_at, acknowledgement document
-- `checklist_ticks`: per item, which checklist entries the user has
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/compliance.py`.
+- `obligation_templates` (config): form code, frequency, applicability and due-date rule (JSONB), `source_reference`, `effective_from/to`
+- `compliance_items`: one filing per business, form and period (partial unique index on live rows), status, filing path, nil return, acknowledgement number and document
+- `checklist_ticks`: ticked checklist keys (from `content/forms/<FORM>/checklist.yaml`); unticking deletes the row
 
 ## Endpoints
 | Method | Path | Who | Returns |

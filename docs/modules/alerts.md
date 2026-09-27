@@ -9,10 +9,11 @@ Skeleton only; no features yet.
 - Frontend: one placeholder page, "Notification settings" at `/business/alerts` (business nav), `frontend/src/pages/business/AlertsPage.jsx`, built from `Placeholder`; no API hooks yet.
 
 ## Tables
-None yet. Planned:
-- `reminder_log`: item + reminder kind + sent_at, for de-duplication
-- `notification_settings`: user, type, email on/off
-- `penalty_rules` (config): late fee/interest per form with `source_reference`, `effective_from/to`
+Created by migration `schema: complete data model` (no service, route or page uses them yet). Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/alerts.py`.
+- `notifications`: the in-app tray (moved here from core-infra); soft-deleted when dismissed
+- `notification_settings`: email on/off per user and type (no row = on)
+- `reminder_log`: one row per filing and reminder kind, so a reminder is never sent twice
+- `penalty_rules` (config): late fee per day, cap, interest rate, nil-return fee, `source_reference`, `effective_from/to`
 
 ## Endpoints
 None yet. Planned: `/api/v1/alerts/...` (settings, penalty estimate).

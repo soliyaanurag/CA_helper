@@ -130,9 +130,20 @@ class Widget(SoftDeleteMixin, BaseModel):     # id (UUID), created_at, updated_a
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))  # rupees
     status: Mapped[WidgetStatus] = mapped_column(str_enum(WidgetStatus))
 ```
-Import it in `backend/app/models/__init__.py` (or Alembic will not see it). Then: pull main →
+Import it in `backend/app/models/__init__.py` (or Alembic will not see it). Then: `make sync` →
 `make migration name="<module>: add widgets"` → review the generated file → `make migrate`. One migration per PR.
 Add the table to `docs/DATA_MODEL.md` and the module doc.
+
+Every table already exists (migration `schema: complete data model`); a module usually only changes columns.
+When reviewing a generated migration, fix these by hand (Alembic cannot):
+- An encrypted column appears as `app.utils.encryption.EncryptedString()`: write `sa.Text()` (the database sees
+  text; a migration never imports app code).
+- A `vector` column needs `import pgvector.sqlalchemy` at the top.
+- A CHECK constraint (or a new enum value) on an **existing** table is not detected: add
+  `op.create_check_constraint(...)` (or replace the constraint) yourself.
+- Soft-deleted table with a UNIQUE that must allow re-creating a live row: use a partial unique index,
+  `Index("ux_<table>_<cols>", ..., unique=True, postgresql_where=text("deleted_at IS NULL"))`
+  (example: `ux_compliance_items_business_form_period` in `backend/app/models/compliance.py`).
 
 ## 4. Seed data
 A `seed_<module>()` function in `backend/app/seed.py`, listed in `SEEDS` after what it depends on (demo users
