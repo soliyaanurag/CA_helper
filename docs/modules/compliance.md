@@ -13,7 +13,7 @@ Obligation templates, the due-date calculator and filing creation work (CO1, CO2
 - **How filings are created:** for each template in force whose `applicability` matches the profile, one filing per period of the **current financial year**, status `upcoming`. Only periods due today or later are added (older ones may already be filed). Existing filings are skipped, so it is safe to run again.
 - **Due-date rules** (JSON in `obligation_templates.due_date_rule`): monthly `{"day": 11}` = the 11th of the next month; quarterly `{"quarters": [[7, 13], [10, 13], [1, 13], [4, 13]]}` = [month, day] for Q1–Q4; yearly `{"month": 7, "day": 31}` after the financial year, with `audit_month`/`audit_day` for businesses with a tax audit (ITR).
 - **Tests:** `tests/test_compliance_due_dates.py` (periods and due dates), `tests/test_compliance_items.py` (which forms for QRMP, monthly and composition businesses; only future periods; idempotent; list sorted; 404 before registration), `tests/test_compliance_dashboard.py`.
-- **Frontend:** `pages/business/BusinessDashboardPage.jsx` (welcome text) and the placeholder "Compliance calendar" page at `/business/compliance`.
+- **Frontend:** `pages/business/BusinessDashboardPage.jsx` (welcome text); "Compliance calendar" at `/business/compliance` (`pages/business/CompliancePage.jsx`) lists the filings in a table (form, period, due date, status); before registration it links to the Business profile page. `useFilings()` in `api/compliance.js` (null before registration). Test: `CompliancePage.test.jsx`. The month view comes later.
 - Form content: `content/forms/<FORM>/` holds a TODO template (explanation, instructions, checklist) for each of the 7 forms; nothing reads it yet.
 
 ## Tables

@@ -12,7 +12,7 @@ Registration and the regulatory profile work (ON1, ON2, ON4, ON5, ON6, ON7; ON3 
   - `seed.py`: `seed_rule_thresholds()` adds 11 thresholds, **all `TODO_VERIFY`** (`docs/TODO_VERIFY.md`).
   - PAN, GSTIN, TAN and phone are stored encrypted (`EncryptedString`).
 - **Tests:** `tests/test_onboarding_register.py` (register, filings created, PAN encrypted, one per user, validation, GET, roles), `tests/test_onboarding_profile.py` (every rule of the engine, and that thresholds come from the table).
-- **Frontend:** still the placeholder page "Business profile" at `/business/onboarding` (`pages/business/OnboardingPage.jsx`). Try the API in Swagger (`/api/docs`).
+- **Frontend:** "Business profile" at `/business/onboarding` (`pages/business/OnboardingPage.jsx`): the registration form (Zod rules mirror `BusinessInputSchema`; GSTIN, composition, TAN, salary and CIN/LLPIN fields appear only when they apply) until the business is registered, then the regulatory profile with the "why" under each line, a notice when GST registration is suggested or ROC filings are not tracked, and a link to the compliance calendar. API calls in `api/onboarding.js` (`useMyBusiness()` returns null before registration, `registerBusiness()`). Test: `OnboardingPage.test.jsx`.
 - **Rules in the engine** (values from `rule_thresholds`):
   1. MSME tier: the smallest tier (micro, small, medium) whose investment **and** turnover limits both fit, else `not_msme`.
   2. GST scheme: not registered → `not_registered` (and `gst_registration_suggested` above the registration limit); chose composition and within its limit → `composition`; otherwise `regular_qrmp` within the QRMP limit, else `regular_monthly`.

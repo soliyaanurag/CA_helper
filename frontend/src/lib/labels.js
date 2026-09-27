@@ -67,6 +67,59 @@ export const SERVICE_UNIT_LABELS = {
   per_notice: "per notice",
 };
 
+/** Kinds of business (businesses.entity_type). */
+export const ENTITY_TYPE_LABELS = {
+  individual: "Individual (freelancer / gig worker)",
+  proprietorship: "Proprietorship",
+  partnership: "Partnership firm",
+  llp: "LLP",
+  private_limited: "Private limited company",
+};
+
+/** Regulatory profile lines (regulatory_profiles.msme_tier / gst_scheme / itr_form). */
+export const MSME_TIER_LABELS = {
+  micro: "Micro",
+  small: "Small",
+  medium: "Medium",
+  not_msme: "Not an MSME",
+};
+
+export const GST_SCHEME_LABELS = {
+  not_registered: "Not registered",
+  regular_monthly: "Regular (monthly)",
+  regular_qrmp: "Regular (quarterly, QRMP)",
+  composition: "Composition",
+};
+
+export const ITR_FORM_LABELS = {
+  itr_3: "ITR-3",
+  itr_4: "ITR-4",
+  itr_5: "ITR-5",
+  itr_6: "ITR-6",
+};
+
+/** The seven forms we track (compliance_items.form_code). */
+export const FORM_LABELS = {
+  itr: "Income tax return (ITR)",
+  gstr_1: "GSTR-1",
+  gstr_3b: "GSTR-3B",
+  cmp_08: "CMP-08",
+  gstr_4: "GSTR-4",
+  tds_24q: "TDS return 24Q (salaries)",
+  tds_26q: "TDS return 26Q (other payments)",
+};
+
+/** Where a filing is in its lifecycle (compliance_items.status). */
+export const COMPLIANCE_STATUS_LABELS = {
+  upcoming: "Upcoming",
+  docs_pending: "Docs pending",
+  ready: "Ready",
+  with_ca: "With CA",
+  filed: "Filed",
+  filed_verified: "Filed–verified",
+  overdue: "Overdue",
+};
+
 /** The label for `code`, or the code itself if the map has no entry (never crash on a new value). */
 export function label(labels, code) {
   return labels[code] ?? code;

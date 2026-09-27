@@ -442,6 +442,10 @@ The same seven codes start `ca_profiles.specializations`, so "CAs for this form"
 
 **`obligation_templates.frequency`** (compliance; `Frequency`): `monthly` Monthly · `quarterly` Quarterly · `yearly` Yearly
 
+**`compliance_items.form_code`, `obligation_templates.form_code`** (`FormCode` in `backend/app/models/enums.py`): `itr` Income tax return (ITR) ·
+`gstr_1` GSTR-1 · `gstr_3b` GSTR-3B · `cmp_08` CMP-08 · `gstr_4` GSTR-4 · `tds_24q` TDS return 24Q (salaries) ·
+`tds_26q` TDS return 26Q (other payments)
+
 **`compliance_items.status`** (compliance; `ComplianceStatus` in `backend/app/models/compliance.py`)
 
 | Code | Label | Notes |
