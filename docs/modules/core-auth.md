@@ -28,7 +28,8 @@ Signup with email OTP verification, login (refused until the email is verified),
 - **Frontend** (`frontend/src/`):
   - `context/AuthProvider.jsx` (session in localStorage; TODO: move to a refresh cookie). It hands the token and `endSession` to `apiFetch()` (`setAuth()` in `api/client.js`), which adds the Bearer header and ends the session on any 401 to a request that carried a token. `logout()` (the Log out button) also sets `loggedOutOnPurpose`, so `RequireRole` sends the user to `/login` without remembering the page; after an expired session it does remember it.
   - `useAuth()` in `hooks/useAuth.js`; `login()` throws `ApiRequestError` (`api/client.js`) with the API error code.
-  - `api/auth.js`: `signup()`, `verifyEmail()`, `resendVerificationCode()`, `forgotPassword()`, `resetPassword()`, `changePassword()` (plain async functions around `apiFetch()`).
+  - **Consent:** signup requires `terms_accepted: true` (a checkbox "I agree to the Terms and Privacy Policy", linking to the plain-language `/terms` page, `pages/TermsPage.jsx`) and sets `users.terms_accepted_at`. Login answers `terms_accepted`; a user who signed up earlier sees `components/AcceptTermsGate.jsx` once (rendered by `RequireRole`) and agrees through `POST /auth/accept-terms` (`acceptTerms()` in `AuthProvider`).
+  - `api/auth.js`: `signup()`, `acceptTerms()`, `verifyEmail()`, `resendVerificationCode()`, `forgotPassword()`, `resetPassword()`, `changePassword()` (plain async functions around `apiFetch()`).
   - Public pages: `pages/LoginPage.jsx` (`/login`; links to signup and forgot password; on `EMAIL_NOT_VERIFIED` links to `/verify-email`; shows a `notice` passed in the location state), `SignupPage.jsx` (`/signup`), `VerifyEmailPage.jsx` (`/verify-email`), `ForgotPasswordPage.jsx` (`/forgot-password`), `ResetPasswordPage.jsx` (`/reset-password`). The email moves between them in the location state, never in the URL.
   - `pages/ChangePasswordPage.jsx` at `<area>/change-password` in every role's area (added by `roleArea()` in `routes.jsx`), linked from the sidebar by `AppShell`.
   - `components/RequireRole.jsx` guard; `ROLE_HOME` and the localStorage session in `lib/session.js`.
@@ -57,6 +58,9 @@ Signup with email OTP verification, login (refused until the email is verified),
 | POST | `/api/v1/auth/forgot-password` | public, **3 per minute per IP** | always 204 · 429 |
 | POST | `/api/v1/auth/reset-password` | public, **10 per minute per IP** | 204 · 400 `OTP_INVALID` / `OTP_EXPIRED` · 422 · 429 |
 | POST | `/api/v1/auth/change-password` | any role, **10 per minute per IP** | 204 · 400 `WRONG_PASSWORD` (400, not 401, so the user stays logged in), `SAME_PASSWORD` · 422 · 429 |
+| POST | `/api/v1/auth/accept-terms` | any role | 204: records `terms_accepted_at` (for accounts from before consent) |
+
+Signup's body also needs `terms_accepted: true` (422 otherwise); login's answer also has `terms_accepted` (false for accounts from before consent).
 | GET | `/api/v1/auth/me` | any role | `{id, email, full_name, role}` |
 
 Request bodies: signup `{full_name, email, password, role}`; verify `{email, code}`; resend and forgot `{email}`; reset `{email, code, new_password}`; change `{current_password, new_password}`.

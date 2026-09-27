@@ -52,6 +52,13 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   `fakeApi({"GET /api/v1/...": [status, body]})` stubs fetch (`[204]` for an empty answer), `loginAs(role)`,
   `renderApp(path)` (`path` may be `{pathname, state}` to start with a location state). Account page tests: see
   `docs/modules/core-auth.md`.
+- **Added for the profile, verification and UI work:** `apiFetch()` sends a `FormData` body as it is (file
+  uploads) and `apiDownload(path)` returns a file as a Blob; `lib/dates.js` `todayIso()`, `daysUntil()`,
+  `daysLeftText()` ("In 12 days", "3 days ago"), `monthLabel()`, `expiresInText()` ("expires in 31 h");
+  `lib/gstin.js` (the GSTIN checks, the same as the backend); `components/StatusBadge.jsx` (a coloured filing
+  status); `components/AcceptTermsGate.jsx` (the one-time consent step, shown by `RequireRole`); the public
+  `/terms` page; `EngagementCard` shows a status timeline and the expiry countdown. Money is always shown with
+  `formatRupees()` (Indian grouping, ₹45,00,000).
 - **Not built yet:** refresh-token cookie, notification tray, floating assistant widget.
 
 ## Tables

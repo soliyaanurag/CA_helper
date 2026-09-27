@@ -31,8 +31,14 @@ Seeded rows are effective from 1 April 2025.
 | `itr.presumptive_44ad.max_turnover` | Presumptive taxation eligibility (business; the higher limit for mostly digital receipts is not handled) | Seeded: ₹2 cr — TODO_VERIFY | | |
 | `itr.presumptive.44ada.*` | Presumptive taxation eligibility (professionals) | — TODO_VERIFY | | |
 | `itr.audit_44ab.min_turnover` | Tax audit applicability (the higher limit for mostly digital receipts is not handled) | Seeded: ₹1 cr — TODO_VERIFY | | |
-| `itr.form_by_entity` | Which ITR form (ITR-3/4/5/6) applies per entity type and scheme, and "companies always have an audit" (logic in `compute_profile()`, steps 4–5, not a table value) | In code: company ITR-6; LLP ITR-5; presumptive ITR-4; other firm ITR-5; else ITR-3 — TODO_VERIFY | | |
+| `itr.form_by_entity` | Which ITR form (ITR-3/4/5/6) applies per entity type and scheme; that companies' accounts are always audited under company law, and that partnerships/LLPs answer the other-law audit question themselves (logic in `compute_profile()`, steps 4–5, not a table value) | In code: company ITR-6; LLP ITR-5; presumptive ITR-4; other firm ITR-5; else ITR-3 — TODO_VERIFY | | |
 | `tds.salary.taxable_limit` | Meaning of "pays salaries above the taxable limit" | — TODO_VERIFY | | |
+
+## GST state codes (onboarding)
+
+| Key | What it decides | Value | Official source | Verified by / date |
+|---|---|---|---|---|
+| `content/reference/gst_states.json` | The state dropdown and the first two digits of a GSTIN (a GSTIN must start with its state's code) | 36 states and UTs with codes 01–38 (no 25 and 28, merged or replaced) — TODO_VERIFY | | |
 
 ## Due-date rules (compliance)
 

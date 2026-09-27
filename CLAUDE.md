@@ -33,6 +33,7 @@ backend/app/schemas/         <m>.py (marshmallow request/response shapes)
 backend/app/services/        <m>_service.py (business logic, all DB access)
 backend/app/routes/          <m>.py (one Blueprint each) · __init__.py: BLUEPRINTS list, /api/v1 prefix
 backend/app/utils/           decorators.py (role checks) jwt_handlers.py passwords.py email.py encryption.py
+                             storage.py (encrypted uploads) gstin.py (states, GSTIN checks) money.py
 backend/tests/               test_*.py · conftest.py shared pytest fixtures
 backend/main.py              dev server entrypoint (`python main.py`)
 backend/worker.py            APScheduler entrypoint (every job listed in build_scheduler())
@@ -40,10 +41,10 @@ backend/migrations/          single Alembic dir
 frontend/src/routes.jsx      every page route + sidebar links (NAV) · main.jsx
 frontend/src/api/            client.js (apiFetch) <m>.js (query hooks)
 frontend/src/pages/          HomePage LoginPage NotFoundPage · business/ ca/ admin/ (one folder per role)
-frontend/src/components/     ui/ (shadcn) AppShell PublicLayout RequireRole Placeholder
+frontend/src/components/     ui/ (shadcn) AppShell PublicLayout RequireRole Placeholder FormField StatusBadge ...
 frontend/src/context/ hooks/ AuthProvider · useAuth       frontend/src/lib/  session labels queryClient utils
 frontend/src/test/           setup.js (Vitest setup) utils.jsx (render helpers)
-content/forms/<FORM>/        explanation.md instructions.md checklist.yaml
+content/forms/<FORM>/        explanation.md instructions.md checklist.yaml · content/reference/ (gst_states.json)
 docs/                        project docs · docs/modules/<m>.md = module context (what exists, contracts)
 eval/                        evaluation datasets (never real personal data) · scripts/ setup_dev.sh
 ```

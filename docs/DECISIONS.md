@@ -3,6 +3,50 @@
 Newest first. One entry per decision: date, what, why. Anything decided in chat that affects others goes here
 in the same PR.
 
+
+## 2026-09-27: Editable profile, CA verification and a clearer UI (PRs 2–4 as one)
+
+**What**
+- **Editing the profile** recomputes it in place and syncs this year's filings (`sync_filings`): new ones added,
+  ones that no longer apply soft-deleted, ones that apply again reactivated (never inserted twice), periods and
+  due dates updated. **A filing that no longer applies but is with a CA (`with_ca` or in an open engagement) is
+  kept**, and "What changed" says so. Switching monthly ↔ quarterly turns "Q1" into "Apr" (same start date).
+- **QRMP is the user's choice** within the QRMP limit ("Monthly / Quarterly (QRMP)"); above it returns are
+  monthly. Existing QRMP businesses were recorded as having chosen it, so nothing changed for them.
+- **The audit line is split:** tax audit (s.44AB, from turnover, every entity type) and accounts audited under
+  another law (companies always; partnerships and LLPs answer; others never). The ITR due date uses either. The
+  old "A company's accounts are always audited" under "Tax audit" is gone.
+- **Filings start at 1 April** of the financial year; past due dates start `overdue` and appear in "Earlier this
+  year". Businesses registered earlier get those past filings on their next save (no one-off command).
+- **The Indian number format everywhere:** `format_inr()` on the backend (explanations), `formatRupees()` on the
+  frontend (already en-IN).
+- **The GST state list is a JSON reference file** (`content/reference/gst_states.json`, with a source note and
+  a TODO_VERIFY row), served by `GET /onboarding/states`: one list for backend and frontend, no table or package.
+  A state typed earlier that is not on the list is flagged for the user to choose again. GSTINs are checked for
+  the mod-36 check character, the state code and the PAN (tests use synthetic GSTINs only).
+- **Consent:** signup needs `terms_accepted: true` and sets `users.terms_accepted_at`; login says whether it was
+  given; older accounts see a one-time consent step. `/terms` is short plain language.
+- **Encrypted file storage** (`app/utils/storage.py`): PDF/JPG/PNG recognised by their first bytes, a size limit,
+  Fernet with the same `FIELD_ENCRYPTION_KEY`, files in `UPLOAD_DIR` outside the tracked repo. First use: the
+  Certificate of Practice, which is required before an admin can verify a CA.
+- **Re-verification:** a new certificate (like a new membership or CoP number, the existing rule) sends a CA back
+  to `pending`, out of the marketplace until checked; the profile page warns before saving a new number.
+- **Admin verification** is in the admin module; it calls marketplace, documents and auth service functions and
+  writes `admin_audit_log`. Verify/reject emails the CA; a rejection needs a reason the CA sees.
+- **"Find a CA" is ranked for a registered business by default** (its own filings first, then same city, then the
+  old order), with its prices per filing. No language badge: businesses have no language field. Unregistered
+  users see the old list unchanged.
+- **Presentation:** dashboard cards and to-dos, profile chips with collapsible explanations, the calendar by month
+  with days left, coloured statuses and filters, request filings by quarter, engagement timelines with a
+  countdown, CA preview and setup checklist, admin counts. All from existing endpoints except the new admin ones.
+- **Tests whose expectations changed** because the behaviour they checked changed on purpose: the old GSTIN
+  `27ABCDE1234F1Z5` (fails the check digit) became the synthetic `27ABCDE1234F1Z0`; tests that expected QRMP now
+  choose it; the compliance tests expect every period from 1 April; the company audit test checks both lines;
+  signup bodies send `terms_accepted`; the CA profile save body has `pro_bono_slots_per_month`; the calendar
+  test counts one header row per month; the onboarding page selects the state from the list.
+
+**Why:** the browser audit and the plan agreed for PRs 2–4, built as one pull request at the team's request.
+
 ## 2026-09-27: Audit bug fixes (PR 1)
 
 **What**
