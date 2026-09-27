@@ -45,6 +45,7 @@ from app.extensions import db
 from app.models import CaProfile, CaService, CatalogService, Engagement, EngagementItem, User
 from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus
+from app.models.enums import FormCode
 from app.models.marketplace import CaVerificationStatus, EngagementStatus
 from app.services import compliance_service, onboarding_service
 from app.utils.email import send_email
@@ -353,6 +354,27 @@ FILED_STATUSES = [ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED]
 # A CA has this long to answer a request. (The job that expires old requests is MA12.)
 ANSWER_WITHIN = timedelta(hours=48)
 
+# The one catalog service (seed.SERVICE_CATALOG code) that fits each ITR form, so an ITR
+# filing is only ever priced with the service for the business's own form.
+ITR_SERVICE_CODES = {
+    "itr_3": "itr_business",
+    "itr_4": "itr_presumptive",
+    "itr_5": "itr_firm_company",
+    "itr_6": "itr_firm_company",
+}
+
+
+def _itr_service_code(business) -> str | None:
+    """The catalog code of the ITR service that fits the business's profile."""
+    return ITR_SERVICE_CODES.get(onboarding_service.get_itr_form(business))
+
+
+def _fits(service: CatalogService, filing, itr_service_code: str | None) -> bool:
+    """True if `service` is for this filing; for ITR, only the service of the business's form."""
+    if service.form_code != filing.form_code:
+        return False
+    return filing.form_code != FormCode.ITR or service.code == itr_service_code
+
 
 def _busy_filing_ids(filing_ids) -> set:
     """The filings among `filing_ids` that are already in an open engagement."""
@@ -390,6 +412,7 @@ def list_requestable_filings(business, ca_profile_id) -> list[dict]:
     """
     ca = _find_listed_ca(ca_profile_id)
     services = _filing_services(ca)
+    itr_service_code = _itr_service_code(business)
     filings = compliance_service.list_filings(business)
     filing_ids = []
     for filing in filings:
@@ -400,7 +423,7 @@ def list_requestable_filings(business, ca_profile_id) -> list[dict]:
     for filing in filings:
         options = []
         for service, price in services:
-            if service.form_code == filing.form_code:
+            if _fits(service, filing, itr_service_code):
                 options.append({"service_id": service.id, "name": service.name, "price": price})
 
         blocked_reason = None
@@ -408,6 +431,8 @@ def list_requestable_filings(business, ca_profile_id) -> list[dict]:
             blocked_reason = "Already filed."
         elif filing.id in busy:
             blocked_reason = "Already requested from a CA or with a CA."
+        elif len(options) == 0 and filing.form_code == FormCode.ITR:
+            blocked_reason = "This CA has not listed a price for the ITR of your business type."
         elif len(options) == 0:
             blocked_reason = "This CA has not listed a price for this filing."
 
@@ -431,9 +456,11 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
     `items` is [{compliance_item_id, service_id}]; the price of each filing is copied
     from the CA's menu now. The CA gets an email. Errors: 404 CA_NOT_FOUND,
     404 FILING_NOT_FOUND, 400 DUPLICATE_FILING, 409 FILING_ALREADY_FILED,
-    409 FILING_ALREADY_REQUESTED, 400 SERVICE_NOT_OFFERED.
+    409 FILING_ALREADY_REQUESTED, 400 SERVICE_NOT_OFFERED (also for an ITR service
+    that does not fit the business's ITR form).
     """
     ca = _find_listed_ca(ca_profile_id)
+    itr_service_code = _itr_service_code(business)
 
     # {filing id: the service chosen for it}
     chosen = {}
@@ -463,7 +490,7 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
                 "FILING_ALREADY_REQUESTED",
                 f"{filing.period_label} is already requested from a CA or with a CA.",
             )
-        if service_id not in offered or offered[service_id][0].form_code != filing.form_code:
+        if service_id not in offered or not _fits(offered[service_id][0], filing, itr_service_code):
             raise ApiError(
                 400, "SERVICE_NOT_OFFERED", "This CA does not offer that service for this filing."
             )

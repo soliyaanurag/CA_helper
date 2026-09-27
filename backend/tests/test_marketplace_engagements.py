@@ -22,11 +22,13 @@ from app.models import (
     Engagement,
     EngagementItem,
     ObligationTemplate,
+    RegulatoryProfile,
 )
+from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus, FilingPath
 from app.models.enums import FormCode, UserRole
 from app.models.marketplace import CaVerificationStatus, EngagementStatus
-from app.models.onboarding import EntityType
+from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.seed import seed_service_catalog
 
 BASE = "/api/v1/marketplace"
@@ -217,20 +219,92 @@ def test_a_requested_filing_is_blocked_for_every_ca(client, setup, make_ca):
     assert row["blocked_reason"] == "Already requested from a CA or with a CA."
 
 
-def test_itr_filing_offers_every_itr_service_of_the_ca(client, setup, add_filing, make_ca):
-    add_filing(setup["business"], FormCode.ITR, "FY 2025-26", days=30)
-    _, ca = make_ca({"itr_presumptive": "1200", "itr_business": "2500"}, name="ITR CA")
+# ITR: an ITR filing is priced only with the service for the business's own ITR form.
+ITR_PRICES = {"itr_presumptive": "1200", "itr_business": "2500", "itr_firm_company": "8000"}
 
+
+def give_profile(database, business, itr_form):
+    """Give the business a regulatory profile with this ITR form."""
+    database.session.add(
+        RegulatoryProfile(
+            business_id=business.id,
+            msme_tier=MsmeTier.MICRO,
+            gst_scheme=GstScheme.REGULAR_MONTHLY,
+            gst_registration_suggested=False,
+            itr_form=itr_form,
+            presumptive_eligible=False,
+            audit_applicable=False,
+            files_24q=False,
+            files_26q=False,
+            roc_not_tracked=False,
+            explanations={},
+            rule_version="test",
+            computed_at=utcnow(),
+        )
+    )
+    database.session.commit()
+
+
+def itr_options(client, setup, ca):
     response = client.get(
         f"{BASE}/cas/{ca.id}/requestable-filings", headers=setup["business_headers"]
     )
-
     rows = {row["period_label"]: row for row in response.get_json()}
-    names = [option["name"] for option in rows["FY 2025-26"]["options"]]
-    assert names == [
-        "ITR filing: presumptive income (ITR-4)",
-        "ITR filing: business or profession (ITR-3)",
-    ]
+    return rows["FY 2025-26"]
+
+
+@pytest.mark.parametrize(
+    ("itr_form", "service_code"),
+    [
+        (ItrForm.ITR_3, "itr_business"),
+        (ItrForm.ITR_4, "itr_presumptive"),
+        (ItrForm.ITR_5, "itr_firm_company"),
+        (ItrForm.ITR_6, "itr_firm_company"),
+    ],
+)
+def test_an_itr_filing_gets_only_the_service_of_its_itr_form(
+    client, setup, add_filing, make_ca, database, itr_form, service_code
+):
+    give_profile(database, setup["business"], itr_form)
+    itr = add_filing(setup["business"], FormCode.ITR, "FY 2025-26", days=30)
+    _, ca = make_ca(ITR_PRICES, name="ITR CA")
+    service = setup["catalog"][service_code]
+
+    row = itr_options(client, setup, ca)
+    response = send_request(client, setup, (itr, service), ca=ca)
+
+    assert [option["name"] for option in row["options"]] == [service.name]
+    assert response.status_code == 201
+    stored = database.session.query(EngagementItem).filter_by(compliance_item_id=itr.id).one()
+    assert stored.service_id == service.id
+
+
+def test_an_llp_cannot_request_the_presumptive_itr_service(
+    client, setup, add_filing, make_ca, database
+):
+    give_profile(database, setup["business"], ItrForm.ITR_5)
+    itr = add_filing(setup["business"], FormCode.ITR, "FY 2025-26", days=30)
+    _, ca = make_ca(ITR_PRICES, name="ITR CA")
+
+    response = send_request(client, setup, (itr, setup["catalog"]["itr_presumptive"]), ca=ca)
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "SERVICE_NOT_OFFERED"
+
+
+def test_an_itr_filing_is_blocked_when_the_ca_lacks_the_right_service(
+    client, setup, add_filing, make_ca, database
+):
+    give_profile(database, setup["business"], ItrForm.ITR_5)
+    add_filing(setup["business"], FormCode.ITR, "FY 2025-26", days=30)
+    _, ca = make_ca({"itr_presumptive": "1200"}, name="Presumptive only")
+
+    row = itr_options(client, setup, ca)
+
+    assert row["options"] == []
+    assert row["blocked_reason"] == (
+        "This CA has not listed a price for the ITR of your business type."
+    )
 
 
 def test_requestable_filings_need_a_registered_business(client, make_user, auth_headers, setup):
@@ -560,3 +634,40 @@ def test_engagement_rows_are_stored(client, setup, database):
     assert database.session.get(Engagement, uuid.UUID(engagement["id"])).status == (
         EngagementStatus.REQUESTED
     )
+
+
+# --- Data isolation: nobody reaches another business's or CA's engagement ---------------
+
+
+def quote_body(engagement):
+    prices = [{"engagement_item_id": item["id"], "price": "900"} for item in engagement["items"]]
+    return {"reason": "More invoices than usual.", "prices": prices}
+
+
+@pytest.mark.parametrize("name", ["accept", "quote", "decline", "complete"])
+def test_another_ca_cannot_act_on_an_engagement(client, setup, make_ca, auth_headers, name):
+    engagement = request_gst(client, setup)
+    if name == "complete":
+        action(client, setup["ca_headers"], engagement["id"], "accept")
+    other_ca_user, _ = make_ca({"gstr_3b": "700"}, name="Other CA")
+    body = quote_body(engagement) if name == "quote" else None
+
+    response = action(client, auth_headers(other_ca_user), engagement["id"], name, body)
+
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == "ENGAGEMENT_NOT_FOUND"
+
+
+@pytest.mark.parametrize("name", ["withdraw", "accept-quote", "reject-quote"])
+def test_another_business_cannot_act_on_an_engagement(
+    client, setup, make_business, auth_headers, name
+):
+    engagement = request_gst(client, setup)
+    if name != "withdraw":
+        action(client, setup["ca_headers"], engagement["id"], "quote", quote_body(engagement))
+    other_owner, _ = make_business("Someone Else")
+
+    response = action(client, auth_headers(other_owner), engagement["id"], name)
+
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == "ENGAGEMENT_NOT_FOUND"
