@@ -144,6 +144,9 @@ Cardinality is read left to right: "1–N" = one row on the left has many on the
 - A compliance item is in at most **one open engagement** (status `requested`, `quoted` or `active`) (marketplace).
 - A document request's compliance item belongs to its engagement (an `engagement_items` row) (ca_workspace).
 - A soft-deleted filing that comes back is a new row; services look at live rows only.
+- `ca_profiles` and `service_catalog` are never re-inserted after soft delete. Removing then re-adding
+  reactivates the existing row (keeps `user_id`/`membership_no`/`code` unique). Their UNIQUEs are plain, not
+  partial, so a new row would fail (marketplace).
 
 ### Diagram 1: filings, documents and the marketplace
 

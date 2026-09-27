@@ -85,7 +85,13 @@ core-auth (users, roles), compliance (form codes, items), documents (CoP upload)
 - Engagement status codes: `requested → active` (CA accepts the listed prices) or `requested → quoted → active`
   (business accepts the quote), then `completed`; plus `declined`, `expired` (48 hours), `cancelled` (by the
   business). No `accepted`. Open = `requested`, `quoted`, `active`; at most one open engagement per filing
+- `ca_profiles` and `service_catalog` are never re-inserted after soft delete. Removing then re-adding
+  reactivates the existing row (keeps `user_id`/`membership_no`/`code` unique). Same as `ca_services`, whose
+  rows `save_own_menu()` already reactivates.
 
 ## Known issues
+- Nothing soft-deletes a CA profile or a catalog service yet. The planned admin "remove" and the admin catalog
+  editor must follow the rule above: inserting a new row for the same user, membership number or code fails on
+  the plain UNIQUE constraint.
 - No admin screen yet: a newly signed-up CA stays `pending` and is not listed. For local testing, verify by hand:
   `docker compose exec db psql -U ca_helper -d ca_helper -c "UPDATE ca_profiles SET verification_status = 'verified'"`
