@@ -12,6 +12,8 @@
  * - Throws ApiRequestError (status, code, message) for every error response.
  * - A 401 on a request that carried a token logs the user out (the token expired or
  *   the account was deactivated).
+ * - A request with no answer after REQUEST_TIMEOUT_MS fails with code TIMEOUT, so a
+ *   hung server shows a clear message instead of a page that never finishes.
  *
  * Usage, in api/<module>.js:
  *   queryFn: () => apiFetch("/api/v1/<module>/<resource>"),
@@ -30,6 +32,9 @@ export class ApiRequestError extends Error {
   }
 }
 
+// How long a request may take before it fails with code TIMEOUT.
+export const REQUEST_TIMEOUT_MS = 20_000;
+
 // The logged-in user's token and how to log them out. AuthProvider
 // (context/AuthProvider.jsx) sets both through setAuth() whenever the session changes.
 let accessToken = null;
@@ -45,13 +50,31 @@ export async function apiFetch(path, { method = "GET", body } = {}) {
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  const response = await fetch(path, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  // No body (204) or not JSON (e.g. a proxy's HTML error page): null.
-  const data = await response.json().catch(() => null);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response;
+  let data;
+  try {
+    response = await fetch(path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    });
+    // No body (204) or not JSON (e.g. a proxy's HTML error page): null.
+    data = await response.json().catch(() => null);
+  } catch (error) {
+    if (!controller.signal.aborted) throw error; // a network failure: see errorMessage()
+  } finally {
+    clearTimeout(timer);
+  }
+  if (controller.signal.aborted) {
+    throw new ApiRequestError(
+      0,
+      "TIMEOUT",
+      "The server did not answer within 20 seconds. Try again in a moment.",
+    );
+  }
   if (response.ok) return data;
 
   if (response.status === 401 && headers.Authorization) logout();

@@ -7,13 +7,37 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Each card links to where that audience starts: signup with the role chosen, or login.
 const AUDIENCES = [
-  { title: "Businesses", text: "Profile, compliance calendar, documents, find a CA." },
-  { title: "Chartered Accountants", text: "Clients, deadlines and requests." },
-  { title: "Admins", text: "Users, CA verification and configuration." },
+  {
+    title: "Businesses",
+    text: "Profile, compliance calendar, documents, find a CA.",
+    action: "Create a business account",
+    to: "/signup",
+    state: { role: "business" },
+  },
+  {
+    title: "Chartered Accountants",
+    text: "Clients, deadlines and requests.",
+    action: "Join as a CA",
+    to: "/signup",
+    state: { role: "ca" },
+  },
+  {
+    title: "Admins",
+    text: "Users, CA verification and configuration.",
+    action: "Log in",
+    to: "/login",
+  },
 ];
 
-/** Landing page: what the platform is, log in / sign up buttons, and the API health badge. */
+/** The API status badge is for developers: shown in development, or when something is down. */
+function showApiStatus(health) {
+  if (import.meta.env.DEV || health.isError) return true;
+  return health.isSuccess && health.data.status !== "ok";
+}
+
+/** Landing page: what the platform is, log in / sign up buttons, and (see above) API status. */
 export function HomePage() {
   const health = useHealth();
   const { user } = useAuth();
@@ -40,27 +64,37 @@ export function HomePage() {
             </Button>
           </div>
         )}
-        <p className="text-sm">
-          API status:{" "}
-          {health.isPending ? (
-            <Badge variant="secondary">checking...</Badge>
-          ) : health.isError ? (
-            <Badge variant="destructive">unreachable</Badge>
-          ) : health.data.status === "ok" ? (
-            <Badge>ok</Badge>
-          ) : (
-            <Badge variant="destructive">API up, database {health.data.database}</Badge>
-          )}
-        </p>
+        {showApiStatus(health) && (
+          <p className="text-sm">
+            API status:{" "}
+            {health.isPending ? (
+              <Badge variant="secondary">checking...</Badge>
+            ) : health.isError ? (
+              <Badge variant="destructive">unreachable</Badge>
+            ) : health.data.status === "ok" ? (
+              <Badge>ok</Badge>
+            ) : (
+              <Badge variant="destructive">API up, database {health.data.database}</Badge>
+            )}
+          </p>
+        )}
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {AUDIENCES.map((audience) => (
-          <Card key={audience.title} className="h-full">
-            <CardHeader>
-              <CardTitle>{audience.title}</CardTitle>
-              <CardDescription>{audience.text}</CardDescription>
-            </CardHeader>
-          </Card>
+          <Link
+            key={audience.title}
+            to={audience.to}
+            state={audience.state}
+            className="rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <Card className="h-full transition-colors hover:bg-muted/50">
+              <CardHeader>
+                <CardTitle>{audience.title}</CardTitle>
+                <CardDescription>{audience.text}</CardDescription>
+                <span className="text-sm font-medium text-primary">{audience.action} →</span>
+              </CardHeader>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>

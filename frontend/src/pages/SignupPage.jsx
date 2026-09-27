@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { z } from "zod";
 
 import { signup } from "@/api/auth";
@@ -37,12 +37,17 @@ const signupSchema = z
 export function SignupPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  // The landing page's "Join as a CA" card passes { role: "ca" }.
+  const askedRole = useLocation().state?.role;
   const [serverError, setServerError] = useState(null);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(signupSchema), defaultValues: { role: "business" } });
+  } = useForm({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { role: SIGNUP_ROLES.includes(askedRole) ? askedRole : "business" },
+  });
 
   if (user) return <Navigate to={ROLE_HOME[user.role]} replace />;
 
