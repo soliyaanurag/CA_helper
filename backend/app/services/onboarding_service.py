@@ -13,6 +13,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 
 from app.errors import ApiError
 from app.extensions import db
@@ -25,6 +26,7 @@ log = logging.getLogger(__name__)
 
 # Which version of the profile logic below produced a profile. Change it when the logic changes.
 RULE_VERSION = "v1"
+BUSINESS_USER_UNIQUE_CONSTRAINT = "ux_businesses_user_id"
 
 
 def _threshold(key: str, today: date) -> Decimal:
@@ -206,7 +208,16 @@ def register_business(user: User, data: dict) -> dict:
     db.session.add(profile)
     added = compliance_service.create_filings(business.id, profile, today)
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError as error:
+        db.session.rollback()
+        constraint_name = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+        if constraint_name == BUSINESS_USER_UNIQUE_CONSTRAINT:
+            raise ApiError(
+                409, "BUSINESS_EXISTS", "You have already registered your business."
+            ) from error
+        raise
     log.info("Business %s registered with %d filings", business.id, added)
     return {"business": business, "profile": profile}
 

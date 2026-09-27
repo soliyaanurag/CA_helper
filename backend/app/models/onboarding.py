@@ -88,6 +88,9 @@ class Business(SoftDeleteMixin, BaseModel):
         CheckConstraint(
             "NOT gst_registered OR gstin IS NOT NULL", name="gstin_when_gst_registered"
         ),
+        CheckConstraint(
+            "NOT gst_composition OR gst_registered", name="gst_composition_requires_registration"
+        ),
         CheckConstraint("NOT deducts_tds OR tan IS NOT NULL", name="tan_when_deducts_tds"),
         CheckConstraint(
             "entity_type NOT IN ('llp', 'private_limited') OR cin_llpin IS NOT NULL",

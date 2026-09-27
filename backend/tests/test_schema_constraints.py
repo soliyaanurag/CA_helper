@@ -134,6 +134,14 @@ def test_gst_registered_needs_a_gstin(database, make_user):
     )
 
 
+def test_gst_composition_needs_gst_registration(database, make_user):
+    refused(
+        database,
+        new_business(make_user(), gst_registered=False, gst_composition=True),
+        constraint="ck_businesses_gst_composition_requires_registration",
+    )
+
+
 def test_deducting_tds_needs_a_tan(database, make_user):
     refused(
         database,

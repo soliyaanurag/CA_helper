@@ -1,9 +1,11 @@
 """POST/GET /api/v1/onboarding/business: registering a business (ON1) and reading it back."""
 
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.models import ComplianceItem
 from app.models.enums import UserRole
@@ -69,6 +71,20 @@ def test_pan_is_stored_encrypted(client, owner, auth_headers, database):
 
 def test_only_one_business_per_user(client, owner, auth_headers):
     register(client, auth_headers(owner))
+    response = register(client, auth_headers(owner))
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "BUSINESS_EXISTS"
+
+
+def test_unique_index_race_still_returns_business_exists(client, owner, auth_headers, monkeypatch):
+    unique_violation = SimpleNamespace(diag=SimpleNamespace(constraint_name="ux_businesses_user_id"))
+
+    def fail_commit():
+        raise IntegrityError("INSERT INTO businesses ...", None, unique_violation)
+
+    monkeypatch.setattr(onboarding_service.db.session, "commit", fail_commit)
+
     response = register(client, auth_headers(owner))
 
     assert response.status_code == 409
