@@ -18,7 +18,10 @@ export function useAdminDashboard() {
 export const ADMIN_CAS_KEY = ["admin", "cas"];
 export const ADMIN_STATS_KEY = ["admin", "stats"];
 
-/** GET /api/v1/admin/stats: users by role, businesses, CAs by status, open engagements */
+/**
+ * GET /api/v1/admin/stats: users by role, businesses, CAs by status, open engagements, and
+ * filings_by_status, filings_due_so_far, filings_late, overdue_rate (percent or null).
+ */
 export function useAdminStats() {
   return useQuery({
     queryKey: ADMIN_STATS_KEY,
@@ -67,4 +70,27 @@ export function verifyCa(caId) {
 
 export function rejectCa(caId, reason) {
   return apiFetch("/api/v1/admin/cas/" + caId + "/reject", { method: "POST", body: { reason } });
+}
+
+// Suspend an account (it cannot log in); the reason is optional and kept in the audit log.
+export function suspendUser(userId, reason) {
+  return apiFetch("/api/v1/admin/users/" + userId + "/suspend", {
+    method: "POST",
+    body: { reason: reason || null },
+  });
+}
+
+export function reactivateUser(userId) {
+  return apiFetch("/api/v1/admin/users/" + userId + "/reactivate", { method: "POST" });
+}
+
+/**
+ * GET /api/v1/admin/audit-log?page=: { items: [{ id, admin_name, action, target_type,
+ * target_id, target_name, details, created_at }], page, page_size, total }, newest first.
+ */
+export function useAuditLog(page) {
+  return useQuery({
+    queryKey: ["admin", "audit-log", page],
+    queryFn: () => apiFetch("/api/v1/admin/audit-log?page=" + page),
+  });
 }

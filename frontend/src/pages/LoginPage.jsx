@@ -20,7 +20,8 @@ const loginSchema = z.object({
 /** What to tell the user for each login error code from the API. */
 const LOGIN_ERROR_TEXT = {
   INVALID_CREDENTIALS: "Wrong email or password.",
-  ACCOUNT_INACTIVE: "This account is inactive. Please contact support.",
+  ACCOUNT_INACTIVE:
+    "This account is suspended. Contact the CA Helper team if you think this is a mistake.",
   EMAIL_NOT_VERIFIED: "Your email is not verified yet.",
   TOO_MANY_REQUESTS: "Too many login attempts. Wait a minute and try again.",
 };

@@ -1,12 +1,14 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 
-import { useAdminCas, useAdminUsers } from "@/api/admin";
+import { reactivateUser, suspendUser, useAdminCas, useAdminUsers } from "@/api/admin";
 import { errorMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDateTime } from "@/lib/dates";
+import { useAuth } from "@/hooks/useAuth";
 import { label, USER_ROLE_LABELS } from "@/lib/labels";
 
 const TABS = ["Pending verification", "All users"];
@@ -146,18 +148,16 @@ function AllUsers() {
                   <th className="py-2 pr-4 font-medium">Email</th>
                   <th className="py-2 pr-4 font-medium">Role</th>
                   <th className="py-2 pr-4 font-medium">Email verified</th>
-                  <th className="py-2 font-medium">Joined</th>
+                  <th className="py-2 pr-4 font-medium">Joined</th>
+                  <th className="py-2 pr-4 font-medium">Account</th>
+                  <th className="py-2 font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {users.data.items.map((user) => (
-                  <tr key={user.id} className="border-b">
-                    <td className="py-2 pr-4">{user.full_name}</td>
-                    <td className="py-2 pr-4">{user.email}</td>
-                    <td className="py-2 pr-4">{label(USER_ROLE_LABELS, user.role)}</td>
-                    <td className="py-2 pr-4">{user.email_verified ? "Yes" : "No"}</td>
-                    <td className="py-2">{formatDateTime(user.created_at)}</td>
-                  </tr>
+                  <UserRow key={user.id} user={user} />
                 ))}
               </tbody>
             </table>
@@ -166,6 +166,70 @@ function AllUsers() {
         </>
       )}
     </div>
+  );
+}
+
+// One account, with Suspend / Reactivate (AD4). Admins cannot suspend themselves.
+function UserRow({ user }) {
+  const { user: me } = useAuth();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(action) {
+    setError(null);
+    setBusy(true);
+    try {
+      await action();
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onSuspend() {
+    const reason = window.prompt(
+      `Suspend ${user.full_name}? They cannot log in until reactivated.` +
+        (user.role === "ca" ? " Their open requests are cancelled." : "") +
+        "\n\nReason (optional, kept in the audit log):",
+    );
+    if (reason === null) return; // cancelled
+    run(() => suspendUser(user.id, reason.trim()));
+  }
+
+  return (
+    <tr className="border-b align-top">
+      <td className="py-2 pr-4">{user.full_name}</td>
+      <td className="py-2 pr-4">{user.email}</td>
+      <td className="py-2 pr-4">{label(USER_ROLE_LABELS, user.role)}</td>
+      <td className="py-2 pr-4">{user.email_verified ? "Yes" : "No"}</td>
+      <td className="py-2 pr-4">{formatDateTime(user.created_at)}</td>
+      <td className="py-2 pr-4">{user.is_active ? "Active" : "Suspended"}</td>
+      <td className="py-2">
+        {user.id !== me?.id &&
+          (user.is_active ? (
+            <Button variant="outline" size="sm" disabled={busy} onClick={onSuspend}>
+              Suspend
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => run(() => reactivateUser(user.id))}
+            >
+              Reactivate
+            </Button>
+          ))}
+        {error && (
+          <p role="alert" className="mt-1 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+      </td>
+    </tr>
   );
 }
 
