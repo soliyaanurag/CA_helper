@@ -48,5 +48,6 @@ class ChatMessage(SoftDeleteMixin, BaseModel):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     role: Mapped[ChatRole] = mapped_column(str_enum(ChatRole))
     content: Mapped[str] = mapped_column(Text)
-    # The sources an answer cites, e.g. [{"source_path": "...", "chunk_index": 2}].
-    citations: Mapped[list | None] = mapped_column(JSONB)
+    # For an answer: {"sources": [{number, title, url, source_path, excerpt}], "ask_a_ca": bool,
+    # "ai_used": bool} (assistant_service.ask). Empty for a question.
+    citations: Mapped[dict | None] = mapped_column(JSONB)

@@ -10,6 +10,7 @@
     alerts.py        /api/v1/alerts/...
     documents.py     /api/v1/documents/...
     regulatory.py    /api/v1/admin/regulatory/... (news monitor)
+    assistant.py     /api/v1/assistant/... (AI assistant)
 
 Add a new feature's blueprint to BLUEPRINTS below. Routes stay thin: parse input
 (app/schemas/), call one service function (app/services/), serialize the result.
@@ -20,6 +21,7 @@ from flask_smorest import Api
 from app.routes import (
     admin,
     alerts,
+    assistant,
     auth,
     ca_workspace,
     compliance,
@@ -44,6 +46,7 @@ BLUEPRINTS = [
     alerts.blp,
     documents.blp,
     regulatory.blp,
+    assistant.blp,
 ]
 
 
