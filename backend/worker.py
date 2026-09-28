@@ -14,7 +14,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
-from app.services import marketplace_service
+from app.services import compliance_service, marketplace_service
 
 log = logging.getLogger("worker")
 
@@ -44,6 +44,15 @@ def build_scheduler(app: Flask) -> AppScheduler:
     scheduler = AppScheduler(app)
     # Feature jobs go here, each calling a service function. Cron times are IST, e.g.
     #   scheduler.add_job(alerts_service.send_reminders, "cron", hour=8, id="alerts.reminders")
+
+    # CO11: every hour, late filings the business has not started become "overdue".
+    # Hourly (not once at midnight), so a worker started late in the day catches up soon.
+    scheduler.add_job(
+        compliance_service.mark_overdue_filings,
+        "interval",
+        hours=1,
+        id="compliance.mark_overdue",
+    )
 
     # MA12: every 15 minutes, requests unanswered for 48 hours expire.
     scheduler.add_job(

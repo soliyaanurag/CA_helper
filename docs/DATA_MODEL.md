@@ -457,10 +457,10 @@ The same seven codes start `ca_profiles.specializations`, so "CAs for this form"
 | `with_ca` | With CA | set from marketplace engagements |
 | `filed` | Filed | |
 | `filed_verified` | Filed–verified | acknowledgement verified (OCR) |
-| `overdue` | Overdue | reachable from any pre-filed state |
+| `overdue` | Overdue | set by the hourly worker job from `upcoming`, `docs_pending` or `ready` once the due date has passed; a `with_ca` filing stays `with_ca` |
 
-Lifecycle: `upcoming → docs_pending → ready → with_ca → filed → filed_verified`, plus `overdue` from any pre-filed
-state.
+Lifecycle: `upcoming → docs_pending → ready → with_ca → filed → filed_verified`, plus `overdue` from the states
+before `with_ca` (the CA handles a late `with_ca` filing; pages show how late it is from `due_date`).
 
 **`compliance_items.filing_path`** (`FilingPath`): `self` Self-file · `ca` Through a CA (null until the business chooses)
 

@@ -8,6 +8,7 @@ create_filings(business_id, profile, today) -> int  the same for a new business 
 list_filings(business) -> list[ComplianceItem]      one business's filings, soonest first
 get_filings_by_ids(ids, lock) -> dict               filings by id (used by marketplace)
 mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
+mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
 get_dashboard(user) -> dict                         the business home page (welcome text for now)
 
 How forms and due dates work: each row of `obligation_templates` says which
@@ -17,14 +18,17 @@ app/seed.py; no legal date is written in this file (CLAUDE.md rule 3).
 """
 
 import calendar
+import logging
 from datetime import date
 
 from sqlalchemy import or_, select
 
 from app.extensions import db
 from app.models import ComplianceItem, ObligationTemplate, RegulatoryProfile, User
-from app.models.base import utcnow
+from app.models.base import today_in_india, utcnow
 from app.models.compliance import ComplianceStatus, FilingPath, Frequency
+
+log = logging.getLogger(__name__)
 
 
 def financial_year_start(day: date) -> date:
@@ -273,3 +277,38 @@ def mark_filings_with_ca(filing_ids) -> None:
     for filing in get_filings_by_ids(filing_ids).values():
         filing.status = ComplianceStatus.WITH_CA
         filing.filing_path = FilingPath.CA
+
+
+# --- Worker job (CO11) ---------------------------------------------------------------
+
+# The business still has to act on filings in these states, so they turn "overdue" once
+# the due date has passed. A filing "With CA" keeps that status: the CA is handling it,
+# and the pages already show how late it is from its due date. Filed ones are done.
+NOT_STARTED_STATUSES = (
+    ComplianceStatus.UPCOMING,
+    ComplianceStatus.DOCS_PENDING,
+    ComplianceStatus.READY,
+)
+
+
+def mark_overdue_filings(today: date | None = None) -> int:
+    """Set every live filing whose due date has passed, and which is not started yet,
+    to "overdue". Returns how many changed. The worker runs this every hour.
+
+    A filing due today is not overdue yet. Running it again changes nothing.
+    """
+    if today is None:
+        today = today_in_india()
+    late = db.session.scalars(
+        select(ComplianceItem).where(
+            ComplianceItem.status.in_(NOT_STARTED_STATUSES),
+            ComplianceItem.due_date < today,
+            ComplianceItem.deleted_at.is_(None),
+        )
+    ).all()
+    for filing in late:
+        filing.status = ComplianceStatus.OVERDUE
+    db.session.commit()
+    if len(late) > 0:
+        log.info("Marked %d filing(s) overdue", len(late))
+    return len(late)

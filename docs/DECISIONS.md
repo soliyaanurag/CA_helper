@@ -4,6 +4,22 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Overdue job (CO11): hourly, and "With CA" stays "With CA"
+
+**What**
+- `compliance_service.mark_overdue_filings(today)` sets live filings in `upcoming`, `docs_pending` or `ready` whose
+  due date is **before** today (Indian date) to `overdue`. A filing due today is not late yet.
+- The worker runs it **every hour** (`compliance.mark_overdue`), not once at midnight: on a laptop the worker is
+  often started during the day, and hourly means it catches up within an hour. Running it again changes nothing.
+- **A late `with_ca` filing keeps `with_ca`.** `SCOPE.md` and `DATA_MODEL.md` said overdue is reachable from any
+  pre-filed state; `DATA_MODEL.md` now says "from the states before `with_ca`". Reason: `with_ca` is how the code
+  knows a CA is handling a filing (the dashboard's "with a CA" card, `sync_filings` keeping it on a profile change,
+  and the CA workspace to come); overwriting it with `overdue` would lose that. The pages already show how late any
+  filing is from its `due_date`.
+
+**Why:** filings created by `sync_filings` only got `overdue` at registration or on a profile edit, so a filing
+created as `upcoming` stayed `upcoming` after its due date.
+
 ## 2026-09-28: Pro-bono queue (MA16): micro businesses, the CA chooses, active at ₹0
 
 **What**
