@@ -177,9 +177,18 @@ class RegulatoryProfileSchema(Schema):
     computed_at = fields.DateTime(required=True)
 
 
+class NicCodeSchema(Schema):
+    """One official NIC activity code, e.g. 10712 "Manufacture of biscuits, cakes, ..."."""
+
+    code = fields.String(required=True)
+    description = fields.String(required=True)
+
+
 class MyBusinessSchema(Schema):
     business = fields.Nested(BusinessSchema, required=True)
     profile = fields.Nested(RegulatoryProfileSchema, required=True)
+    # The NIC code the user confirmed; null until they choose one.
+    nic_code = fields.Nested(NicCodeSchema, allow_none=True)
 
 
 class ProfileChangeSchema(Schema):
@@ -207,6 +216,31 @@ class MyBusinessUpdateSchema(MyBusinessSchema):
     """PUT /onboarding/business: the saved business and profile, and what changed."""
 
     changes = fields.Nested(BusinessChangesSchema, required=True)
+
+
+class NicPickSchema(NicCodeSchema):
+    """One suggested code with its reason; source "ai" (Gemini's pick) or "keywords"."""
+
+    reason = fields.String(required=True)
+    source = fields.String(required=True)
+
+
+class NicSuggestionSchema(Schema):
+    """POST /onboarding/nic-suggestions: up to 3 picks, the keyword shortlist they came from."""
+
+    picks = fields.List(fields.Nested(NicPickSchema), required=True)
+    shortlist = fields.List(fields.Nested(NicCodeSchema), required=True)
+    ai_used = fields.Boolean(required=True)
+
+
+class NicSearchQuerySchema(Schema):
+    q = fields.String(load_default="", validate=validate.Length(max=100))
+
+
+class NicCodeInputSchema(Schema):
+    """PUT /onboarding/business/nic-code: the code the user confirmed."""
+
+    code = fields.String(required=True, validate=validate.Length(1, 10))
 
 
 class GstStateSchema(Schema):

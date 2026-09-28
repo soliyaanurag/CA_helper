@@ -41,6 +41,12 @@ Seeded rows are effective from 1 April 2025.
 |---|---|---|---|---|
 | `content/reference/gst_states.json` | The state dropdown and the first two digits of a GSTIN (a GSTIN must start with its state's code) | 36 states and UTs with codes 01–38 (no 25 and 28, merged or replaced) — TODO_VERIFY | | |
 
+## NIC activity codes (onboarding)
+
+| Key | What it decides | Value | Official source | Verified by / date |
+|---|---|---|---|---|
+| `content/reference/nic_2008.csv` descriptions | The text shown for each NIC code | Codes are as published; some descriptions are cut off at about 200 characters in the source PDF (e.g. 07299, 32111) — TODO_VERIFY: complete them from MoSPI's NIC-2008 | Ministry of MSME (PMEGP), NIC_Codes_Updated.pdf | |
+
 ## Due-date rules (compliance)
 
 | Key | What | Value | Official source | Verified by / date |
