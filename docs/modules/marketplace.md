@@ -7,8 +7,10 @@ CA signup/practice profile, verification (Certificate of Practice), the marketpl
 CA practice profiles (MA1), verification by numbers (MA2, the certificate upload comes later), the list of
 verified CAs businesses browse, the CA price menu (MA5), the typical price range per service (MA6), and
 engagements: sending a request (MA9), the CA's answer and the business's decision on a quote (MA10), the
-lifecycle up to `completed` (MA11) and each side's "My engagements" page (MA13). The 48-hour expiry job (MA12)
-is not built: an unanswered request stays `requested` (its `expires_at` is set, ready for MA12).
+lifecycle up to `completed` (MA11) and each side's "My engagements" page (MA13). Request expiry (MA12): a request the CA
+does not answer within 48 hours (`expires_at`) becomes `expired` (worker job `marketplace.expire_requests`, every
+15 minutes, `expire_old_requests()`); the business is emailed (`engagement_expired.txt`) with the services to look
+for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
 - **Backend:** models `CaProfile` + `CaVerificationStatus`, `CA_SPECIALIZATIONS`, `CA_LANGUAGES`,
   `CatalogService` + `ServiceUnit`, `CaService` in `app/models/marketplace.py`; schemas in `app/schemas/marketplace.py` (the list uses the shared
   `app/schemas/pagination.py`); logic in `app/services/marketplace_service.py`; routes in
@@ -79,7 +81,14 @@ is not built: an unanswered request stays `requested` (its `expires_at` is set, 
 - **Tests (new):** `tests/test_admin_ca_verification.py` (certificate upload, type check, re-verification,
   pro-bono; admin side), the ranking test in `test_marketplace_engagements.py`; `CaProfilePage.test.jsx`,
   `CaServicesPage.test.jsx`, `MarketplacePage.test.jsx`, `RequestCaPage.test.jsx`, `MyEngagementsPage.test.jsx`.
-- **Not yet:** MA12 (the expiry job and re-matching email), OCR of the certificate, the admin catalog editor,
+- **Request expiry (MA12):** `expire_old_requests()` sets `requested` engagements past `expires_at` to `expired`
+  (only those: a `quoted` one waits for the business), commits once, then emails each business the services to
+  choose again in "Find a CA". `_check_not_expired()` makes accept / quote / decline answer 409
+  `REQUEST_EXPIRED` after the deadline, even before the job runs. Job in `backend/worker.py`
+  (`build_scheduler()`, id `marketplace.expire_requests`, every 15 minutes; run with `make dev-worker`). The
+  business's "My engagements" shows "Find another CA" on expired and declined requests. Tests: the MA12
+  section of `tests/test_marketplace_engagements.py`, `MyEngagementsPage.test.jsx`.
+- **Not yet:** OCR of the certificate, the admin catalog editor,
   CA capacity limits, the pro-bono queue, ratings (a section on the CA page), the in-app notification tray
   (engagement news is email only).
 
@@ -118,7 +127,7 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 | POST | `/api/v1/marketplace/engagements` | business | body `{ca_profile_id, items: [{compliance_item_id, service_id}]}` (at least one) → 201 the engagement (`requested`; `listed_price` copied from the CA's menu; `expires_at` = +48 h); the CA is emailed · 404 `CA_NOT_FOUND` / `FILING_NOT_FOUND`, 400 `DUPLICATE_FILING` / `SERVICE_NOT_OFFERED`, 409 `FILING_ALREADY_FILED` / `FILING_ALREADY_REQUESTED` |
 | GET | `/api/v1/marketplace/my-engagements` | business | its engagements, newest first · 404 `BUSINESS_NOT_FOUND` |
 | GET | `/api/v1/marketplace/ca-engagements` | ca | their engagements, newest first (empty without a profile) |
-| POST | `/api/v1/marketplace/engagements/<id>/accept` | ca | `requested` → `active`; agreed = listed; the filings become "With CA"; the business is emailed |
+| POST | `/api/v1/marketplace/engagements/<id>/accept` | ca | `requested` → `active` (409 `REQUEST_EXPIRED` after 48 h, also for quote and decline); agreed = listed; the filings become "With CA"; the business is emailed |
 | POST | `/api/v1/marketplace/engagements/<id>/quote` | ca | body `{reason, prices: [{engagement_item_id, price}]}` (a price 0 to 10,00,000 for every filing, 400 `QUOTE_INCOMPLETE` otherwise) → `quoted`; the business is emailed with the reason |
 | POST | `/api/v1/marketplace/engagements/<id>/decline` | ca | `requested` → `declined`; the business is emailed |
 | POST | `/api/v1/marketplace/engagements/<id>/complete` | ca | `active` → `completed` (no check that the filings are filed yet) |
@@ -140,7 +149,7 @@ None yet. Planned: `has_active_engagement(ca_id, business_id)` (used by `ca_has_
 
 ## Depends on
 core-auth (users, roles, `current_business()`), compliance (`list_filings`, `get_filings_by_ids`,
-`mark_filings_with_ca`), onboarding (`get_business`), core-infra (`send_email`; the worker for the 48 h expiry,
+`mark_filings_with_ca`), onboarding (`get_business`), core-infra (`send_email`; the worker runs the 48 h expiry,
 MA12), documents (CoP upload, later).
 
 ## Contracts (don't change without telling the team)

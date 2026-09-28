@@ -16,6 +16,7 @@ create_request(business, ca_id, items) -> dict       send a request (status `req
 list_business_engagements(business) -> list          the business's engagements, newest first
 list_ca_engagements(user) -> list                    the CA's engagements, newest first
 accept_request / send_quote / decline_request / complete_engagement(user, id)    CA actions
+expire_old_requests() -> int                         worker job: unanswered requests expire (MA12)
 accept_quote / reject_quote / withdraw_request(business, id)                    business actions
 
 Engagement lifecycle: requested -> active (the CA accepts at the listed prices), or
@@ -551,7 +552,8 @@ OPEN_STATUSES = [EngagementStatus.REQUESTED, EngagementStatus.QUOTED, Engagement
 # Filings in these states are done: there is nothing left for a CA to do.
 FILED_STATUSES = [ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED]
 
-# A CA has this long to answer a request. (The job that expires old requests is MA12.)
+# A CA has this long to answer a request. After that, expire_old_requests() (a worker
+# job, MA12) marks it `expired` and the CA can no longer accept, quote or decline it.
 ANSWER_WITHIN = timedelta(hours=48)
 
 # The one catalog service (seed.SERVICE_CATALOG code) that fits each ITR form, so an ITR
@@ -873,10 +875,23 @@ def _email_business(engagement: Engagement, subject: str, template: str, **conte
     )
 
 
+def _check_not_expired(engagement: Engagement) -> None:
+    """409 REQUEST_EXPIRED once the 48 hours to answer have passed.
+
+    The worker marks such requests `expired` every few minutes; this check also stops
+    a CA who answers in the minutes before the worker runs.
+    """
+    if engagement.expires_at is not None and engagement.expires_at <= utcnow():
+        raise ApiError(
+            409, "REQUEST_EXPIRED", "This request expired: it was not answered within 48 hours."
+        )
+
+
 def accept_request(user: User, engagement_id) -> dict:
     """The CA accepts at the listed prices: status `active`."""
     engagement = _ca_engagement(user, engagement_id)
     _check_status(engagement, EngagementStatus.REQUESTED)
+    _check_not_expired(engagement)
     items = _items_of(engagement)
     for item in items:
         item.agreed_price = item.listed_price
@@ -895,6 +910,7 @@ def send_quote(user: User, engagement_id, reason: str, prices: list[dict]) -> di
     """
     engagement = _ca_engagement(user, engagement_id)
     _check_status(engagement, EngagementStatus.REQUESTED)
+    _check_not_expired(engagement)
     items = _items_of(engagement)
 
     new_prices = {}
@@ -924,6 +940,7 @@ def decline_request(user: User, engagement_id) -> dict:
     """The CA declines: status `declined`; the filings are free to request again."""
     engagement = _ca_engagement(user, engagement_id)
     _check_status(engagement, EngagementStatus.REQUESTED)
+    _check_not_expired(engagement)
     engagement.status = EngagementStatus.DECLINED
     engagement.responded_at = utcnow()
     db.session.commit()
@@ -969,3 +986,44 @@ def withdraw_request(business, engagement_id) -> dict:
     engagement.status = EngagementStatus.CANCELLED
     db.session.commit()
     return _engagement_details(engagement)
+
+
+# --- Request expiry (MA12): run by the worker, see backend/worker.py ------------------
+
+
+def expire_old_requests() -> int:
+    """Requests the CA did not answer within 48 hours become `expired`. Returns how many.
+
+    Only `requested` engagements expire; a `quoted` one waits for the business. The
+    filings are free again at once (`expired` is not an open status). After the commit,
+    each business is emailed so it can pick another CA.
+    """
+    stmt = select(Engagement).where(
+        Engagement.status == EngagementStatus.REQUESTED,
+        Engagement.expires_at <= utcnow(),
+    )
+    expired = db.session.scalars(stmt).all()
+    for engagement in expired:
+        engagement.status = EngagementStatus.EXPIRED
+    db.session.commit()
+
+    for engagement in expired:
+        _email_business(
+            engagement,
+            "Your CA request expired",
+            "engagement_expired",
+            service_names=_service_names(engagement),
+        )
+    if len(expired) > 0:
+        log.info("Expired %d unanswered request(s)", len(expired))
+    return len(expired)
+
+
+def _service_names(engagement: Engagement) -> str:
+    """The services of an engagement, e.g. "GSTR-3B filing, GSTR-1 filing"."""
+    names = []
+    for item in _items_of(engagement):
+        service = db.session.get(CatalogService, item.service_id)
+        if service.name not in names:
+            names.append(service.name)
+    return ", ".join(names)

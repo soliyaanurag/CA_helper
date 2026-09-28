@@ -4,6 +4,20 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Request expiry (MA12): a 15-minute worker job, plus a check on every answer
+
+**What**
+- `marketplace_service.expire_old_requests()` runs in the worker every 15 minutes (`marketplace.expire_requests`).
+  It sets `requested` engagements whose `expires_at` (request time + 48 h) has passed to `expired`, commits once,
+  then emails each business which services to choose again in "Find a CA". Only `requested` expires: a `quoted`
+  engagement is waiting for the business, not the CA.
+- A CA answering after the deadline (accept, quote, decline) gets 409 `REQUEST_EXPIRED`, even before the job runs.
+- No automatic re-matching: the business picks another CA itself (its filings are free as soon as the request
+  expires, because `expired` is not an open status).
+
+**Why:** a 15-minute interval is simple and precise enough for a 48-hour deadline; the check on every answer
+closes the gap between two runs. Letting the business choose again keeps the CA choice with the business.
+
 ## 2026-09-27: Editable profile, CA verification and a clearer UI (PRs 2–4 as one)
 
 **What**

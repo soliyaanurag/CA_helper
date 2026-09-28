@@ -127,4 +127,16 @@ describe("engagement card timeline", () => {
     expect(progress).toHaveTextContent("✓ Requested→ ● Declined");
     expect(screen.queryByText(/expires in/)).not.toBeInTheDocument();
   });
+
+  it("offers to find another CA when a request expired", async () => {
+    loginAs("business");
+    fakeApi({ [`GET ${LIST_URL}`]: [200, [engagement({ status: "expired" })]] });
+    renderApp("/business/engagements");
+
+    expect(await screen.findByText("Expired")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Find another CA" })).toHaveAttribute(
+      "href",
+      "/business/marketplace",
+    );
+  });
 });
