@@ -45,6 +45,7 @@ frontend/src/components/     ui/ (shadcn) AppShell PublicLayout RequireRole Plac
 frontend/src/context/ hooks/ AuthProvider · useAuth       frontend/src/lib/  session labels queryClient utils
 frontend/src/test/           setup.js (Vitest setup) utils.jsx (render helpers)
 content/forms/<FORM>/        explanation.md instructions.md checklist.yaml · content/reference/ (gst_states.json)
+content/faqs/                official FAQ pages copied word for word, with their source URL (AI assistant)
 docs/                        project docs · docs/modules/<m>.md = module context (what exists, contracts)
 eval/                        evaluation datasets (never real personal data) · scripts/ setup_dev.sh
 ```

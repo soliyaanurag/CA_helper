@@ -4,6 +4,29 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-29: AI assistant (B3: AS1–AS5)
+
+**What**
+- **Retrieval-augmented answers:** our guides (`content/forms/`) and official FAQ pages (`content/faqs/`) are cut
+  into chunks, embedded with Gemini (`gemini-embedding-001`, 768 numbers, `GEMINI_EMBED_MODEL`) and stored in
+  `kb_chunks` (pgvector). A question finds the 5 closest chunks **within a cosine distance of 0.40**, and Gemini
+  answers only from them, citing [n]. Nothing close enough → "not found" without calling Gemini.
+- **Official FAQs are copied word for word** (only the layout becomes Markdown), with source URL, publisher and
+  retrieval date, after checking robots.txt (asked and approved: "our content + a few FAQs"). Pages that were outdated
+  (GSTR-4 "till FY 2018-19") or only built by JavaScript (income-tax "how to file", Protean TDS FAQs) were left out.
+- **Fallbacks, no new tools:** without Gemini the search uses word matches and the answer is the passages
+  themselves; ingestion needs Gemini (the vector column is NOT NULL) and changes nothing without it.
+- **Only categories about the user go into the prompt** (entity type, MSME tier, GST scheme, ITR form, TDS returns,
+  next filings), never names, PAN, GSTIN, addresses or amounts; embeddings go through `gemini_client` too, so
+  questions are scrubbed (rule 1).
+- **"Ask a CA"** = Gemini's own flag or words like notice / penalty / appeal in the question.
+- The floating widget is for business owners and CAs (SCOPE.md "both roles"), not admins; history is kept (AS5,
+  soft delete). `chat_messages.citations` holds `{sources, ask_a_ca, ai_used}` for an answer.
+- `make assistant-ingest` (Makefile) runs `flask assistant ingest`; `content/faqs/` is listed in `CLAUDE.md`.
+
+**Why:** the assistant must not invent legal facts; answering only from our own and official pages, with sources,
+keeps every answer checkable, and the relevance cut-off keeps unrelated questions from getting unrelated passages.
+
 ## 2026-09-28: Regulatory monitor (RE1–RE6, X2 news job)
 
 **What**
