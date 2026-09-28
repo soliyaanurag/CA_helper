@@ -109,4 +109,41 @@ describe("CA detail page", () => {
     expect(router.state.location.search).toBe("?city=Chennai");
     expect(await screen.findByRole("heading", { name: "Priya Iyer" })).toBeInTheDocument();
   });
+
+  it("shows the average rating and the latest reviews", async () => {
+    loginAs("business");
+    fakeApi({
+      [`GET ${DETAIL_URL}`]: [
+        200,
+        {
+          ...CA,
+          services: [],
+          rating_average: 4.5,
+          rating_count: 2,
+          reviews: [
+            { stars: 4, review: null, created_at: "2026-09-28T05:00:00Z" },
+            { stars: 5, review: "Very clear advice", created_at: "2026-09-20T05:00:00Z" },
+          ],
+        },
+      ],
+    });
+    renderApp(`/business/marketplace/${CA_ID}`);
+
+    expect(await screen.findByText("(2 ratings)", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "4 out of 5 stars" })).toBeInTheDocument();
+    expect(screen.getByText("Very clear advice")).toBeInTheDocument();
+  });
+
+  it("says when a CA has no ratings yet", async () => {
+    loginAs("business");
+    fakeApi({
+      [`GET ${DETAIL_URL}`]: [
+        200,
+        { ...CA, services: [], rating_average: null, rating_count: 0, reviews: [] },
+      ],
+    });
+    renderApp(`/business/marketplace/${CA_ID}`);
+
+    expect(await screen.findByText("No ratings yet")).toBeInTheDocument();
+  });
 });

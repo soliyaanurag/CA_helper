@@ -132,6 +132,9 @@ function BusinessActions({ engagement }) {
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {buttons}
+        {engagement.status === "completed" && !engagement.rating && (
+          <RateForm engagement={engagement} />
+        )}
         <Link
           to={"/business/marketplace/" + engagement.ca_profile_id}
           className="self-center text-primary underline-offset-4 hover:underline"
@@ -145,5 +148,69 @@ function BusinessActions({ engagement }) {
         </p>
       )}
     </div>
+  );
+}
+
+// MA17: rate the CA once the work is completed (1 to 5 stars and an optional review).
+function RateForm({ engagement }) {
+  const queryClient = useQueryClient();
+  const [stars, setStars] = useState(0);
+  const [review, setReview] = useState("");
+  const [error, setError] = useState(null);
+  const [sending, setSending] = useState(false);
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (stars === 0) {
+      setError("Choose 1 to 5 stars.");
+      return;
+    }
+    setError(null);
+    setSending(true);
+    try {
+      await engagementAction(engagement.id, "rating", { stars: stars, review: review });
+      queryClient.invalidateQueries({ queryKey: MY_ENGAGEMENTS_KEY });
+    } catch (rateError) {
+      setError(errorMessage(rateError));
+    }
+    setSending(false);
+  }
+
+  const choices = [1, 2, 3, 4, 5];
+  return (
+    <form className="w-full space-y-2 rounded-lg border p-3" onSubmit={onSubmit} noValidate>
+      <p className="font-medium">Rate {engagement.ca_name}</p>
+      <div className="flex gap-1">
+        {choices.map((number) => (
+          <button
+            key={number}
+            type="button"
+            aria-label={number + (number === 1 ? " star" : " stars")}
+            aria-pressed={stars === number}
+            className="text-2xl text-amber-500"
+            onClick={() => setStars(number)}
+          >
+            {number <= stars ? "★" : "☆"}
+          </button>
+        ))}
+      </div>
+      <textarea
+        aria-label="Review (optional)"
+        placeholder="How was working with this CA? (optional)"
+        rows={2}
+        maxLength={2000}
+        className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm"
+        value={review}
+        onChange={(event) => setReview(event.target.value)}
+      />
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+      <Button type="submit" disabled={sending}>
+        {sending ? "Sending..." : "Send rating"}
+      </Button>
+    </form>
   );
 }

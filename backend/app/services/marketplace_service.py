@@ -24,6 +24,9 @@ active_engagement_item_ids(ca_profile_id, business_id)      filings the CA works
 open_engagement_item_ids(ca_profile_id, business_id)        filings in a request or active work
 ca_can_access_document(ca_profile_id, document_id) -> bool  a document of one of those filings?
 own_profile_id(user) -> uuid | None                          the logged-in CA's profile id
+
+Ratings (MA17): rate_engagement(business, id, stars, review) after completion, once;
+rating_summary(ca_profile_id) -> {rating_average, rating_count}; latest_reviews(ca_profile_id).
 accept_quote / reject_quote / withdraw_request(business, id)                    business actions
 
 Engagement lifecycle: requested -> active (the CA accepts at the listed prices), or
@@ -56,7 +59,15 @@ from sqlalchemy import func, select
 
 from app.errors import ApiError
 from app.extensions import db
-from app.models import CaProfile, CaService, CatalogService, Engagement, EngagementItem, User
+from app.models import (
+    CaProfile,
+    CaService,
+    CatalogService,
+    Engagement,
+    EngagementItem,
+    Rating,
+    User,
+)
 from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus
 from app.models.documents import DocumentType
@@ -334,6 +345,7 @@ def list_verified_cas(
         profile = row["profile"]
         my_prices = row["my_prices"]
         same_city = row["same_city"]
+        ratings = rating_summary(profile.id)
         price = None
         if service:
             price = _price_of(profile, service)
@@ -350,6 +362,8 @@ def list_verified_cas(
                 "price": price,
                 "my_prices": my_prices,
                 "same_city": same_city,
+                "rating_average": ratings["rating_average"],
+                "rating_count": ratings["rating_count"],
             }
         )
     return {"items": items, "page": page, "page_size": page_size, "total": total}
@@ -538,6 +552,7 @@ def get_verified_ca(profile_id) -> dict:
             offered["price"] = my_prices[service["id"]]
             services.append(offered)
 
+    ratings = rating_summary(profile.id)
     return {
         "id": profile.id,
         "full_name": profile.user.full_name,
@@ -548,6 +563,9 @@ def get_verified_ca(profile_id) -> dict:
         "years_experience": profile.years_experience,
         "about": profile.about,
         "services": services,
+        "rating_average": ratings["rating_average"],
+        "rating_count": ratings["rating_count"],
+        "reviews": latest_reviews(profile.id),
     }
 
 
@@ -795,6 +813,7 @@ def _engagement_details(engagement: Engagement) -> dict:
         "activated_at": engagement.activated_at,
         "completed_at": engagement.completed_at,
         "items": items,
+        "rating": _rating_of(engagement),
     }
 
 
@@ -1108,3 +1127,69 @@ def ca_can_access_document(ca_profile_id, document_id) -> bool:
         if filing.acknowledgement_document_id is not None:
             allowed.add(filing.acknowledgement_document_id)
     return document_id in allowed
+
+
+# --- Ratings (MA17) --------------------------------------------------------------------
+
+# How many of a CA's latest reviews the CA page shows.
+REVIEWS_SHOWN = 5
+
+
+def _rating_of(engagement: Engagement):
+    """The engagement's rating as {stars, review, created_at}, or None before it is rated."""
+    rating = db.session.scalar(select(Rating).where(Rating.engagement_id == engagement.id))
+    if rating is None:
+        return None
+    return {"stars": rating.stars, "review": rating.review, "created_at": rating.created_at}
+
+
+def rate_engagement(business, engagement_id, stars: int, review: str) -> dict:
+    """The business rates a completed engagement: 1 to 5 stars and an optional review.
+
+    Only once (409 ALREADY_RATED) and only after the CA marked it completed
+    (409 INVALID_STATUS). Another business's engagement → 404.
+    """
+    engagement = _business_engagement(business, engagement_id)
+    _check_status(engagement, EngagementStatus.COMPLETED)
+    if _rating_of(engagement) is not None:
+        raise ApiError(409, "ALREADY_RATED", "You have already rated this CA for this work.")
+
+    review = review.strip()
+    if review == "":
+        review = None
+    db.session.add(Rating(engagement_id=engagement.id, stars=stars, review=review))
+    db.session.commit()
+    log.info("Engagement %s rated %d stars", engagement.id, stars)
+    return _engagement_details(engagement)
+
+
+def _ratings_of_ca(ca_profile_id) -> list:
+    """All ratings of the CA's engagements, newest first."""
+    stmt = (
+        select(Rating)
+        .join(Engagement, Rating.engagement_id == Engagement.id)
+        .where(Engagement.ca_profile_id == ca_profile_id)
+        .order_by(Rating.created_at.desc())
+    )
+    return db.session.scalars(stmt).all()
+
+
+def rating_summary(ca_profile_id) -> dict:
+    """{"rating_average": 4.3 (one decimal) or None before any rating, "rating_count": n}."""
+    ratings = _ratings_of_ca(ca_profile_id)
+    if len(ratings) == 0:
+        return {"rating_average": None, "rating_count": 0}
+    total = 0
+    for rating in ratings:
+        total = total + rating.stars
+    return {"rating_average": round(total / len(ratings), 1), "rating_count": len(ratings)}
+
+
+def latest_reviews(ca_profile_id) -> list[dict]:
+    """The CA's latest ratings (at most REVIEWS_SHOWN), newest first. Anonymous: no business."""
+    reviews = []
+    for rating in _ratings_of_ca(ca_profile_id)[:REVIEWS_SHOWN]:
+        reviews.append(
+            {"stars": rating.stars, "review": rating.review, "created_at": rating.created_at}
+        )
+    return reviews

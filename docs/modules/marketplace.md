@@ -90,9 +90,16 @@ for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
   (`build_scheduler()`, id `marketplace.expire_requests`, every 15 minutes; run with `make dev-worker`). The
   business's "My engagements" shows "Find another CA" on expired and declined requests. Tests: the MA12
   section of `tests/test_marketplace_engagements.py`, `MyEngagementsPage.test.jsx`.
-- **Not yet:** OCR of the certificate, the admin catalog editor,
-  CA capacity limits, the pro-bono queue, ratings (a section on the CA page), the in-app notification tray
-  (engagement news is email only).
+- **Ratings (MA17):** after the CA marks an engagement `completed`, the business rates it once (1–5 stars, optional
+  review up to 2,000 characters; `rate_engagement()`, 409 `ALREADY_RATED` / `INVALID_STATUS`). The average (one
+  decimal, computed live by `rating_summary()`) and count show on Find a CA cards and the CA page, which also
+  lists the latest 5 reviews (`latest_reviews()`), anonymous (no business name). Each engagement response has
+  `rating` (null before). Frontend: `components/Stars.jsx` (`Stars`, `RatingSummary`), the rating form on the
+  business's completed engagements (`MyEngagementsPage`), the Ratings card on `CaDetailPage`, the rating on the
+  engagement card for both sides. No editing, no CA replies yet. Tests: the MA17 section of
+  `tests/test_marketplace_engagements.py`; `MyEngagementsPage`, `CaDetailPage`, `MarketplacePage` tests.
+- **Not yet:** OCR of the certificate, the admin catalog editor, CA capacity limits, the pro-bono queue, objective
+  CA metrics (response time, completion rate), the in-app notification tray (engagement news is email only).
 
 ## Tables
 - `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
@@ -109,7 +116,7 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 - `engagements`: business + CA, status (`requested`, `quoted`, `active`, `completed`, `declined`, `expired`,
   `cancelled`; no `accepted`), pro bono, quote reason, requested/responded/expires/activated/completed times
 - `engagement_items`: the filings of an engagement, with service, listed and agreed price; unique per engagement
-- `ratings` (1–5 stars, one per engagement), `client_invites` (token hash only), `pro_bono_requests`
+- `ratings` (1–5 stars, one per engagement; used by MA17), `client_invites` (token hash only), `pro_bono_requests`
 - **Invariant for the engagement service (not enforceable in the database):** a compliance item is in at most one
   open engagement (`requested`, `quoted`, `active`).
 
@@ -136,6 +143,7 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 | POST | `/api/v1/marketplace/engagements/<id>/accept-quote` | business | `quoted` → `active`; agreed = quoted; the filings become "With CA" |
 | POST | `/api/v1/marketplace/engagements/<id>/reject-quote` | business | `quoted` → `cancelled` |
 | POST | `/api/v1/marketplace/engagements/<id>/withdraw` | business | `requested` → `cancelled` |
+| POST | `/api/v1/marketplace/engagements/<id>/rating` | business | body `{stars (1–5), review?}` on a `completed` engagement → the engagement with `rating`; 409 `ALREADY_RATED`, 409 `INVALID_STATUS` (not completed), 404 another business's |
 
 Every engagement response is `{id, status, ca_profile_id, ca_name, business_name, quote_reason, requested_at,
 expires_at, responded_at, activated_at, completed_at, items: [{id, compliance_item_id, form_code, period_label,

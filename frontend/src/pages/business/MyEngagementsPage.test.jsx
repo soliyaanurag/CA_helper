@@ -144,4 +144,53 @@ describe("engagement card timeline", () => {
       "/business/marketplace",
     );
   });
+
+  it("rates a completed engagement", async () => {
+    loginAs("business");
+    const done = engagement({ status: "completed" });
+    const fetchMock = fakeApi({
+      [`GET ${LIST_URL}`]: [200, [done]],
+      [`POST ${ACTION_URL}/rating`]: [
+        200,
+        { ...done, rating: { stars: 4, review: "Quick", created_at: "2026-09-28T05:00:00Z" } },
+      ],
+    });
+    renderApp("/business/engagements");
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "4 stars" }));
+    await user.type(screen.getByLabelText("Review (optional)"), "Quick");
+    await user.click(screen.getByRole("button", { name: "Send rating" }));
+
+    const [, init] = fetchMock.mock.calls.find(([path]) => path === `${ACTION_URL}/rating`);
+    expect(JSON.parse(init.body)).toEqual({ stars: 4, review: "Quick" });
+  });
+
+  it("asks for stars before sending a rating", async () => {
+    loginAs("business");
+    const fetchMock = fakeApi({
+      [`GET ${LIST_URL}`]: [200, [engagement({ status: "completed" })]],
+    });
+    renderApp("/business/engagements");
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Send rating" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose 1 to 5 stars.");
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  });
+
+  it("shows the rating instead of the form once rated", async () => {
+    loginAs("business");
+    const rated = engagement({
+      status: "completed",
+      rating: { stars: 5, review: "Great help", created_at: "2026-09-28T05:00:00Z" },
+    });
+    fakeApi({ [`GET ${LIST_URL}`]: [200, [rated]] });
+    renderApp("/business/engagements");
+
+    expect(await screen.findByRole("img", { name: "5 out of 5 stars" })).toBeInTheDocument();
+    expect(screen.getByText(/Great help/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send rating" })).not.toBeInTheDocument();
+  });
 });

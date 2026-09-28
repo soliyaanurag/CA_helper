@@ -4,6 +4,20 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Ratings (MA17): once per completed engagement, anonymous, average computed live
+
+**What**
+- The business rates an engagement only after the CA marked it `completed`, and only once (no editing). Stars 1–5
+  (the table's CHECK), an optional review; an empty review is stored as null.
+- A CA's average (one decimal) and count are computed from `ratings` on each request, like the typical price
+  range; shown from the first rating together with the count ("4.5 (2 ratings)").
+- The CA page shows the latest 5 reviews **without the business's name**.
+- Not yet: editing a rating, CA replies, objective metrics (response time, completion rate).
+
+**Why:** rating only completed work keeps ratings honest (you rate what you received). No editing and anonymous
+reviews are the simplest safe choices (privacy of the business). The count next to the average tells readers how
+much it is worth, so no minimum number of ratings is needed.
+
 ## 2026-09-28: Access checks (MA14): only an ACTIVE engagement opens a business to a CA
 
 **What**

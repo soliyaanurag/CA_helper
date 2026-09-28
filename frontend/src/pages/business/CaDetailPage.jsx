@@ -2,6 +2,7 @@ import { Link, useLocation, useParams } from "react-router";
 
 import { errorMessage } from "@/api/client";
 import { useVerifiedCa } from "@/api/marketplace";
+import { RatingSummary, Stars } from "@/components/Stars";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import {
   label,
   SERVICE_UNIT_LABELS,
 } from "@/lib/labels";
+import { formatDateTime } from "@/lib/dates";
 import { comparedToMedian, formatRupees, typicalRangeText } from "@/lib/money";
 
 // /business/marketplace/:caId: everything about one verified CA, opened from a card
@@ -116,6 +118,28 @@ function CaDetails({ ca }) {
             </table>
           )}
         </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ratings</CardTitle>
+          <CardDescription>
+            <RatingSummary average={ca.rating_average} count={ca.rating_count} />
+          </CardDescription>
+        </CardHeader>
+        {ca.reviews && ca.reviews.length > 0 && (
+          <CardContent>
+            <ul className="space-y-3 text-sm">
+              {ca.reviews.map((review) => (
+                <li key={review.created_at}>
+                  <Stars stars={review.stars} />{" "}
+                  <span className="text-muted-foreground">{formatDateTime(review.created_at)}</span>
+                  {review.review && <p>{review.review}</p>}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        )}
       </Card>
     </>
   );

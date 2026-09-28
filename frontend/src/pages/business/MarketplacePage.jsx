@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router";
 
 import { errorMessage } from "@/api/client";
 import { useServices, useVerifiedCas } from "@/api/marketplace";
+import { RatingSummary } from "@/components/Stars";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -220,6 +221,11 @@ function CaCard({ ca, service, search }) {
             <h2>{ca.full_name}</h2>
             <Badge className="bg-green-100 text-green-700">Verified</Badge>
             {ca.same_city && <Badge className="bg-sky-100 text-sky-900">Same city</Badge>}
+            {ca.rating_count > 0 && (
+              <span className="text-sm font-normal">
+                <RatingSummary average={ca.rating_average} count={ca.rating_count} />
+              </span>
+            )}
           </CardTitle>
           <CardDescription>
             {ca.city} · {ca.years_experience} {ca.years_experience === 1 ? "year" : "years"} of

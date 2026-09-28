@@ -20,6 +20,7 @@ Engagements (a business working with a CA):
     POST /api/v1/marketplace/engagements/<id>/accept-quote business  accept the CA's quote
     POST /api/v1/marketplace/engagements/<id>/reject-quote business  reject the CA's quote
     POST /api/v1/marketplace/engagements/<id>/withdraw     business  withdraw an unanswered request
+    POST /api/v1/marketplace/engagements/<id>/rating       business  rate completed work (MA17)
 
 Each route only checks who is calling, reads the input, calls one function in
 app/services/marketplace_service.py and returns its result as JSON.
@@ -41,6 +42,7 @@ from app.schemas.marketplace import (
     EngagementRequestInputSchema,
     EngagementSchema,
     QuoteInputSchema,
+    RatingInputSchema,
     RequestableFilingSchema,
 )
 from app.services import marketplace_service
@@ -227,3 +229,15 @@ def reject_quote(engagement_id):
 def withdraw_request(engagement_id):
     business = current_business()
     return marketplace_service.withdraw_request(business, engagement_id)
+
+
+# The business rates the CA once the work is completed (1 to 5 stars + optional review).
+@blp.route("/marketplace/engagements/<uuid:engagement_id>/rating", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.arguments(RatingInputSchema)
+@blp.response(200, EngagementSchema)
+def rate_engagement(data, engagement_id):
+    business = current_business()
+    return marketplace_service.rate_engagement(
+        business, engagement_id, data["stars"], data["review"]
+    )

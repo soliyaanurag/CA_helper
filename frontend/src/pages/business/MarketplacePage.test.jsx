@@ -135,4 +135,12 @@ describe("Find a CA page", () => {
     expect(within(far).getByText("Offers none of your filings.")).toBeInTheDocument();
     expect(far.firstChild).toHaveClass("opacity-60");
   });
+
+  it("shows a CA's average rating on the card", async () => {
+    loginAs("business");
+    fakeApi({ [`GET ${URL}`]: page([ca({ rating_average: 4.7, rating_count: 12 })]) });
+    renderApp("/business/marketplace");
+
+    expect(await screen.findByText("4.7 (12 ratings)", { exact: false })).toBeInTheDocument();
+  });
 });
