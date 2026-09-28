@@ -900,3 +900,87 @@ def test_require_ca_access_for_ca_routes(app, client, setup, make_user, auth_hea
 
     action(client, setup["ca_headers"], engagement["id"], "accept")
     check(setup["ca_headers"])  # active: no error
+
+
+# --- MA17: ratings ----------------------------------------------------------------------
+
+
+def _completed(client, setup):
+    """A request the CA accepted and completed; returns the engagement JSON."""
+    engagement = request_gst(client, setup)
+    action(client, setup["ca_headers"], engagement["id"], "accept")
+    action(client, setup["ca_headers"], engagement["id"], "complete")
+    return engagement
+
+
+def test_business_rates_completed_work_once(client, setup):
+    engagement = _completed(client, setup)
+    headers = setup["business_headers"]
+
+    response = action(
+        client, headers, engagement["id"], "rating", {"stars": 4, "review": " Quick. "}
+    )
+
+    assert response.status_code == 200
+    rating = response.get_json()["rating"]
+    assert (rating["stars"], rating["review"]) == (4, "Quick.")
+    again = action(client, headers, engagement["id"], "rating", {"stars": 5})
+    assert again.status_code == 409
+    assert again.get_json()["error"]["code"] == "ALREADY_RATED"
+
+
+def test_only_completed_work_can_be_rated(client, setup):
+    engagement = request_gst(client, setup)
+    action(client, setup["ca_headers"], engagement["id"], "accept")  # active, not completed
+
+    response = action(client, setup["business_headers"], engagement["id"], "rating", {"stars": 5})
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "INVALID_STATUS"
+
+
+@pytest.mark.parametrize(
+    "body", [{"stars": 0}, {"stars": 6}, {"stars": 3, "review": "x" * 2001}, {}]
+)
+def test_invalid_ratings_are_rejected(client, setup, body):
+    engagement = _completed(client, setup)
+
+    response = action(client, setup["business_headers"], engagement["id"], "rating", body)
+
+    assert response.status_code == 422
+
+
+def test_only_the_business_of_the_engagement_can_rate(client, setup, make_business, auth_headers):
+    engagement = _completed(client, setup)
+    other_owner, _ = make_business("Someone Else")
+
+    by_other = action(client, auth_headers(other_owner), engagement["id"], "rating", {"stars": 1})
+    by_ca = action(client, setup["ca_headers"], engagement["id"], "rating", {"stars": 5})
+
+    assert by_other.status_code == 404
+    assert by_ca.status_code == 403
+
+
+def test_average_and_reviews_show_on_the_ca_list_and_page(client, setup, add_filing, database):
+    ca = setup["ca"]
+    headers = setup["business_headers"]
+    list_row = client.get(f"{BASE}/cas", headers=headers).get_json()["items"][0]
+    assert (list_row["rating_average"], list_row["rating_count"]) == (None, 0)
+
+    first = _completed(client, setup)
+    action(client, headers, first["id"], "rating", {"stars": 5, "review": "Great"})
+    # A second completed engagement with the same CA, on new filings.
+    newer = add_filing(setup["business"], FormCode.GSTR_3B, "Sep 2026", days=40)
+    second = send_request(client, setup, (newer, setup["catalog"]["gstr_3b"])).get_json()
+    action(client, setup["ca_headers"], second["id"], "accept")
+    action(client, setup["ca_headers"], second["id"], "complete")
+    action(client, headers, second["id"], "rating", {"stars": 4})
+
+    list_row = client.get(f"{BASE}/cas", headers=headers).get_json()["items"][0]
+    page = client.get(f"{BASE}/cas/{ca.id}", headers=headers).get_json()
+
+    assert (list_row["rating_average"], list_row["rating_count"]) == (4.5, 2)
+    assert (page["rating_average"], page["rating_count"]) == (4.5, 2)
+    assert [review["stars"] for review in page["reviews"]] == [4, 5]  # newest first
+    assert page["reviews"][0]["review"] is None
+    assert "business_name" not in page["reviews"][0]  # anonymous

@@ -109,6 +109,14 @@ class MyPriceSchema(Schema):
     price = fields.Decimal(as_string=True, places=2, required=True)
 
 
+class RatingSchema(Schema):
+    """One rating: 1 to 5 stars and an optional review. Never shows who wrote it."""
+
+    stars = fields.Integer(required=True)
+    review = fields.String(allow_none=True)
+    created_at = fields.DateTime(required=True)
+
+
 class CaListItemSchema(Schema):
     """A verified CA as businesses see them (no CoP number, no capacity)."""
 
@@ -126,6 +134,9 @@ class CaListItemSchema(Schema):
     # they offer none), and whether the CA's city is in its address (null otherwise).
     my_prices = fields.List(fields.Nested(MyPriceSchema), required=True)
     same_city = fields.Boolean(allow_none=True)
+    # The average of the CA's ratings (one decimal), null before the first rating.
+    rating_average = fields.Float(allow_none=True)
+    rating_count = fields.Integer(required=True)
 
 
 class CaListPageSchema(PageSchema):
@@ -193,6 +204,10 @@ class CaDetailSchema(Schema):
     years_experience = fields.Integer(required=True)
     about = fields.String(required=True)
     services = fields.List(fields.Nested(CaOfferedServiceSchema), required=True)
+    rating_average = fields.Float(allow_none=True)
+    rating_count = fields.Integer(required=True)
+    # The latest ratings, newest first (anonymous).
+    reviews = fields.List(fields.Nested(RatingSchema), required=True)
 
 
 # --- Engagements ---------------------------------------------------------------------
@@ -269,6 +284,8 @@ class EngagementSchema(Schema):
     activated_at = fields.DateTime(allow_none=True)
     completed_at = fields.DateTime(allow_none=True)
     items = fields.List(fields.Nested(EngagementItemSchema), required=True)
+    # The business's rating once it rated the completed engagement (null before).
+    rating = fields.Nested(RatingSchema, allow_none=True)
 
 
 class QuotePriceInputSchema(Schema):
@@ -288,3 +305,12 @@ class QuoteInputSchema(Schema):
         required=True,
         validate=validate.Length(min=1, error="Enter the new prices."),
     )
+
+
+class RatingInputSchema(Schema):
+    """POST /marketplace/engagements/<id>/rating: 1 to 5 stars and an optional review."""
+
+    stars = fields.Integer(
+        required=True, validate=validate.Range(1, 5, error="Choose 1 to 5 stars.")
+    )
+    review = fields.String(load_default="", validate=validate.Length(max=2000))

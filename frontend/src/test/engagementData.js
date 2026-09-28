@@ -16,6 +16,7 @@ export function engagement(fields) {
     responded_at: null,
     activated_at: null,
     completed_at: null,
+    rating: null,
     items: [
       {
         id: "i1",

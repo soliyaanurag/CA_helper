@@ -1,3 +1,4 @@
+import { Stars } from "@/components/Stars";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { expiresInText, formatDate, formatDateTime } from "@/lib/dates";
@@ -156,6 +157,13 @@ export function EngagementCard({ engagement, title, children }) {
           <p>
             <span className="font-medium">Reason for the quote: </span>
             {engagement.quote_reason}
+          </p>
+        )}
+        {engagement.rating && (
+          <p>
+            <span className="font-medium">Rating: </span>
+            <Stars stars={engagement.rating.stars} />
+            {engagement.rating.review && <span> “{engagement.rating.review}”</span>}
           </p>
         )}
         {children}
