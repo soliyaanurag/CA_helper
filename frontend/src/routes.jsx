@@ -12,6 +12,7 @@ import { CaDetailPage } from "@/pages/business/CaDetailPage";
 import { BusinessDashboardPage } from "@/pages/business/BusinessDashboardPage";
 import { CompliancePage } from "@/pages/business/CompliancePage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
+import { FilingPage } from "@/pages/business/FilingPage";
 import { MarketplacePage } from "@/pages/business/MarketplacePage";
 import { MyEngagementsPage } from "@/pages/business/MyEngagementsPage";
 import { TypicalFeesPage } from "@/pages/business/TypicalFeesPage";
@@ -104,6 +105,7 @@ export const appRoutes = [
     { index: true, element: <BusinessDashboardPage /> },
     { path: "onboarding", element: <OnboardingPage /> },
     { path: "compliance", element: <CompliancePage /> },
+    { path: "compliance/:itemId", element: <FilingPage /> },
     { path: "documents", element: <DocumentsPage /> },
     { path: "marketplace", element: <MarketplacePage /> },
     { path: "marketplace/:caId", element: <CaDetailPage /> },

@@ -1,16 +1,35 @@
 # Document checklist for GSTR-3B.
-# Status: TODO. Replace the example item with real ones.
+# Status: DRAFT (review, then set status: DONE).
 #
-# Used by: the checklist UI on the item page and OCR document-type checks.
+# Used by: the checklist on the filing page (and OCR document-type checks later).
 # Each item:
 #   key       stable snake_case id (never rename once used; ticks are stored against it)
 #   label     text shown to the user
 #   required  true if a CA normally cannot file without it
 #   help      optional one-line hint
 form: GSTR-3B
-status: TODO
+status: DRAFT
 items:
-  - key: todo_example_document
-    label: "TODO: first document the user should have"
+  - key: sales_summary
+    label: "Sales summary of the period (same as in GSTR-1)"
     required: true
-    help: "TODO: where the user can find it"
+    help: "File GSTR-1 first if it is due"
+  - key: purchase_invoices
+    label: "Purchase invoices with GST"
+    required: true
+    help: "For the tax credit you claim"
+  - key: gstr_2b
+    label: "GSTR-2B statement from the portal"
+    required: true
+    help: "Returns Dashboard → GSTR-2B"
+  - key: reverse_charge_details
+    label: "Purchases under reverse charge"
+    required: false
+    help: "Only if you have any"
+  - key: tax_payment_funds
+    label: "Money in the bank to pay the GST due"
+    required: true
+  - key: gst_portal_login
+    label: "GST portal username and password"
+    required: true
+    help: "And the registered mobile for the OTP"

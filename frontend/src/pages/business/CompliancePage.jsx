@@ -25,6 +25,7 @@ const STATUS_FILTERS = {
  * /business/compliance: every filing of this financial year.
  * Filings whose due date has passed come first, in "Earlier this year"; the rest are
  * grouped by the month they are due, soonest first. Chips filter by form and status.
+ * Clicking a form opens its filing page (FilingPage).
  */
 export function CompliancePage() {
   const filings = useFilings();
@@ -166,7 +167,14 @@ function FilingTable({ filings }) {
         <tbody>
           {filings.map((item) => (
             <tr key={item.id} className="border-b">
-              <td className="py-2 pr-4">{label(FORM_LABELS, item.form_code)}</td>
+              <td className="py-2 pr-4">
+                <Link
+                  to={`/business/compliance/${item.id}`}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {label(FORM_LABELS, item.form_code)}
+                </Link>
+              </td>
               <td className="py-2 pr-4">{item.period_label}</td>
               <td className="py-2 pr-4">{formatDate(item.due_date)}</td>
               <td className="py-2 pr-4 tabular-nums">

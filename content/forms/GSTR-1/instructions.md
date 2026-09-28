@@ -1,31 +1,34 @@
 ---
 form: GSTR-1
-status: TODO
+status: DRAFT
 ---
 
 # How to file GSTR-1 yourself
 
-<!-- TODO: step-by-step self-filing guide. Shown on the item page. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## Before you start
-- TODO: what to keep ready (links to the checklist in `checklist.yaml`)
-- TODO: login details needed for the official portal
+Tick the documents in the checklist on this page, and keep your login details ready.
 
-## Steps on the official portal
-1. TODO: open the official portal (link)
-2. TODO: ...
-3. TODO: submit and download the acknowledgement
+## Steps
+1. Log in to the GST portal and open **Services → Returns → Returns Dashboard**.
+2. Choose the financial year and the period, then open **GSTR-1**.
+3. Add your invoices: to registered businesses (B2B, with their GSTIN), to consumers (B2C), exports, and credit or debit notes. You can type them in or upload them with the offline tool.
+4. Fill in the **HSN/SAC summary** and the **documents issued** section.
+5. Click **Generate GSTR-1 summary**, check the preview carefully, then **File** with DSC or EVC (OTP).
+6. Download the acknowledgement with the **ARN** (acknowledgement reference number).
 
 ## After filing
-Upload the acknowledgement on the item page. The app reads the acknowledgement/ARN number, date and period
-(locally, with OCR) and marks the item **Filed–verified**.
+Click **Mark as filed** on this page and upload the acknowledgement (PDF or photo), so you and your CA can
+always find it.
 
 ## Common mistakes
-- TODO
+- Wrong GSTIN of a customer, so their credit goes missing.
+- Reporting an invoice in the wrong period.
+- Forgetting credit notes for returned goods.
 
 ## Official sources
-- TODO
+- GST portal: <https://www.gst.gov.in>
+- GST portal user manuals (GSTR-1): <https://tutorial.gst.gov.in>

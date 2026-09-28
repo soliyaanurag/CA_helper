@@ -1,31 +1,33 @@
 ---
 form: ITR
-status: TODO
+status: DRAFT
 ---
 
-# How to file ITR yourself
+# How to file Income tax return (ITR) yourself
 
-<!-- TODO: step-by-step self-filing guide. Shown on the item page. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## Before you start
-- TODO: what to keep ready (links to the checklist in `checklist.yaml`)
-- TODO: login details needed for the official portal
+Tick the documents in the checklist on this page, and keep your login details ready.
 
-## Steps on the official portal
-1. TODO: open the official portal (link)
-2. TODO: ...
-3. TODO: submit and download the acknowledgement
+## Steps
+1. Log in to the income-tax e-filing portal with your PAN.
+2. Open **e-File → Income Tax Returns → File Income Tax Return**, choose the assessment year and online filing.
+3. Choose the ITR form your profile shows, and check the figures filled in for you against your **AIS** and **Form 26AS**.
+4. Enter your business income, deductions and any tax already paid (TDS, advance tax).
+5. Pay any tax still due through **e-Pay Tax**, then submit the return.
+6. **E-verify** it (Aadhaar OTP, net banking or a bank account) and download the acknowledgement (ITR-V).
 
 ## After filing
-Upload the acknowledgement on the item page. The app reads the acknowledgement/ARN number, date and period
-(locally, with OCR) and marks the item **Filed–verified**.
+Click **Mark as filed** on this page and upload the acknowledgement (PDF or photo), so you and your CA can
+always find it.
 
 ## Common mistakes
-- TODO
+- Income that does not match AIS / Form 26AS.
+- Submitting but never e-verifying the return.
+- Using the wrong ITR form.
 
 ## Official sources
-- TODO
+- Income-tax e-filing portal: <https://www.incometax.gov.in>

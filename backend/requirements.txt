@@ -25,5 +25,9 @@ argon2-cffi==25.1.0
 # Fernet encryption of PAN, GSTIN, TAN and phone (app/utils/encryption.py).
 cryptography==50.0.1
 
+# --- Content files ---
+# Reads content/forms/<FORM>/checklist.yaml (compliance form content, CO6).
+PyYAML==6.0.3
+
 # --- Background jobs (worker process only) ---
 APScheduler==3.11.3

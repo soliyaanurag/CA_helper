@@ -1,16 +1,32 @@
 # Document checklist for GSTR-1.
-# Status: TODO. Replace the example item with real ones.
+# Status: DRAFT (review, then set status: DONE).
 #
-# Used by: the checklist UI on the item page and OCR document-type checks.
+# Used by: the checklist on the filing page (and OCR document-type checks later).
 # Each item:
 #   key       stable snake_case id (never rename once used; ticks are stored against it)
 #   label     text shown to the user
 #   required  true if a CA normally cannot file without it
 #   help      optional one-line hint
 form: GSTR-1
-status: TODO
+status: DRAFT
 items:
-  - key: todo_example_document
-    label: "TODO: first document the user should have"
+  - key: sales_invoices
+    label: "All sales invoices of the period"
     required: true
-    help: "TODO: where the user can find it"
+    help: "Your billing software or invoice book"
+  - key: customer_gstins
+    label: "GSTINs of your business customers"
+    required: true
+    help: "Printed on their purchase orders or invoices"
+  - key: credit_debit_notes
+    label: "Credit and debit notes issued"
+    required: false
+    help: "Only if goods came back or prices changed"
+  - key: hsn_summary
+    label: "Sales summary by HSN/SAC code"
+    required: true
+    help: "Most billing software prints this report"
+  - key: gst_portal_login
+    label: "GST portal username and password"
+    required: true
+    help: "And the registered mobile for the OTP"

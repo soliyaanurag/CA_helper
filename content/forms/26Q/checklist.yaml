@@ -1,16 +1,30 @@
 # Document checklist for 26Q.
-# Status: TODO. Replace the example item with real ones.
+# Status: DRAFT (review, then set status: DONE).
 #
-# Used by: the checklist UI on the item page and OCR document-type checks.
+# Used by: the checklist on the filing page (and OCR document-type checks later).
 # Each item:
 #   key       stable snake_case id (never rename once used; ticks are stored against it)
 #   label     text shown to the user
 #   required  true if a CA normally cannot file without it
 #   help      optional one-line hint
 form: 26Q
-status: TODO
+status: DRAFT
 items:
-  - key: todo_example_document
-    label: "TODO: first document the user should have"
+  - key: payment_vouchers
+    label: "Payments of the quarter on which TDS was deducted"
     required: true
-    help: "TODO: where the user can find it"
+    help: "Contractor bills, fees, rent"
+  - key: payee_pans
+    label: "PAN of every payee"
+    required: true
+  - key: tds_challans
+    label: "TDS challans paid for the quarter"
+    required: true
+    help: "Challan number, date and amount"
+  - key: lower_deduction_certificates
+    label: "Lower-deduction certificates of payees"
+    required: false
+    help: "Only if a payee gave you one"
+  - key: tan_login
+    label: "TAN and e-filing portal login"
+    required: true
