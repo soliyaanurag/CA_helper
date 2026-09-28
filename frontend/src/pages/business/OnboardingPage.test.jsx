@@ -225,3 +225,63 @@ describe("business profile page", () => {
     expect(chips).toHaveTextContent("ITR-4");
   });
 });
+
+describe("fill in from a document (ON13)", () => {
+  it("puts the values found in a GST certificate into the form", async () => {
+    loginAs("business");
+    const fetchMock = fakeApi({
+      ...STATES_ROUTE,
+      [`GET ${URL}`]: NOT_FOUND,
+      "POST /api/v1/onboarding/autofill": [
+        200,
+        {
+          found: {
+            gstin: "27ABCDE1234F1Z5",
+            pan: "ABCDE1234F",
+            state: "Maharashtra",
+            legal_name: "ASHA TRADERS PRIVATE LIMITED",
+            entity_type: "private_limited",
+          },
+        },
+      ],
+    });
+    renderApp("/business/onboarding");
+    const user = userEvent.setup();
+    const certificate = new File(["%PDF-1.4"], "certificate.pdf", { type: "application/pdf" });
+
+    await user.upload(
+      await screen.findByLabelText(/Fill in from your GST certificate/),
+      certificate,
+    );
+
+    expect(
+      await screen.findByText(/Filled in: business name, type of business/),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Business name")).toHaveValue("ASHA TRADERS PRIVATE LIMITED");
+    expect(screen.getByLabelText("PAN")).toHaveValue("ABCDE1234F");
+    expect(screen.getByLabelText("State")).toHaveValue("Maharashtra");
+    expect(screen.getByLabelText("GST registered")).toBeChecked();
+    expect(screen.getByLabelText("GSTIN")).toHaveValue("27ABCDE1234F1Z5");
+    const call = fetchMock.mock.calls.find(([path]) => path === "/api/v1/onboarding/autofill");
+    expect(call[1].body.get("file").name).toBe("certificate.pdf");
+  });
+
+  it("says when a file cannot be read", async () => {
+    loginAs("business");
+    fakeApi({
+      ...STATES_ROUTE,
+      [`GET ${URL}`]: NOT_FOUND,
+      "POST /api/v1/onboarding/autofill": [
+        422,
+        { error: { code: "DOCUMENT_UNREADABLE", message: "We could not read this file." } },
+      ],
+    });
+    renderApp("/business/onboarding");
+    const user = userEvent.setup();
+    const photo = new File(["x"], "blurry.png", { type: "image/png" });
+
+    await user.upload(await screen.findByLabelText(/Fill in from your GST certificate/), photo);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("We could not read this file.");
+  });
+});

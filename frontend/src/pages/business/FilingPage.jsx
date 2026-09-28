@@ -337,6 +337,35 @@ function MarkFiledForm({ page, onUpdated }) {
   );
 }
 
+/**
+ * DO8: what the acknowledgement file showed when it was read (locally, with OCR).
+ * Verified: the form, period, number and date match this filing. Otherwise the list
+ * says what did not match; the filing stays "Filed".
+ */
+function Verification({ verification }) {
+  if (verification.verified) {
+    return (
+      <p className="rounded-lg bg-green-50 p-3 text-green-900">
+        ✓ Verified from the acknowledgement: number {verification.acknowledgement_no}, filed on{" "}
+        {formatDate(verification.filing_date)}.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg bg-amber-50 p-3 text-amber-900">
+      <p className="font-medium">We could not verify it from the acknowledgement:</p>
+      <ul className="list-disc pl-5">
+        {verification.problems.map((problem) => (
+          <li key={problem}>{problem}</li>
+        ))}
+      </ul>
+      <p className="mt-1 text-xs">
+        Check that you uploaded the acknowledgement of this filing. It stays marked as filed.
+      </p>
+    </div>
+  );
+}
+
 function Filed({ page, onUpdated }) {
   const item = page.filing;
   const [error, setError] = useState(null);
@@ -357,7 +386,7 @@ function Filed({ page, onUpdated }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Filed</CardTitle>
+        <CardTitle>{item.status === "filed_verified" ? "Filed and verified" : "Filed"}</CardTitle>
         <CardDescription>
           {item.filed_at ? `Marked as filed on ${formatDateTime(item.filed_at)}.` : "Filed."}
           {item.acknowledgement_no && ` Acknowledgement number: ${item.acknowledgement_no}.`}
@@ -373,7 +402,10 @@ function Filed({ page, onUpdated }) {
         ) : (
           <p className="text-muted-foreground">Loading the acknowledgement...</p>
         )}
-        {item.status === "filed" && item.filing_path === "self" && (
+        {page.acknowledgement !== null && (
+          <Verification verification={page.acknowledgement.verification} />
+        )}
+        {["filed", "filed_verified"].includes(item.status) && item.filing_path === "self" && (
           <div>
             <Button variant="outline" size="sm" onClick={undo}>
               Undo: not filed yet

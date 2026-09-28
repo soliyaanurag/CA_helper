@@ -69,3 +69,11 @@ export function useGstStates() {
     staleTime: Infinity, // reference data: it does not change while the app is open
   });
 }
+
+// ON13: reads a GST certificate or PAN card on the server (locally, never stored) and
+// returns what it found: { found: { pan?, gstin?, legal_name?, state?, entity_type? } }.
+export function readRegistrationDocument(file) {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch("/api/v1/onboarding/autofill", { method: "POST", body: form });
+}

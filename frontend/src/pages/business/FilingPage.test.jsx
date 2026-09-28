@@ -491,3 +491,56 @@ describe("how similar businesses file it", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("acknowledgement verification (DO8)", () => {
+  function filedPage(status, verification) {
+    return page({
+      filing: {
+        status,
+        filing_path: "self",
+        filed_at: "2026-10-20T06:00:00Z",
+        acknowledgement_no: "AA2710260123456",
+      },
+      acknowledgement: { filename: "ack.pdf", uploaded_at: "2026-10-20T06:00:00Z", verification },
+    });
+  }
+
+  it("shows a verified filing", async () => {
+    open({
+      [`GET ${ITEM}`]: [
+        200,
+        filedPage("filed_verified", {
+          verified: true,
+          problems: [],
+          acknowledgement_no: "AA2710260123456",
+          filing_date: "2026-10-20",
+        }),
+      ],
+      [`GET ${ITEM}/acknowledgement`]: [200, {}],
+    });
+
+    expect(await screen.findByText("Filed and verified")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Verified from the acknowledgement: number AA2710260123456/),
+    ).toBeInTheDocument();
+  });
+
+  it("says what did not match", async () => {
+    open({
+      [`GET ${ITEM}`]: [
+        200,
+        filedPage("filed", {
+          verified: false,
+          problems: ["It does not name the form GSTR-3B."],
+          acknowledgement_no: null,
+          filing_date: null,
+        }),
+      ],
+      [`GET ${ITEM}/acknowledgement`]: [200, {}],
+    });
+
+    expect(await screen.findByText(/We could not verify it/)).toBeInTheDocument();
+    expect(screen.getByText("It does not name the form GSTR-3B.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo: not filed yet" })).toBeInTheDocument();
+  });
+});
