@@ -62,9 +62,16 @@ def _send_to_gemini(prompt: str, want_json: bool) -> str:
     config = current_app.config
     client = genai.Client(
         api_key=config["GEMINI_API_KEY"],
-        http_options=types.HttpOptions(timeout=config["GEMINI_TIMEOUT_SECONDS"] * 1000),
+        http_options=types.HttpOptions(
+            timeout=config["GEMINI_TIMEOUT_SECONDS"] * 1000,
+            # Gemini sometimes answers 503 "high demand" or 429 for a moment: try twice more.
+            retry_options=types.HttpRetryOptions(attempts=3, http_status_codes=[429, 503]),
+        ),
     )
-    settings = types.GenerateContentConfig()
+    # We only ask for text; the library's automatic function calling stays off.
+    settings = types.GenerateContentConfig(
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+    )
     if want_json:
         settings.response_mime_type = "application/json"
     response = client.models.generate_content(
