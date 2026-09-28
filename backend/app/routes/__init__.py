@@ -9,6 +9,7 @@
     admin.py         /api/v1/admin/...
     alerts.py        /api/v1/alerts/...
     documents.py     /api/v1/documents/...
+    regulatory.py    /api/v1/admin/regulatory/... (news monitor)
 
 Add a new feature's blueprint to BLUEPRINTS below. Routes stay thin: parse input
 (app/schemas/), call one service function (app/services/), serialize the result.
@@ -26,6 +27,7 @@ from app.routes import (
     health,
     marketplace,
     onboarding,
+    regulatory,
 )
 
 # Every feature route lives under this prefix (docs/API_CONVENTIONS.md).
@@ -41,6 +43,7 @@ BLUEPRINTS = [
     admin.blp,
     alerts.blp,
     documents.blp,
+    regulatory.blp,
 ]
 
 

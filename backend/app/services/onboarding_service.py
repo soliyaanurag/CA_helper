@@ -627,6 +627,30 @@ def get_msme_tier(business: Business) -> str | None:
     return profile.msme_tier.value
 
 
+def business_categories(business_ids) -> list[dict]:
+    """For live businesses among `business_ids`: {id, user_id, legal_name, entity_type,
+    state, gst_scheme} (category-level facts only; used to match regulatory changes)."""
+    stmt = (
+        select(Business, RegulatoryProfile.gst_scheme)
+        .join(RegulatoryProfile, RegulatoryProfile.business_id == Business.id)
+        .where(Business.id.in_(list(business_ids)), Business.deleted_at.is_(None))
+        .order_by(Business.legal_name)
+    )
+    rows = []
+    for business, gst_scheme in db.session.execute(stmt):
+        rows.append(
+            {
+                "id": business.id,
+                "user_id": business.user_id,
+                "legal_name": business.legal_name,
+                "entity_type": business.entity_type.value,
+                "state": business.state,
+                "gst_scheme": gst_scheme.value,
+            }
+        )
+    return rows
+
+
 def business_ids_in_segment(entity_type, msme_tier) -> set:
     """The live businesses with this entity type and MSME tier (peer insights, CO13)."""
     stmt = (

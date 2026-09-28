@@ -73,7 +73,8 @@ class RegulatoryChange(BaseModel):
     summary: Mapped[str] = mapped_column(Text)
     # The forms it affects, e.g. {gstr_3b}: an array of FormCode values.
     form_codes: Mapped[list[str]] = mapped_column(ARRAY(String(50)))
-    # Who it affects, e.g. {"gst_scheme": ["regular_monthly"], "states": ["Maharashtra"]}.
+    # Who it affects, e.g. {"extracted_by": "ai", "gst_schemes": ["regular_monthly"],
+    # "states": ["Maharashtra"]}; a missing list means everyone.
     affected_categories: Mapped[dict] = mapped_column(JSONB)
     # The dates it mentions, e.g. {"old_due_date": "2026-10-20", "new_due_date": "2026-10-31"}.
     dates: Mapped[dict] = mapped_column(JSONB)

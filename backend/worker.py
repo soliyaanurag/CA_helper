@@ -14,7 +14,12 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
-from app.services import alerts_service, compliance_service, marketplace_service
+from app.services import (
+    alerts_service,
+    compliance_service,
+    marketplace_service,
+    regulatory_service,
+)
 
 log = logging.getLogger("worker")
 
@@ -66,6 +71,11 @@ def build_scheduler(app: Flask) -> AppScheduler:
     # 08:15, after the hourly overdue job has had a chance to run.
     scheduler.add_job(
         alerts_service.send_reminders, "cron", hour=8, minute=15, id="alerts.reminders"
+    )
+
+    # RE2 (X2): every morning, read the news sources and save changes for an admin to review.
+    scheduler.add_job(
+        regulatory_service.scan_news, "cron", hour=7, minute=0, id="regulatory.scan_news"
     )
     return scheduler
 

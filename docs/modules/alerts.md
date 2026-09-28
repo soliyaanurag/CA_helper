@@ -82,7 +82,7 @@ Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backe
 ## Service functions other modules call
 - `notify(user, type, title, body, link=None, email=False) -> Notification` (does not commit; call it before your
   commit). Used by marketplace (engagement events, `email=False`: it sends its own emails) and ca_workspace
-  (document requests, "your CA filed it", `email=True`). Planned: regulatory (approved changes), `email=True`.
+  (document requests, "your CA filed it", `email=True`). Also regulatory (an approved change: the business owner `email=True`, its active CAs tray only).
 - `queue_email(to, subject, template, **context)`: send an email only once the transaction commits.
 
 ## Depends on
