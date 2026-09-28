@@ -15,8 +15,8 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 - Frontend: React + Vite + **JavaScript (`.js`/`.jsx`, no TypeScript)**, React Router, TanStack Query, Tailwind +
   shadcn/ui, React Hook Form + Zod, `apiFetch()` (fields per Swagger at `/api/docs`), Vitest + RTL.
 - Installed for the schema: `cryptography` (Fernet, `EncryptedString`; no blind index) and `pgvector` (`vector(768)`).
-  Added with their features, not installed yet: google-genai (Gemini), Tesseract + PyMuPDF (never pdfplumber as
-  well), a calendar and a chart library (ask which first).
+  Added with their features: google-genai (Gemini), Tesseract (conda) + PyMuPDF (pip) for OCR (never pdfplumber
+  as well); not installed yet: a calendar and a chart library (ask which first).
 - Run: `make infra` (Postgres + Mailpit in Docker), `make dev-backend` (`python main.py`), `make dev-worker`,
   `make dev-frontend` (Vite forwards `/api` to Flask); all read the root `.env`. `make help` lists every target.
   People may run the servers by hand (README "Quick start"); Claude always uses Make targets or `conda run`.
@@ -59,7 +59,8 @@ Foundation docs: `core-auth.md` (auth), `core-infra.md` (shared backend + dev se
 
 ## Conda rules
 1. Miniforge / conda-forge only: `environment.yml` uses `channels: [conda-forge, nodefaults]`.
-2. Conda installs only `python=3.12`, `nodejs=22`, `pip`. **All Python packages come from pip via
+2. Conda installs only `python=3.12`, `nodejs=22`, `pip` and `tesseract=5` (the OCR program, not a Python
+   library; CI installs it with apt). **All Python packages come from pip via
    `backend/requirements*.txt`** (CI uses the same files). Never `conda install` a Python library; never
    pip-install anything that isn't in a requirements file. npm packages come from `frontend/package-lock.json`.
 3. One shared `environment.yml` (env `ca-helper`; its pip section installs `-r backend/requirements-dev.txt`).

@@ -51,6 +51,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r backend/requirements-dev.txt
 
+      # The OCR program (app/utils/ocr.py); on laptops it comes from environment.yml.
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
       - name: Ruff (lint + format check)
         run: |
           ruff check backend
