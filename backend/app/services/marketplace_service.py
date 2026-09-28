@@ -27,6 +27,11 @@ own_profile_id(user) -> uuid | None                          the logged-in CA's 
 
 Ratings (MA17): rate_engagement(business, id, stars, review) after completion, once;
 rating_summary(ca_profile_id) -> {rating_average, rating_count}; latest_reviews(ca_profile_id).
+
+Pro-bono queue (MA16): a MICRO business asks for free help with some filings
+(join_pro_bono_queue); verified CAs with free slots this month see the queue
+(get_pro_bono_queue) and take a request (accept_pro_bono_request), which becomes an
+`active` engagement at ₹0 with is_pro_bono. The business can cancel while queued.
 accept_quote / reject_quote / withdraw_request(business, id)                    business actions
 
 Engagement lifecycle: requested -> active (the CA accepts at the listed prices), or
@@ -52,8 +57,9 @@ on any save, so fixing it and saving asks for a new check.
 """
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from statistics import median
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
@@ -65,14 +71,20 @@ from app.models import (
     CatalogService,
     Engagement,
     EngagementItem,
+    ProBonoRequest,
     Rating,
     User,
 )
-from app.models.base import utcnow
+from app.models.base import today_in_india, utcnow
 from app.models.compliance import ComplianceStatus
 from app.models.documents import DocumentType
 from app.models.enums import FormCode
-from app.models.marketplace import SERVICE_SPECIALIZATIONS, CaVerificationStatus, EngagementStatus
+from app.models.marketplace import (
+    SERVICE_SPECIALIZATIONS,
+    CaVerificationStatus,
+    EngagementStatus,
+    ProBonoRequestStatus,
+)
 from app.services import compliance_service, documents_service, onboarding_service
 from app.utils.email import send_email
 
@@ -814,6 +826,7 @@ def _engagement_details(engagement: Engagement) -> dict:
         "completed_at": engagement.completed_at,
         "items": items,
         "rating": _rating_of(engagement),
+        "is_pro_bono": engagement.is_pro_bono,
     }
 
 
@@ -1193,3 +1206,273 @@ def latest_reviews(ca_profile_id) -> list[dict]:
             {"stars": rating.stars, "review": rating.review, "created_at": rating.created_at}
         )
     return reviews
+
+
+# --- Pro-bono queue (MA16) ---------------------------------------------------------------
+
+# Only businesses whose computed MSME tier is one of these may ask for free help.
+# A platform policy (docs/DECISIONS.md), not a legal value.
+PRO_BONO_TIERS = ["micro"]
+
+
+def _pro_bono_eligibility(business) -> dict:
+    """{"eligible": True/False, "reason": text shown to the business}."""
+    tier = onboarding_service.get_msme_tier(business)
+    if tier in PRO_BONO_TIERS:
+        return {
+            "eligible": True,
+            "reason": "Your business is a micro enterprise, so you can ask for a free CA.",
+        }
+    return {
+        "eligible": False,
+        "reason": "Free (pro-bono) help is for micro enterprises. "
+        "Your business profile shows another tier.",
+    }
+
+
+def _queued_request_of(business):
+    """The business's request still waiting in the queue, or None."""
+    stmt = select(ProBonoRequest).where(
+        ProBonoRequest.business_id == business.id,
+        ProBonoRequest.status == ProBonoRequestStatus.QUEUED,
+    )
+    return db.session.scalar(stmt)
+
+
+def _pro_bono_details(request: ProBonoRequest) -> dict:
+    """A pro-bono request as both sides see it."""
+    business = onboarding_service.get_business(request.business_id)
+    filings = []
+    for filing in compliance_service.get_filings_by_ids(request.compliance_item_ids).values():
+        filings.append(
+            {
+                "id": filing.id,
+                "form_code": filing.form_code,
+                "period_label": filing.period_label,
+                "due_date": filing.due_date,
+                "blocked_reason": None,
+            }
+        )
+    return {
+        "id": request.id,
+        "status": request.status,
+        "note": request.note,
+        "created_at": request.created_at,
+        "business_name": business.legal_name,
+        "filings": filings,
+    }
+
+
+def _filing_blocked_reason(filing, busy: set):
+    """Why a filing cannot be given to a (pro-bono) CA now, or None if it can."""
+    if filing.status in FILED_STATUSES:
+        return "Already filed."
+    if filing.id in busy:
+        return "Already requested from a CA or with a CA."
+    return None
+
+
+def get_pro_bono_page(business) -> dict:
+    """What the business's pro-bono page shows: eligibility, its queued request, its filings."""
+    filings = compliance_service.list_filings(business)
+    filing_ids = []
+    for filing in filings:
+        filing_ids.append(filing.id)
+    busy = _busy_filing_ids(filing_ids)
+
+    rows = []
+    for filing in filings:
+        rows.append(
+            {
+                "id": filing.id,
+                "form_code": filing.form_code,
+                "period_label": filing.period_label,
+                "due_date": filing.due_date,
+                "blocked_reason": _filing_blocked_reason(filing, busy),
+            }
+        )
+
+    eligibility = _pro_bono_eligibility(business)
+    queued = _queued_request_of(business)
+    request = None
+    if queued is not None:
+        request = _pro_bono_details(queued)
+    return {
+        "eligible": eligibility["eligible"],
+        "reason": eligibility["reason"],
+        "request": request,
+        "filings": rows,
+    }
+
+
+def join_pro_bono_queue(business, filing_ids: list, note: str) -> dict:
+    """An eligible business asks for free help with some filings: a `queued` request.
+
+    409 NOT_ELIGIBLE_FOR_PRO_BONO (not micro), 409 PRO_BONO_ALREADY_QUEUED (one at a time),
+    404 FILING_NOT_FOUND, 409 FILING_ALREADY_FILED / FILING_ALREADY_REQUESTED.
+    """
+    if not _pro_bono_eligibility(business)["eligible"]:
+        raise ApiError(409, "NOT_ELIGIBLE_FOR_PRO_BONO", "Free help is for micro enterprises only.")
+    if _queued_request_of(business) is not None:
+        raise ApiError(409, "PRO_BONO_ALREADY_QUEUED", "You are already in the pro-bono queue.")
+
+    # Each filing once, in the order sent.
+    unique_ids = []
+    for filing_id in filing_ids:
+        if filing_id not in unique_ids:
+            unique_ids.append(filing_id)
+
+    filings = compliance_service.get_filings_by_ids(unique_ids)
+    busy = _busy_filing_ids(unique_ids)
+    for filing_id in unique_ids:
+        filing = filings.get(filing_id)
+        if filing is None or filing.business_id != business.id:
+            raise ApiError(404, "FILING_NOT_FOUND", "One of the filings was not found.")
+        if filing.status in FILED_STATUSES:
+            raise ApiError(409, "FILING_ALREADY_FILED", f"{filing.period_label} is already filed.")
+        if filing_id in busy:
+            raise ApiError(
+                409,
+                "FILING_ALREADY_REQUESTED",
+                f"{filing.period_label} is already requested from a CA or with a CA.",
+            )
+
+    request = ProBonoRequest(
+        business_id=business.id, note=note.strip(), compliance_item_ids=unique_ids
+    )
+    db.session.add(request)
+    db.session.commit()
+    log.info("Business %s joined the pro-bono queue", business.id)
+    return _pro_bono_details(request)
+
+
+def cancel_pro_bono_request(business, request_id) -> dict:
+    """The business leaves the queue (only while `queued`)."""
+    request = db.session.get(ProBonoRequest, request_id)
+    if request is None or request.business_id != business.id:
+        raise ApiError(404, "PRO_BONO_REQUEST_NOT_FOUND", "This request was not found.")
+    if request.status != ProBonoRequestStatus.QUEUED:
+        raise ApiError(409, "PRO_BONO_NOT_QUEUED", "This request is no longer in the queue.")
+    request.status = ProBonoRequestStatus.CANCELLED
+    db.session.commit()
+    return _pro_bono_details(request)
+
+
+def _month_start():
+    """The start of the current month in Indian time (slots are counted per calendar month)."""
+    today = today_in_india()
+    return datetime(today.year, today.month, 1, tzinfo=ZoneInfo("Asia/Kolkata"))
+
+
+def pro_bono_used_this_month(ca_profile_id) -> int:
+    """How many pro-bono engagements the CA started this month."""
+    stmt = select(Engagement.id).where(
+        Engagement.ca_profile_id == ca_profile_id,
+        Engagement.is_pro_bono,
+        Engagement.activated_at >= _month_start(),
+    )
+    return len(db.session.scalars(stmt).all())
+
+
+def get_pro_bono_queue(user: User) -> dict:
+    """What the CA's pro-bono page shows: their pledge, slots used, and the queue (oldest first)."""
+    ca = get_own_profile(user)
+    stmt = (
+        select(ProBonoRequest)
+        .where(ProBonoRequest.status == ProBonoRequestStatus.QUEUED)
+        .order_by(ProBonoRequest.created_at)
+    )
+    requests = []
+    for request in db.session.scalars(stmt):
+        requests.append(_pro_bono_details(request))
+    return {
+        "pledged": ca.pro_bono_slots_per_month,
+        "used_this_month": pro_bono_used_this_month(ca.id),
+        "verified": ca.verification_status == CaVerificationStatus.VERIFIED,
+        "requests": requests,
+    }
+
+
+def _catalog_service_for(filing, itr_service_code):
+    """The catalog service that fits a filing (for ITR: the business's ITR form), or None."""
+    stmt = (
+        select(CatalogService)
+        .where(CatalogService.form_code == filing.form_code, CatalogService.is_active)
+        .order_by(CatalogService.sort_order)
+    )
+    for service in db.session.scalars(stmt):
+        if _fits(service, filing, itr_service_code):
+            return service
+    return None
+
+
+def accept_pro_bono_request(user: User, request_id) -> dict:
+    """A verified CA with a free slot takes a queued request: an `active` engagement at ₹0.
+
+    409 CA_NOT_VERIFIED, 409 NO_PRO_BONO_SLOTS, 404 PRO_BONO_REQUEST_NOT_FOUND,
+    409 PRO_BONO_NOT_QUEUED (another CA was quicker, or it was cancelled),
+    409 FILING_ALREADY_REQUESTED (a filing went to another CA meanwhile).
+    """
+    ca = get_own_profile(user)
+    if ca.verification_status != CaVerificationStatus.VERIFIED:
+        raise ApiError(409, "CA_NOT_VERIFIED", "Only verified CAs can take pro-bono requests.")
+    if pro_bono_used_this_month(ca.id) >= ca.pro_bono_slots_per_month:
+        raise ApiError(409, "NO_PRO_BONO_SLOTS", "You have no free pro-bono slots left this month.")
+
+    # Lock the request, so two CAs cannot take it at the same moment.
+    request = db.session.get(ProBonoRequest, request_id, with_for_update=True)
+    if request is None:
+        raise ApiError(404, "PRO_BONO_REQUEST_NOT_FOUND", "This request was not found.")
+    if request.status != ProBonoRequestStatus.QUEUED:
+        raise ApiError(409, "PRO_BONO_NOT_QUEUED", "This request is no longer in the queue.")
+
+    business = onboarding_service.get_business(request.business_id)
+    filings = compliance_service.get_filings_by_ids(request.compliance_item_ids, lock=True)
+    busy = _busy_filing_ids(request.compliance_item_ids)
+    for filing_id in request.compliance_item_ids:
+        filing = filings.get(filing_id)
+        if filing is None or _filing_blocked_reason(filing, busy) is not None:
+            raise ApiError(
+                409,
+                "FILING_ALREADY_REQUESTED",
+                "A filing of this request is already filed or with another CA.",
+            )
+
+    now = utcnow()
+    engagement = Engagement(
+        business_id=business.id,
+        ca_profile_id=ca.id,
+        status=EngagementStatus.REQUESTED,
+        is_pro_bono=True,
+        requested_at=request.created_at,
+        responded_at=now,
+    )
+    db.session.add(engagement)
+    db.session.flush()  # gives engagement.id
+
+    itr_service_code = _itr_service_code(business)
+    items = []
+    for filing_id in request.compliance_item_ids:
+        service = _catalog_service_for(filings[filing_id], itr_service_code)
+        if service is None:
+            raise ApiError(
+                400, "SERVICE_NOT_OFFERED", "No catalog service fits one of the filings."
+            )
+        item = EngagementItem(
+            engagement_id=engagement.id,
+            compliance_item_id=filing_id,
+            service_id=service.id,
+            listed_price=0,
+            agreed_price=0,
+        )
+        db.session.add(item)
+        items.append(item)
+
+    _activate(engagement, items)  # status active, filings "With CA"
+    request.status = ProBonoRequestStatus.MATCHED
+    request.engagement_id = engagement.id
+    db.session.commit()
+    log.info("CA %s took pro-bono request %s", ca.id, request.id)
+
+    _email_business(engagement, "A CA will help you for free", "pro_bono_matched")
+    return _engagement_details(engagement)

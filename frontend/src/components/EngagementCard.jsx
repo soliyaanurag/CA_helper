@@ -94,6 +94,9 @@ export function EngagementCard({ engagement, title, children }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           <h3>{title}</h3>
+          {engagement.is_pro_bono && (
+            <Badge className="bg-purple-100 text-purple-800">Pro-bono</Badge>
+          )}
           <Badge className={STATUS_COLORS[engagement.status]}>
             {label(ENGAGEMENT_STATUS_LABELS, engagement.status)}
           </Badge>

@@ -49,6 +49,7 @@ Planned: NIC suggestion; admin editors at `/api/v1/admin/onboarding/...`.
 - `compute_profile(business, today) -> dict`: the profile values with explanations (no database writes).
 - `get_my_business(business) -> {business, profile}`.
 - `get_business(business_id) -> Business | None`: one business by id (marketplace shows its name on engagements).
+- `get_msme_tier(business) -> str | None`: the profile's MSME tier, e.g. `"micro"` (marketplace pro-bono eligibility).
 - `get_itr_form(business) -> str | None`: the profile's ITR form code, e.g. `"itr_5"` (marketplace picks the ITR
   service for it).
 - `business_of_user(user) -> Business | None`: the user's live business (marketplace ranks the CA list for it).

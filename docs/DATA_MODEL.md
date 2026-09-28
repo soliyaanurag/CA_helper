@@ -83,7 +83,7 @@ Column types are in the model files; this lists what each table is for and its k
 | `engagement_items` | one filing in an engagement | engagement_id, compliance_item_id, service_id → service_catalog, listed_price, quoted_price (the CA's quote; null unless quoted; CHECK `ck_engagement_items_quoted_price_not_negative` ≥ 0), agreed_price (null until agreed). Unique (engagement, item) |
 | `ratings` **(implemented, MA17)** | the business's review of one engagement | engagement_id (unique), stars (CHECK 1–5), review (null when empty). Deleted normally. Averages are computed, never stored |
 | `client_invites` | a CA's invitation to an existing client | ca_profile_id, email (indexed), token_hash (SHA-256, unique; the token is never stored), status, expires_at, accepted_business_id → businesses |
-| `pro_bono_requests` | a business in the pro-bono queue | business_id, status, note, engagement_id → engagements (unique; null while queued) |
+| `pro_bono_requests` **(implemented, MA16)** | a business in the pro-bono queue | business_id, status (`queued` / `matched` / `cancelled`), note, compliance_item_ids (uuid[]: the filings asked for; not a foreign key), engagement_id → engagements (unique; null while queued) |
 
 ### ca_workspace (`models/ca_workspace.py`)
 | Table | One row is... | Key fields |

@@ -9,6 +9,7 @@ from app.models.marketplace import (
     CA_SPECIALIZATIONS,
     CaVerificationStatus,
     EngagementStatus,
+    ProBonoRequestStatus,
     ServiceUnit,
 )
 from app.schemas.pagination import PageArgsSchema, PageSchema
@@ -286,6 +287,8 @@ class EngagementSchema(Schema):
     items = fields.List(fields.Nested(EngagementItemSchema), required=True)
     # The business's rating once it rated the completed engagement (null before).
     rating = fields.Nested(RatingSchema, allow_none=True)
+    # A free engagement from the pro-bono queue (prices are 0).
+    is_pro_bono = fields.Boolean(required=True)
 
 
 class QuotePriceInputSchema(Schema):
@@ -314,3 +317,53 @@ class RatingInputSchema(Schema):
         required=True, validate=validate.Range(1, 5, error="Choose 1 to 5 stars.")
     )
     review = fields.String(load_default="", validate=validate.Length(max=2000))
+
+
+# --- Pro-bono queue (MA16) --------------------------------------------------------------
+
+
+class ProBonoFilingSchema(Schema):
+    id = fields.UUID(required=True)
+    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    period_label = fields.String(required=True)
+    due_date = fields.Date(required=True)
+    # Why it cannot be chosen ("Already filed." ...); null when it can.
+    blocked_reason = fields.String(allow_none=True)
+
+
+class ProBonoRequestSchema(Schema):
+    id = fields.UUID(required=True)
+    status = fields.Enum(ProBonoRequestStatus, by_value=True, required=True)
+    note = fields.String(required=True)
+    created_at = fields.DateTime(required=True)
+    business_name = fields.String(required=True)
+    filings = fields.List(fields.Nested(ProBonoFilingSchema), required=True)
+
+
+class ProBonoPageSchema(Schema):
+    """GET /marketplace/pro-bono: what the business's pro-bono page shows."""
+
+    eligible = fields.Boolean(required=True)
+    reason = fields.String(required=True)
+    request = fields.Nested(ProBonoRequestSchema, allow_none=True)  # its queued request
+    filings = fields.List(fields.Nested(ProBonoFilingSchema), required=True)
+
+
+class ProBonoJoinInputSchema(Schema):
+    """POST /marketplace/pro-bono: the filings to get free help with, and a short note."""
+
+    compliance_item_ids = fields.List(
+        fields.UUID(),
+        required=True,
+        validate=validate.Length(min=1, error="Choose at least one filing."),
+    )
+    note = fields.String(load_default="", validate=validate.Length(max=1000))
+
+
+class ProBonoQueueSchema(Schema):
+    """GET /marketplace/pro-bono-queue: the CA's pledge, slots used this month, the queue."""
+
+    pledged = fields.Integer(required=True)
+    used_this_month = fields.Integer(required=True)
+    verified = fields.Boolean(required=True)
+    requests = fields.List(fields.Nested(ProBonoRequestSchema), required=True)

@@ -17,6 +17,7 @@ export function engagement(fields) {
     activated_at: null,
     completed_at: null,
     rating: null,
+    is_pro_bono: false,
     items: [
       {
         id: "i1",

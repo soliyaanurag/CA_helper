@@ -22,6 +22,13 @@ Engagements (a business working with a CA):
     POST /api/v1/marketplace/engagements/<id>/withdraw     business  withdraw an unanswered request
     POST /api/v1/marketplace/engagements/<id>/rating       business  rate completed work (MA17)
 
+Pro-bono queue (MA16):
+    GET  /api/v1/marketplace/pro-bono                      business  eligibility, request, filings
+    POST /api/v1/marketplace/pro-bono                      business  join the queue
+    POST /api/v1/marketplace/pro-bono/<id>/cancel          business  leave the queue
+    GET  /api/v1/marketplace/pro-bono-queue                CA        pledge, slots used, the queue
+    POST /api/v1/marketplace/pro-bono/<id>/accept          CA        take a request (free work)
+
 Each route only checks who is calling, reads the input, calls one function in
 app/services/marketplace_service.py and returns its result as JSON.
 """
@@ -41,6 +48,10 @@ from app.schemas.marketplace import (
     CertificateUploadSchema,
     EngagementRequestInputSchema,
     EngagementSchema,
+    ProBonoJoinInputSchema,
+    ProBonoPageSchema,
+    ProBonoQueueSchema,
+    ProBonoRequestSchema,
     QuoteInputSchema,
     RatingInputSchema,
     RequestableFilingSchema,
@@ -241,3 +252,54 @@ def rate_engagement(data, engagement_id):
     return marketplace_service.rate_engagement(
         business, engagement_id, data["stars"], data["review"]
     )
+
+
+# --- Pro-bono queue (MA16) --------------------------------------------------------------
+
+
+# The business sees whether it may ask for free help, its queued request and its filings.
+@blp.route("/marketplace/pro-bono", methods=["GET"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, ProBonoPageSchema)
+def get_pro_bono_page():
+    business = current_business()
+    return marketplace_service.get_pro_bono_page(business)
+
+
+# The business joins the pro-bono queue with some filings.
+@blp.route("/marketplace/pro-bono", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.arguments(ProBonoJoinInputSchema)
+@blp.response(201, ProBonoRequestSchema)
+def join_pro_bono_queue(data):
+    business = current_business()
+    return marketplace_service.join_pro_bono_queue(
+        business, data["compliance_item_ids"], data["note"]
+    )
+
+
+# The business leaves the queue.
+@blp.route("/marketplace/pro-bono/<uuid:request_id>/cancel", methods=["POST"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, ProBonoRequestSchema)
+def cancel_pro_bono_request(request_id):
+    business = current_business()
+    return marketplace_service.cancel_pro_bono_request(business, request_id)
+
+
+# The CA sees their pledge, the slots used this month and the queue.
+@blp.route("/marketplace/pro-bono-queue", methods=["GET"])
+@roles_required(UserRole.CA)
+@blp.response(200, ProBonoQueueSchema)
+def get_pro_bono_queue():
+    user = current_user()
+    return marketplace_service.get_pro_bono_queue(user)
+
+
+# The CA takes a request from the queue: a free engagement starts at once.
+@blp.route("/marketplace/pro-bono/<uuid:request_id>/accept", methods=["POST"])
+@roles_required(UserRole.CA)
+@blp.response(200, EngagementSchema)
+def accept_pro_bono_request(request_id):
+    user = current_user()
+    return marketplace_service.accept_pro_bono_request(user, request_id)

@@ -94,12 +94,25 @@ for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
   review up to 2,000 characters; `rate_engagement()`, 409 `ALREADY_RATED` / `INVALID_STATUS`). The average (one
   decimal, computed live by `rating_summary()`) and count show on Find a CA cards and the CA page, which also
   lists the latest 5 reviews (`latest_reviews()`), anonymous (no business name). Each engagement response has
-  `rating` (null before). Frontend: `components/Stars.jsx` (`Stars`, `RatingSummary`), the rating form on the
+  `rating` (null before) and `is_pro_bono`. Frontend: `components/Stars.jsx` (`Stars`, `RatingSummary`), the rating form on the
   business's completed engagements (`MyEngagementsPage`), the Ratings card on `CaDetailPage`, the rating on the
   engagement card for both sides. No editing, no CA replies yet. Tests: the MA17 section of
   `tests/test_marketplace_engagements.py`; `MyEngagementsPage`, `CaDetailPage`, `MarketplacePage` tests.
-- **Not yet:** OCR of the certificate, the admin catalog editor, CA capacity limits, the pro-bono queue, objective
-  CA metrics (response time, completion rate), the in-app notification tray (engagement news is email only).
+- **Pro-bono queue (MA16):** a business whose computed MSME tier is **micro** (`PRO_BONO_TIERS`,
+  `onboarding_service.get_msme_tier`) picks filings and joins the queue (`join_pro_bono_queue`; one queued
+  request at a time, filings must not be filed or in an open engagement; stored in
+  `pro_bono_requests.compliance_item_ids`). It can leave while queued. A **verified** CA with free slots this
+  calendar month (`pro_bono_slots_per_month` minus pro-bono engagements activated since the 1st, Indian time)
+  sees the queue oldest first and takes a request (`accept_pro_bono_request`): the request row is locked, the
+  filings re-checked, and an engagement is created **already `active`**, `is_pro_bono`, every price 0, with the
+  catalog service that fits each filing (ITR by the business's form); the filings become "With CA", the request
+  `matched`, the business is emailed (`pro_bono_matched.txt`). Queued filings are not reserved: if the business
+  gives one to a paid CA meanwhile, taking the request answers 409 `FILING_ALREADY_REQUESTED`. Pages:
+  `pages/business/ProBonoPage.jsx` (`/business/pro-bono`, nav "Pro-bono help") and `pages/ca/CaProBonoPage.jsx`
+  (`/ca/pro-bono`, nav "Pro-bono queue"); a "Pro-bono" badge on engagement cards. Tests: the MA16 section of
+  `tests/test_marketplace_engagements.py`, `ProBonoPage.test.jsx`, `CaProBonoPage.test.jsx`.
+- **Not yet:** OCR of the certificate, the admin catalog editor, CA capacity limits, objective CA metrics
+  (response time, completion rate), the in-app notification tray (engagement news is email only).
 
 ## Tables
 - `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
@@ -144,6 +157,11 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 | POST | `/api/v1/marketplace/engagements/<id>/reject-quote` | business | `quoted` → `cancelled` |
 | POST | `/api/v1/marketplace/engagements/<id>/withdraw` | business | `requested` → `cancelled` |
 | POST | `/api/v1/marketplace/engagements/<id>/rating` | business | body `{stars (1–5), review?}` on a `completed` engagement → the engagement with `rating`; 409 `ALREADY_RATED`, 409 `INVALID_STATUS` (not completed), 404 another business's |
+| GET | `/api/v1/marketplace/pro-bono` | business | `{eligible, reason, request (its queued one or null), filings: [{id, form_code, period_label, due_date, blocked_reason}]}` · 404 `BUSINESS_NOT_FOUND` |
+| POST | `/api/v1/marketplace/pro-bono` | business | body `{compliance_item_ids (≥1), note?}` → 201 the request (`queued`) · 409 `NOT_ELIGIBLE_FOR_PRO_BONO`, `PRO_BONO_ALREADY_QUEUED`, `FILING_ALREADY_FILED`, `FILING_ALREADY_REQUESTED`; 404 `FILING_NOT_FOUND` |
+| POST | `/api/v1/marketplace/pro-bono/<id>/cancel` | business | `queued` → `cancelled` · 409 `PRO_BONO_NOT_QUEUED` |
+| GET | `/api/v1/marketplace/pro-bono-queue` | ca | `{pledged, used_this_month, verified, requests}` (queued, oldest first) · 404 `CA_PROFILE_NOT_FOUND` |
+| POST | `/api/v1/marketplace/pro-bono/<id>/accept` | ca | → the new engagement (`active`, `is_pro_bono`, prices 0) · 409 `CA_NOT_VERIFIED`, `NO_PRO_BONO_SLOTS`, `PRO_BONO_NOT_QUEUED`, `FILING_ALREADY_REQUESTED` |
 
 Every engagement response is `{id, status, ca_profile_id, ca_name, business_name, quote_reason, requested_at,
 expires_at, responded_at, activated_at, completed_at, items: [{id, compliance_item_id, form_code, period_label,

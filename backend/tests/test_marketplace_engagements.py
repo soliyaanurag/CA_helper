@@ -984,3 +984,138 @@ def test_average_and_reviews_show_on_the_ca_list_and_page(client, setup, add_fil
     assert [review["stars"] for review in page["reviews"]] == [4, 5]  # newest first
     assert page["reviews"][0]["review"] is None
     assert "business_name" not in page["reviews"][0]  # anonymous
+
+
+# --- MA16: pro-bono queue -----------------------------------------------------------------
+
+
+def _pledge(database, ca_profile, slots):
+    ca_profile.pro_bono_slots_per_month = slots
+    database.session.commit()
+
+
+def _join(client, s, filings, note=""):
+    ids = []
+    for filing in filings:
+        ids.append(str(filing.id))
+    body = {"compliance_item_ids": ids, "note": note}
+    return client.post(f"{BASE}/pro-bono", json=body, headers=s["business_headers"])
+
+
+def test_pro_bono_page_for_a_micro_business(client, setup, database):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+
+    page = client.get(f"{BASE}/pro-bono", headers=setup["business_headers"]).get_json()
+
+    assert page["eligible"] is True
+    assert page["request"] is None
+    assert [row["blocked_reason"] for row in page["filings"]] == [None, None]
+
+
+def test_only_micro_businesses_may_ask(client, setup, database):
+    # No regulatory profile at all, then a small (not micro) one.
+    assert (
+        client.get(f"{BASE}/pro-bono", headers=setup["business_headers"]).get_json()["eligible"]
+        is False
+    )
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    profile = database.session.query(RegulatoryProfile).one()
+    profile.msme_tier = MsmeTier.SMALL
+    database.session.commit()
+
+    response = _join(client, setup, [setup["gst_3b"]])
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "NOT_ELIGIBLE_FOR_PRO_BONO"
+
+
+def test_joining_and_leaving_the_queue(client, setup, database):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+
+    joined = _join(client, setup, [setup["gst_3b"], setup["gst_3b"]], " Small shop ")
+    again = _join(client, setup, [setup["gst_1"]])
+    page = client.get(f"{BASE}/pro-bono", headers=setup["business_headers"]).get_json()
+
+    assert joined.status_code == 201
+    assert joined.get_json()["status"] == "queued"
+    assert joined.get_json()["note"] == "Small shop"
+    assert len(joined.get_json()["filings"]) == 1  # the same filing once
+    assert again.get_json()["error"]["code"] == "PRO_BONO_ALREADY_QUEUED"
+    assert page["request"]["id"] == joined.get_json()["id"]
+
+    request_id = joined.get_json()["id"]
+    left = client.post(f"{BASE}/pro-bono/{request_id}/cancel", headers=setup["business_headers"])
+    twice = client.post(f"{BASE}/pro-bono/{request_id}/cancel", headers=setup["business_headers"])
+    assert left.get_json()["status"] == "cancelled"
+    assert twice.get_json()["error"]["code"] == "PRO_BONO_NOT_QUEUED"
+
+
+def test_filings_already_with_a_ca_cannot_join(client, setup, database):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    request_gst(client, setup)  # both filings requested from a paid CA
+
+    response = _join(client, setup, [setup["gst_3b"]])
+
+    assert response.get_json()["error"]["code"] == "FILING_ALREADY_REQUESTED"
+
+
+def test_ca_takes_a_request_from_the_queue(client, setup, database, mailbox):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    _pledge(database, setup["ca"], 1)
+    request_id = _join(client, setup, [setup["gst_3b"], setup["gst_1"]], "Please help").get_json()[
+        "id"
+    ]
+    mailbox.clear()
+
+    queue = client.get(f"{BASE}/pro-bono-queue", headers=setup["ca_headers"]).get_json()
+    assert (queue["pledged"], queue["used_this_month"], queue["verified"]) == (1, 0, True)
+    assert queue["requests"][0]["business_name"] == "Asha Traders"
+
+    response = client.post(f"{BASE}/pro-bono/{request_id}/accept", headers=setup["ca_headers"])
+
+    engagement = response.get_json()
+    assert response.status_code == 200
+    assert engagement["status"] == "active"
+    assert engagement["is_pro_bono"] is True
+    assert {item["agreed_price"] for item in engagement["items"]} == {"0.00"}
+    database.session.expire_all()
+    assert database.session.get(ComplianceItem, setup["gst_3b"].id).status == "with_ca"
+    assert "for free" in mailbox[0].get_content()
+    after = client.get(f"{BASE}/pro-bono-queue", headers=setup["ca_headers"]).get_json()
+    assert (after["used_this_month"], after["requests"]) == (1, [])
+
+
+def test_pro_bono_slots_and_verification(client, setup, database, make_ca, auth_headers):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    request_id = _join(client, setup, [setup["gst_3b"]]).get_json()["id"]
+    unverified_user, unverified = make_ca({}, status=CaVerificationStatus.PENDING, name="New CA")
+    _pledge(database, unverified, 2)
+
+    def accept(headers):
+        response = client.post(f"{BASE}/pro-bono/{request_id}/accept", headers=headers)
+        return response.get_json()["error"]["code"]
+
+    assert accept(setup["ca_headers"]) == "NO_PRO_BONO_SLOTS"  # pledged 0
+    assert accept(auth_headers(unverified_user)) == "CA_NOT_VERIFIED"
+    _pledge(database, setup["ca"], 1)
+    client.post(f"{BASE}/pro-bono/{request_id}/cancel", headers=setup["business_headers"])
+    assert accept(setup["ca_headers"]) == "PRO_BONO_NOT_QUEUED"
+
+
+def test_a_filing_taken_meanwhile_stops_the_match(client, setup, database):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    _pledge(database, setup["ca"], 1)
+    request_id = _join(client, setup, [setup["gst_3b"]]).get_json()["id"]
+    request_gst(client, setup)  # the business then asked a paid CA for the same filing
+
+    response = client.post(f"{BASE}/pro-bono/{request_id}/accept", headers=setup["ca_headers"])
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "FILING_ALREADY_REQUESTED"
+
+
+def test_pro_bono_pages_are_for_their_role(client, setup):
+    assert (
+        client.get(f"{BASE}/pro-bono-queue", headers=setup["business_headers"]).status_code == 403
+    )
+    assert client.get(f"{BASE}/pro-bono", headers=setup["ca_headers"]).status_code == 403

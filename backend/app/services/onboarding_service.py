@@ -6,6 +6,7 @@ get_my_business(business) -> dict         the business with its profile
 list_states() -> list[dict]               the states / UTs for the form, with their GST codes
 compute_profile(business, today) -> dict  the profile values plus a "why" for each (ON5, ON6)
 get_business(business_id) -> Business     one business by id (used by marketplace)
+get_msme_tier(business) -> str | None     "micro", "small", ... (used by marketplace pro-bono)
 get_itr_form(business) -> str | None      its profile's ITR form, e.g. "itr_5" (used by marketplace)
 
 The profile is computed from legal thresholds stored in `rule_thresholds` (read
@@ -335,3 +336,13 @@ def business_of_user(user: User) -> Business | None:
     return db.session.scalar(
         select(Business).where(Business.user_id == user.id, Business.deleted_at.is_(None))
     )
+
+
+def get_msme_tier(business: Business) -> str | None:
+    """The MSME tier of the business's regulatory profile, e.g. "micro" (None without a profile)."""
+    profile = db.session.scalar(
+        select(RegulatoryProfile).where(RegulatoryProfile.business_id == business.id)
+    )
+    if profile is None:
+        return None
+    return profile.msme_tier.value
