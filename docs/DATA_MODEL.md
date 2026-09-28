@@ -108,7 +108,7 @@ Column types are in the model files; this lists what each table is for and its k
 ### admin (`models/admin.py`)
 | Table | One row is... | Key fields |
 |---|---|---|
-| `admin_audit_log` | one admin action | admin_id → users (indexed), action, target_type, target_id (no FK: any table), details (JSONB, never PII or document contents). Append-only |
+| `admin_audit_log` | one admin action | admin_id → users (indexed), action, target_type, target_id (no FK: any table), details (JSONB, never PII or document contents). Append-only. Actions so far: `ca_profile.verify`, `ca_profile.reject` (`{reason}`), `user.suspend` (`{reason, cancelled_requests}`), `user.reactivate` |
 
 ## Relationships
 

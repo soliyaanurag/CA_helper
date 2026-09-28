@@ -27,7 +27,7 @@ Admin. 3-person MTech CSE lab project (IIT Bombay); every file must be explainab
 
 ## Folder map
 ```
-backend/app/__init__.py      create_app() · config.py extensions.py errors.py seed.py (`flask seed`)
+backend/app/__init__.py      create_app() · config.py extensions.py errors.py seed.py (`flask seed`) demo_seed.py
 backend/app/models/          base.py (BaseModel, mixins) enums.py <m>.py (one per module) · __init__.py imports all
 backend/app/schemas/         <m>.py (marshmallow request/response shapes)
 backend/app/services/        <m>_service.py (business logic, all DB access)

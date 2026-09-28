@@ -89,6 +89,7 @@ without activating the env yourself.
 make infra          # Postgres + Mailpit in Docker (waits until healthy)
 make migrate        # apply database migrations
 make seed           # demo users, one per role (logins in "Quick start (manual)")
+make seed-demo      # optional: fictional demo data for every flow ("Demo script" below)
 make dev-backend    # API (python main.py) with auto-reload -> http://localhost:8000
 make dev-worker     # background jobs (APScheduler), separate process
 make dev-frontend   # Vite dev server                      -> http://localhost:5173
@@ -101,6 +102,29 @@ make dev-frontend   # Vite dev server                      -> http://localhost:5
 | API routes | http://localhost:8000/api/v1/... (see API docs) |
 | API docs (Swagger UI) | http://localhost:8000/api/docs |
 | Mailpit (caught emails) | http://localhost:8025 |
+
+## Demo script
+
+`make seed-demo` adds fictional demo data once (`backend/app/demo_seed.py`; it runs `make seed` first): 14
+businesses, their filings for this financial year, engagements of the demo CA in every status, documents,
+document requests, notifications, ratings, a pro-bono request and a CA waiting for verification. Every name,
+PAN, GSTIN and file is made up. It gives `business@demo.local` a business (Asha Traders) only if that account has
+none yet. To start again from scratch, empty the database (`docker compose down -v`, then `make infra migrate
+seed-demo`).
+
+Every demo business logs in with the business password (`DEMO_BUSINESS_PASSWORD`, `DemoBusiness#2026`):
+`business@demo.local`, then `demo-biz-01@demo.local` to `demo-biz-13@demo.local`.
+
+A 10-minute walk through every flow:
+
+| Minutes | Log in as | Show |
+|---|---|---|
+| 0–1 | (new) `/signup` | Sign up as a business; the code arrives in Mailpit; register a business and read the "why" of each profile line |
+| 1–3 | `business@demo.local` | Dashboard: next deadline, overdue count, penalty exposure, the CA's document request in "To do", the bell. Calendar → an overdue filing (late fees) → an upcoming GSTR-3B: "How similar businesses file it" (10 micro proprietorships), the checklist with linked files, "Your CA asked for documents" (answer it from the vault) |
+| 3–4 | `business@demo.local` | Document vault: filters, open a file, try to delete an acknowledgement (refused). Find a CA, typical fees, My engagements (completed and rated, active) |
+| 4–7 | `ca@demo.local` | My clients: three clients by urgency with "Why flagged". Asha Traders: profile, files (Open), the fulfilled request, ask for a document, **Mark as filed** with an ARN. Deadline batches: one GSTR-3B due date for three clients. My engagements: a new request (accept), a quote waiting, declined / expired / cancelled ones. Pro-bono queue: take the freelancer's request |
+| 7–8 | `demo-biz-04@demo.local` | My engagements: accept or reject the CA's quote |
+| 8–10 | `admin@demo.local` | Dashboard: filings by status and the overdue rate. Users & CAs: review the pending CA (Tanvi Kulkarni), open the certificate, verify. Suspend a business, then try to log in as it (refused), reactivate. Audit log: every action just taken |
 
 ## Team workflow
 
@@ -180,6 +204,7 @@ these targets or `conda run`; an activated env is only for running things by han
 | `make migrate` | apply migrations | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db upgrade` |
 | `make migration name="onboarding: add businesses"` | new migration | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db migrate -m "onboarding: add businesses"` |
 | `make seed` | dev seed data | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed` |
+| `make seed-demo` | fictional demo data (runs once) | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed-demo` |
 | `make test` | all tests (backend needs `make infra`) | `conda run --no-capture-output -n ca-helper --cwd backend pytest`, then `conda run --no-capture-output -n ca-helper --cwd frontend npm test` |
 | `make lint` | ruff + ESLint + Prettier | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `conda run -n ca-helper --cwd frontend npm run lint` (then `format:check`) |
 | `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend`, `conda run -n ca-helper ruff format backend`, `conda run -n ca-helper --cwd frontend npm run format` |

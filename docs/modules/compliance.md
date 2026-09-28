@@ -8,8 +8,16 @@ The whole business side of a filing works: templates, due dates and filing creat
 (CO4), the filing page (CO5) with the form's content (CO6), checklist ticks (CO7), choosing a path (CO8), marking it
 filed with the acknowledgement (CO9), the status lifecycle up to `filed` (CO10), the hourly overdue job (CO11) and
 the dashboard numbers (CO12). The penalty estimate on the filing page and the dashboard comes from the alerts
-module (AL5; its own endpoints, shown by `FilingPage` and `BusinessDashboardPage`). Not yet: `filed_verified` (needs
-OCR, DO8), peer insights (CO13).
+module (AL5; its own endpoints, shown by `FilingPage` and `BusinessDashboardPage`). Peer insights (CO13) and the
+admin's filing numbers (AD5) are below. Not yet: `filed_verified` from OCR (DO8; the demo seed sets it by hand).
+- **Peer insights (CO13):** `peer_insights(business, item_id)`: over the **filed** filings of the same form, the
+  share filed by the business itself vs through a CA (`filing_path`) and each path's on-time rate (`filed_on_time`:
+  the Indian date of `filed_at` ≤ `due_date`). The segment is the same entity type and MSME tier
+  (`onboarding_service.business_ids_in_segment`); it is shown only when at least `MIN_PEER_BUSINESSES` (10, a product
+  rule from SCOPE.md, not a legal value) businesses filed that form; otherwise the figures over every business
+  (`scope: "overall"`), or nothing (`"none"`). The filing page shows it in "How similar businesses file it".
+- **Admin numbers (AD5):** `filing_stats(today)`: live filings by status, the filings due so far, how many were
+  late (still unfiled, or filed after the due date) and `overdue_rate` (late / due, %). Used by `admin_service.get_stats`.
 - **Backend** (`services/compliance_service.py`, `routes/compliance.py`, `schemas/compliance.py`):
   - Filings: `financial_year_start()`, `fy_label()`, `periods_of_year()`, `due_date()` (reads the template's
     `due_date_rule`), `sync_filings(business_id, profile, today, keep_ids)` (makes this year's filings match the
@@ -99,6 +107,7 @@ Created by migration `schema: complete data model`. Columns, constraints and sta
 | POST | `/api/v1/compliance/items/{id}/mark-filed` | business | multipart: `acknowledgement_no` and `file` (both optional) → the filing page · 409 `FILING_WITH_CA`, `ALREADY_FILED` · storage errors (`FILE_TYPE_NOT_ALLOWED`, `FILE_TOO_LARGE`, `FILE_EMPTY`) |
 | POST | `/api/v1/compliance/items/{id}/unmark-filed` | business | → the filing page · 409 `NOT_SELF_FILED` |
 | GET | `/api/v1/compliance/items/{id}/acknowledgement` | business | the file · 404 `ACKNOWLEDGEMENT_MISSING` |
+| GET | `/api/v1/compliance/items/{id}/peer-insights` | business | `{form_code, scope ("segment", "overall", "none"), entity_type, msme_tier, min_businesses, business_count, filing_count, self, ca}`; `self` / `ca` = `{count, share_pct, on_time_pct}` or null · 404 `FILING_NOT_FOUND` |
 | GET | `/api/v1/compliance/forms/{form_code}` | any logged-in user | `{form_code, status, explanation, instructions, checklist}` · 404 `FORM_NOT_FOUND` |
 
 Planned: admin editors at `/api/v1/admin/compliance/...`; the CA's side of a filing (CW3, CW5).
