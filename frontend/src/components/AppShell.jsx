@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router";
 
+import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { USER_ROLE_LABELS } from "@/lib/labels";
@@ -8,7 +9,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Layout for the logged-in areas (/business, /ca, /admin): sidebar with the
- * role's links, user name, change password + logout, and the current page (<Outlet />).
+ * notification bell, the role's links, user name, change password + logout, and the
+ * current page (<Outlet />).
  * `nav` is a list of { label, path } links (NAV in routes.jsx).
  *
  * The sidebar is exactly one screen tall and stays in place while the page scrolls
@@ -23,10 +25,15 @@ export function AppShell({ role, nav }) {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-muted/40 p-4">
-        <Link to={home} className="text-lg font-semibold">
-          CA Helper
-        </Link>
-        <p className="text-xs text-muted-foreground">{title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <Link to={home} className="text-lg font-semibold">
+              CA Helper
+            </Link>
+            <p className="text-xs text-muted-foreground">{title}</p>
+          </div>
+          <NotificationBell />
+        </div>
         <nav
           className="mt-6 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
           aria-label={`${title} navigation`}

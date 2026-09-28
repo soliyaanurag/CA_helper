@@ -11,7 +11,8 @@ Anyone may add rows for values their module needs.
 **Current status:** the onboarding thresholds (`rule_thresholds`) and the compliance due-date rules
 (`obligation_templates`) are **seeded with proposed values** in `backend/app/seed.py`, every row with `TODO_VERIFY`
 in its `source_reference`. The proposed values below are what the code uses today; **none has been checked against
-an official source yet.** Rows without a value (penalties, the salary limit) are not used by any code yet. Section
+an official source yet.** The penalty rules are seeded with no amounts at all (NULL), so the estimator shows
+"pending"; the salary limit has no value and is not used by any code yet. Section
 names and descriptions in the "What" columns are pointers for the verifier and must be confirmed too.
 Seeded rows are effective from 1 April 2025.
 
@@ -57,12 +58,24 @@ Seeded rows are effective from 1 April 2025.
 
 ## Penalties (alerts)
 
-| Key | What | Value | Official source | Verified by / date |
+Table `penalty_rules`, one row per form, seeded by `seed_penalty_rules()` (`PENALTY_RULES` in `app/seed.py`) with
+**every amount NULL**: the estimator shows "pending" for a NULL amount and never treats it as 0. To fill one, set
+the columns below from the official source, then remove `TODO_VERIFY` from `source_reference` (a later small PR).
+The sections in the seeded `source_reference` are pointers only and must be checked too.
+
+| Form (`form_code`) | Columns to fill | Value | Official source | Verified by / date |
 |---|---|---|---|---|
-| `penalty.gst.late_fee.*` | Late fee per day and cap for GSTR-1 / GSTR-3B / CMP-08 / GSTR-4 (incl. nil returns) | — TODO_VERIFY | | |
-| `penalty.gst.interest_rate` | Interest on late GST payment | — TODO_VERIFY | | |
-| `penalty.tds.late_fee` | Late fee for late 24Q/26Q statements | — TODO_VERIFY | | |
-| `penalty.itr.late_fee.*` | Late fee for a belated ITR (by income slab) | — TODO_VERIFY | | |
+| GSTR-1 (`gstr_1`) | `late_fee_per_day`, `max_late_fee`, `nil_return_late_fee_per_day`, `annual_interest_rate` | Seeded: all NULL — TODO_VERIFY | | |
+| GSTR-3B (`gstr_3b`) | same | Seeded: all NULL — TODO_VERIFY | | |
+| CMP-08 (`cmp_08`) | same | Seeded: all NULL — TODO_VERIFY | | |
+| GSTR-4 (`gstr_4`) | same | Seeded: all NULL — TODO_VERIFY | | |
+| 24Q (`tds_24q`) | `late_fee_per_day`, `max_late_fee`, `annual_interest_rate` | Seeded: all NULL — TODO_VERIFY | | |
+| 26Q (`tds_26q`) | same | Seeded: all NULL — TODO_VERIFY | | |
+| ITR (`itr`) | `flat_late_fee` (a fixed fee, not per day), `annual_interest_rate` | Seeded: all NULL — TODO_VERIFY | | |
+
+Known limits of the table (decide when verifying): one rule per form and period, so a fee or cap that depends on
+turnover or income (GST late-fee caps, the ITR fee by income) needs a choice of which value to store, or a later
+column.
 
 ## Verified values
 _None yet._ Move rows here (with value + source) once verified.

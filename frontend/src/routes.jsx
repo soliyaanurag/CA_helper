@@ -19,6 +19,7 @@ import { TypicalFeesPage } from "@/pages/business/TypicalFeesPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { ProBonoPage } from "@/pages/business/ProBonoPage";
 import { RequestCaPage } from "@/pages/business/RequestCaPage";
+import { CaAlertsPage } from "@/pages/ca/CaAlertsPage";
 import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
 import { CaEngagementsPage } from "@/pages/ca/CaEngagementsPage";
 import { CaProBonoPage } from "@/pages/ca/CaProBonoPage";
@@ -61,6 +62,7 @@ export const NAV = {
     { label: "My engagements", path: "/ca/engagements" },
     { label: "Pro-bono queue", path: "/ca/pro-bono" },
     { label: "My clients", path: "/ca/clients" },
+    { label: "Notification settings", path: "/ca/alerts" },
   ],
   admin: [
     { label: "Dashboard", path: "/admin" },
@@ -123,6 +125,7 @@ export const appRoutes = [
     { path: "engagements", element: <CaEngagementsPage /> },
     { path: "pro-bono", element: <CaProBonoPage /> },
     { path: "clients", element: <CaWorkspacePage /> },
+    { path: "alerts", element: <CaAlertsPage /> },
   ]),
   roleArea("admin", [
     { index: true, element: <AdminDashboardPage /> },

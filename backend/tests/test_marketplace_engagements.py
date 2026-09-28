@@ -5,6 +5,7 @@ MA10  POST /marketplace/engagements/<id>/accept | quote | decline
       POST /marketplace/engagements/<id>/accept-quote | reject-quote | withdraw
 MA11  POST /marketplace/engagements/<id>/complete (and filings become "With CA")
 MA13  GET  /marketplace/my-engagements, GET /marketplace/ca-engagements
+AL1   every engagement event also adds a tray entry (alerts_service.notify)
 """
 
 import uuid
@@ -25,6 +26,7 @@ from app.models import (
     Document,
     Engagement,
     EngagementItem,
+    Notification,
     ObligationTemplate,
     RegulatoryProfile,
 )
@@ -1119,3 +1121,106 @@ def test_pro_bono_pages_are_for_their_role(client, setup):
         client.get(f"{BASE}/pro-bono-queue", headers=setup["business_headers"]).status_code == 403
     )
     assert client.get(f"{BASE}/pro-bono", headers=setup["ca_headers"]).status_code == 403
+
+
+# --- AL1: every engagement event also reaches the tray ---------------------------------
+
+
+def tray(database, user):
+    """[(title, body, link)] of the user's tray entries, oldest first."""
+    rows = (
+        database.session.query(Notification)
+        .filter_by(user_id=user.id)
+        .order_by(Notification.created_at)
+    )
+    return [(note.title, note.body, note.link) for note in rows]
+
+
+def test_a_new_request_reaches_the_cas_tray_and_inbox(client, setup, database, mailbox):
+    request_gst(client, setup)
+
+    assert tray(database, setup["ca_user"]) == [
+        (
+            "New request from Asha Traders",
+            "Asha Traders asked you to handle 2 filing(s). Answer within 48 hours.",
+            "/ca/engagements",
+        )
+    ]
+    assert mailbox[0]["To"] == setup["ca_user"].email  # the email is unchanged
+
+
+@pytest.mark.parametrize(
+    "name, title, text",
+    [
+        ("accept", "Your CA accepted your request", "accepted your request"),
+        ("decline", "Your CA declined your request", "declined your request"),
+        ("quote", "Your CA sent you a quote", "sent a new price. Reason: More invoices"),
+    ],
+)
+def test_the_cas_answer_reaches_the_business_tray(
+    client, setup, database, mailbox, name, title, text
+):
+    engagement = request_gst(client, setup)
+    mailbox.clear()
+    body = None
+    if name == "quote":
+        prices = [
+            {"engagement_item_id": item["id"], "price": "900"} for item in engagement["items"]
+        ]
+        body = {"reason": "More invoices", "prices": prices}
+
+    action(client, setup["ca_headers"], engagement["id"], name, body)
+
+    [(tray_title, tray_body, link)] = tray(database, setup["owner"])
+    assert tray_title == title
+    assert tray_body.startswith(f"Meera Shah {text}")
+    assert link == "/business/engagements"
+    assert len(mailbox) == 1  # the email is still sent
+
+
+def test_completion_reaches_the_business_tray_without_email(client, setup, database, mailbox):
+    engagement = request_gst(client, setup)
+    action(client, setup["ca_headers"], engagement["id"], "accept")
+    mailbox.clear()
+
+    action(client, setup["ca_headers"], engagement["id"], "complete")
+
+    assert tray(database, setup["owner"])[-1][0] == "Your CA completed the work"
+    assert mailbox == []
+
+
+def test_an_expired_request_reaches_the_business_tray(client, setup, database):
+    engagement = request_gst(client, setup)
+    _make_overdue(database, engagement["id"])
+
+    marketplace_service.expire_old_requests()
+
+    [(title, body, _)] = tray(database, setup["owner"])
+    assert title == "Your CA request expired"
+    assert "Choose another CA for: GSTR-3B filing, GSTR-1 filing." in body
+
+
+def test_a_pro_bono_match_reaches_the_business_tray(client, setup, database):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    _pledge(database, setup["ca"], 1)
+    request_id = _join(client, setup, [setup["gst_3b"]]).get_json()["id"]
+
+    client.post(f"{BASE}/pro-bono/{request_id}/accept", headers=setup["ca_headers"])
+
+    assert tray(database, setup["owner"]) == [
+        (
+            "A CA will help you for free",
+            "Meera Shah took your pro-bono request.",
+            "/business/engagements",
+        )
+    ]
+
+
+def test_a_refused_action_adds_nothing_to_the_tray(client, setup, database):
+    engagement = request_gst(client, setup)
+    action(client, setup["ca_headers"], engagement["id"], "decline")
+
+    response = action(client, setup["ca_headers"], engagement["id"], "accept")
+
+    assert response.status_code == 409
+    assert [row[0] for row in tray(database, setup["owner"])] == ["Your CA declined your request"]

@@ -68,10 +68,10 @@ Column types are in the model files; this lists what each table is for and its k
 ### alerts (`models/alerts.py`)
 | Table | One row is... | Key fields |
 |---|---|---|
-| `notifications` (SD) | a tray entry | user_id → users (indexed), type, title, body, link, read_at. Soft-deleted when dismissed |
-| `notification_settings` | a user's email preference for one type | user_id, type, email_enabled. Unique (user, type); no row = email on |
-| `reminder_log` | a reminder already sent | compliance_item_id, kind, sent_at. Unique (item, kind): never sent twice |
-| `penalty_rules` | late fee and interest for one form | form_code, late_fee_per_day, max_late_fee (null = no cap), annual_interest_rate, nil_return_late_fee_per_day (null = same), source_reference, effective_from, effective_to. Unique (form_code, effective_from); matched by form code + date, no FK |
+| `notifications` (SD) **(implemented, AL1)** | a tray entry | user_id → users (indexed), type, title, body, link (an app path), read_at. Soft-deleted when dismissed |
+| `notification_settings` **(implemented, AL3)** | a user's email preference for one type | user_id, type, email_enabled. Unique (user, type); no row = email on. Only `deadline_reminder`, `overdue`, `document_request`, `regulatory_update` are switchable; `engagement_update` and `account` are always emailed |
+| `reminder_log` **(implemented, AL2)** | a reminder already sent | compliance_item_id, kind, sent_at. Unique (item, kind): never sent twice |
+| `penalty_rules` **(implemented, AL4/AL5)** | late fee and interest for one form | form_code, late_fee_per_day, max_late_fee (null = no cap), **flat_late_fee** (a fixed fee charged once, e.g. the ITR; used instead of the per-day fee when set; CHECK `flat_late_fee_not_negative`), annual_interest_rate, nil_return_late_fee_per_day (null = same), source_reference, effective_from, effective_to. **Every amount is nullable: NULL = not confirmed yet** (the estimator skips it; migration `alerts: nullable penalty amounts and flat late fee`). Unique (form_code, effective_from); matched by form code + the filing's due date, no FK. Seeded: 7 rows, every amount NULL, `TODO_VERIFY` |
 
 ### marketplace (`models/marketplace.py`)
 | Table | One row is... | Key fields |

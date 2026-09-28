@@ -44,11 +44,22 @@ const DASHBOARD = {
   with_ca: 1,
 };
 
-function api(engagements = []) {
+// GET /alerts/penalties: one overdue filing, its late fee not confirmed yet.
+const EXPOSURE = {
+  total_late_fees: "0.00",
+  overdue_count: 1,
+  estimated_count: 0,
+  pending_count: 1,
+  label: "Estimate (rules pending verification)",
+  items: [],
+};
+
+function api(engagements = [], exposure = EXPOSURE) {
   return fakeApi({
     "GET /api/v1/compliance/dashboard": [200, DASHBOARD],
     "GET /api/v1/compliance/items": [200, FILINGS],
     "GET /api/v1/marketplace/my-engagements": [200, engagements],
+    "GET /api/v1/alerts/penalties": [200, exposure],
   });
 }
 
@@ -91,5 +102,26 @@ describe("business dashboard", () => {
     renderApp("/business");
 
     expect(await screen.findByRole("link", { name: "Register your business" })).toBeInTheDocument();
+  });
+
+  it("shows the penalty exposure of overdue filings, labelled as an estimate", async () => {
+    loginAs("business");
+    api();
+    renderApp("/business");
+
+    const card = (await screen.findByText(/Penalty exposure/)).closest("[data-slot=card]");
+    expect(card).toHaveTextContent("Estimate (rules pending verification)");
+    expect(card).toHaveTextContent("Not available yet");
+    expect(card).toHaveTextContent("1 of 1 have no confirmed rule yet");
+  });
+
+  it("adds up the confirmed late fees", async () => {
+    loginAs("business");
+    api([], { ...EXPOSURE, total_late_fees: "1500.00", estimated_count: 1, pending_count: 0 });
+    renderApp("/business");
+
+    const card = (await screen.findByText(/Penalty exposure/)).closest("[data-slot=card]");
+    expect(card).toHaveTextContent("₹1,500");
+    expect(card).not.toHaveTextContent("no confirmed rule");
   });
 });

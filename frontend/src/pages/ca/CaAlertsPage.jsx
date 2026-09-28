@@ -1,6 +1,6 @@
 import { NotificationSettings } from "@/components/NotificationSettings";
 
-// /business/alerts: which notifications are also emailed.
-export function AlertsPage() {
+// /ca/alerts: which notifications are also emailed.
+export function CaAlertsPage() {
   return <NotificationSettings />;
 }

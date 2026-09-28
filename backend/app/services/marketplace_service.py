@@ -24,6 +24,7 @@ active_engagement_item_ids(ca_profile_id, business_id)      filings the CA works
 open_engagement_item_ids(ca_profile_id, business_id)        filings in a request or active work
 ca_can_access_document(ca_profile_id, document_id) -> bool  a document of one of those filings?
 own_profile_id(user) -> uuid | None                          the logged-in CA's profile id
+active_ca_users_by_filing(filing_ids) -> dict               {filing id: CA user} (alerts' reminders)
 
 Ratings (MA17): rate_engagement(business, id, stars, review) after completion, once;
 rating_summary(ca_profile_id) -> {rating_average, rating_count}; latest_reviews(ca_profile_id).
@@ -45,6 +46,11 @@ Typical price range: the min, median and max price of a service across verified 
 with live accounts, worked out each time from `ca_services` (never typed in). It is
 shown only once MIN_CAS_FOR_RANGE CAs offer the service; with fewer, one or two
 prices would say little and could reveal a single CA's fee.
+
+Tray notifications (AL1): every event that emails someone (request, accept, quote, decline,
+expiry, pro-bono match) also adds a tray entry with alerts_service.notify(), before the
+commit; completion adds a tray entry only. The emails themselves are unchanged and always
+sent (engagement emails are transactional, not in the notification settings).
 
 For the admin module: list_cas_for_admin, get_ca_for_admin, certificate_document_id,
 set_verification, count_cas_by_status, count_open_engagements.
@@ -75,6 +81,7 @@ from app.models import (
     Rating,
     User,
 )
+from app.models.alerts import NotificationType
 from app.models.base import today_in_india, utcnow
 from app.models.compliance import ComplianceStatus
 from app.models.documents import DocumentType
@@ -85,7 +92,12 @@ from app.models.marketplace import (
     EngagementStatus,
     ProBonoRequestStatus,
 )
-from app.services import compliance_service, documents_service, onboarding_service
+from app.services import (
+    alerts_service,
+    compliance_service,
+    documents_service,
+    onboarding_service,
+)
 from app.utils.email import send_email
 
 log = logging.getLogger(__name__)
@@ -759,6 +771,14 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
                 listed_price=offered[service_id][1],
             )
         )
+    alerts_service.notify(
+        ca.user,
+        NotificationType.ENGAGEMENT_UPDATE,
+        f"New request from {business.legal_name}",
+        f"{business.legal_name} asked you to handle {len(chosen)} filing(s). "
+        "Answer within 48 hours.",
+        "/ca/engagements",
+    )
     db.session.commit()
     log.info("Engagement %s requested with %d filings", engagement.id, len(chosen))
 
@@ -899,6 +919,21 @@ def _activate(engagement: Engagement, items: list[EngagementItem]) -> None:
     compliance_service.mark_filings_with_ca(filing_ids)
 
 
+def _notify_business(engagement: Engagement, title: str, text: str) -> None:
+    """Add a tray entry for the owner of the engagement's business: the body is the CA's
+    name followed by `text`. Does not commit."""
+    business = onboarding_service.get_business(engagement.business_id)
+    owner = db.session.get(User, business.user_id)
+    ca = db.session.get(CaProfile, engagement.ca_profile_id)
+    alerts_service.notify(
+        owner,
+        NotificationType.ENGAGEMENT_UPDATE,
+        title,
+        f"{ca.user.full_name} {text}",
+        "/business/engagements",
+    )
+
+
 def _email_business(engagement: Engagement, subject: str, template: str, **context) -> None:
     """Email the owner of the engagement's business (call after committing)."""
     business = onboarding_service.get_business(engagement.business_id)
@@ -936,6 +971,11 @@ def accept_request(user: User, engagement_id) -> dict:
         item.agreed_price = item.listed_price
     engagement.responded_at = utcnow()
     _activate(engagement, items)
+    _notify_business(
+        engagement,
+        "Your CA accepted your request",
+        "accepted your request at their listed prices. The work has started.",
+    )
     db.session.commit()
     _email_business(engagement, "Your CA accepted your request", "engagement_accepted")
     return _engagement_details(engagement)
@@ -970,6 +1010,7 @@ def send_quote(user: User, engagement_id, reason: str, prices: list[dict]) -> di
     engagement.quote_reason = reason
     engagement.status = EngagementStatus.QUOTED
     engagement.responded_at = utcnow()
+    _notify_business(engagement, "Your CA sent you a quote", f"sent a new price. Reason: {reason}")
     db.session.commit()
     _email_business(engagement, "Your CA sent you a quote", "engagement_quoted", reason=reason)
     return _engagement_details(engagement)
@@ -982,6 +1023,11 @@ def decline_request(user: User, engagement_id) -> dict:
     _check_not_expired(engagement)
     engagement.status = EngagementStatus.DECLINED
     engagement.responded_at = utcnow()
+    _notify_business(
+        engagement,
+        "Your CA declined your request",
+        'declined your request. You can ask another CA in "Find a CA".',
+    )
     db.session.commit()
     _email_business(engagement, "Your CA declined your request", "engagement_declined")
     return _engagement_details(engagement)
@@ -993,6 +1039,11 @@ def complete_engagement(user: User, engagement_id) -> dict:
     _check_status(engagement, EngagementStatus.ACTIVE)
     engagement.status = EngagementStatus.COMPLETED
     engagement.completed_at = utcnow()
+    _notify_business(
+        engagement,
+        "Your CA completed the work",
+        'marked the work as completed. You can rate it in "My engagements".',
+    )
     db.session.commit()
     return _engagement_details(engagement)
 
@@ -1044,6 +1095,11 @@ def expire_old_requests() -> int:
     expired = db.session.scalars(stmt).all()
     for engagement in expired:
         engagement.status = EngagementStatus.EXPIRED
+        _notify_business(
+            engagement,
+            "Your CA request expired",
+            f"did not answer within 48 hours. Choose another CA for: {_service_names(engagement)}.",
+        )
     db.session.commit()
 
     for engagement in expired:
@@ -1140,6 +1196,27 @@ def ca_can_access_document(ca_profile_id, document_id) -> bool:
         if filing.acknowledgement_document_id is not None:
             allowed.add(filing.acknowledgement_document_id)
     return document_id in allowed
+
+
+def active_ca_users_by_filing(filing_ids) -> dict:
+    """{filing id: the CA's User} for the filings among `filing_ids` in an ACTIVE engagement
+    (at most one per filing). Used by the alerts reminders to remind the CA too."""
+    if len(filing_ids) == 0:
+        return {}
+    stmt = (
+        select(EngagementItem.compliance_item_id, User)
+        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
+        .join(CaProfile, Engagement.ca_profile_id == CaProfile.id)
+        .join(User, CaProfile.user_id == User.id)
+        .where(
+            EngagementItem.compliance_item_id.in_(filing_ids),
+            Engagement.status == EngagementStatus.ACTIVE,
+        )
+    )
+    users = {}
+    for filing_id, user in db.session.execute(stmt):
+        users[filing_id] = user
+    return users
 
 
 # --- Ratings (MA17) --------------------------------------------------------------------
@@ -1471,6 +1548,7 @@ def accept_pro_bono_request(user: User, request_id) -> dict:
     _activate(engagement, items)  # status active, filings "With CA"
     request.status = ProBonoRequestStatus.MATCHED
     request.engagement_id = engagement.id
+    _notify_business(engagement, "A CA will help you for free", "took your pro-bono request.")
     db.session.commit()
     log.info("CA %s took pro-bono request %s", ca.id, request.id)
 

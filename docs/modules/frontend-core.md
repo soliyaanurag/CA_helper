@@ -16,7 +16,9 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   `card`, `input`, `label`; the standard `cn()` helper from clsx + tailwind-merge in `lib/utils.js`); one explicit
   route table in `routes.jsx`: the public area (`/`, `/login`) in `PublicLayout`, and the `/business`, `/ca`,
   `/admin` areas built by `roleArea(role, children)`, each wrapped in `RequireRole` and rendered in `AppShell`
-  (sidebar with the role's `NAV` links, the user's name and a Log out button, title from `USER_ROLE_LABELS`; the
+  (sidebar with the notification bell (`components/NotificationBell.jsx`, alerts module; it asks
+  `GET /api/v1/alerts/notifications/unread-count` every minute), the role's `NAV` links, the user's name and a Log
+  out button, title from `USER_ROLE_LABELS`; the
   sidebar is one screen tall and sticky, so the name / Change password / Log out stay visible at its bottom and only
   the links scroll when there are many); each
   area's home is its `index: true` dashboard page; landing page with Log in / Create an account buttons, three

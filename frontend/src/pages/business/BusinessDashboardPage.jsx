@@ -1,11 +1,13 @@
 import { Link } from "react-router";
 
+import { usePenaltyExposure } from "@/api/alerts";
 import { errorMessage } from "@/api/client";
 import { useComplianceDashboard, useFilings } from "@/api/compliance";
 import { useMyEngagements } from "@/api/marketplace";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { daysLeftText, daysUntil, formatDate } from "@/lib/dates";
 import { FORM_LABELS, label } from "@/lib/labels";
+import { formatRupees } from "@/lib/money";
 
 const DONE = ["filed", "filed_verified"];
 
@@ -45,6 +47,9 @@ export function BusinessDashboardPage() {
         </p>
       )}
       {dashboard.isSuccess && dashboard.data.registered && <Numbers numbers={dashboard.data} />}
+      {dashboard.isSuccess && dashboard.data.registered && dashboard.data.overdue > 0 && (
+        <PenaltyExposure />
+      )}
       {filings.isSuccess && filings.data !== null && (
         <>
           <ToDo filings={filings.data} engagements={engagements.data || []} />
@@ -77,6 +82,32 @@ function Numbers({ numbers }) {
       />
       <NumberCard title="With a CA" value={numbers.with_ca} note="a CA is working on them" />
     </div>
+  );
+}
+
+// The late fees of the overdue filings (GET /alerts/penalties); interest is not included.
+function PenaltyExposure() {
+  const exposure = usePenaltyExposure(true);
+  if (!exposure.isSuccess) {
+    return null;
+  }
+  const data = exposure.data;
+  let value = "Not available yet";
+  if (data.estimated_count > 0) {
+    value = formatRupees(data.total_late_fees);
+  }
+  let note = "late fees of your overdue filings (interest not included)";
+  if (data.pending_count > 0) {
+    note += `; ${data.pending_count} of ${data.overdue_count} have no confirmed rule yet`;
+  }
+  return (
+    <Card className="ring-red-300">
+      <CardHeader>
+        <CardDescription>Penalty exposure · {data.label}</CardDescription>
+        <CardTitle className="text-2xl text-red-700 tabular-nums">{value}</CardTitle>
+        <p className="text-xs text-muted-foreground">{note}</p>
+      </CardHeader>
+    </Card>
   );
 }
 

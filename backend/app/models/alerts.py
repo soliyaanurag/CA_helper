@@ -6,7 +6,8 @@
     penalty_rules          late fees and interest per form, versioned by dates (PenaltyRule)
 
 A reminder is sent at most once per filing and kind (UNIQUE). Penalty rules are matched
-by form code and date (no foreign key) and never invented (rule 3).
+by form code and date (no foreign key) and never invented (rule 3): an amount that is
+not confirmed yet is left empty (NULL) and the estimator skips it.
 """
 
 import uuid
@@ -98,12 +99,18 @@ class PenaltyRule(BaseModel):
             " AND (nil_return_late_fee_per_day IS NULL OR nil_return_late_fee_per_day >= 0)",
             name="amounts_not_negative",
         ),
+        CheckConstraint(
+            "flat_late_fee IS NULL OR flat_late_fee >= 0", name="flat_late_fee_not_negative"
+        ),
     )
 
+    # Every amount may be empty (NULL) while it is not confirmed from an official source.
     form_code: Mapped[FormCode] = mapped_column(str_enum(FormCode))
-    late_fee_per_day: Mapped[Decimal] = mapped_column(Numeric(12, 2))  # rupees
+    late_fee_per_day: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # rupees
     max_late_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # empty = no cap
-    annual_interest_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2))  # percent, e.g. 18.00
+    # A fixed late fee, charged once however late (e.g. the ITR); used instead of the per-day fee.
+    flat_late_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    annual_interest_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))  # percent, e.g. 18
     # Late fee per day for a nil return, when it differs (empty = same as late_fee_per_day).
     nil_return_late_fee_per_day: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     source_reference: Mapped[str] = mapped_column(String(500))

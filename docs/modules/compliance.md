@@ -7,7 +7,9 @@ Turns a regulatory profile into dated compliance items for the 7 forms, shows th
 The whole business side of a filing works: templates, due dates and filing creation (CO1–CO3), the list with filters
 (CO4), the filing page (CO5) with the form's content (CO6), checklist ticks (CO7), choosing a path (CO8), marking it
 filed with the acknowledgement (CO9), the status lifecycle up to `filed` (CO10), the hourly overdue job (CO11) and
-the dashboard numbers (CO12). Not yet: `filed_verified` (needs OCR, DO8), penalties (AL4/AL5), peer insights (CO13).
+the dashboard numbers (CO12). The penalty estimate on the filing page and the dashboard comes from the alerts
+module (AL5; its own endpoints, shown by `FilingPage` and `BusinessDashboardPage`). Not yet: `filed_verified` (needs
+OCR, DO8), peer insights (CO13).
 - **Backend** (`services/compliance_service.py`, `routes/compliance.py`, `schemas/compliance.py`):
   - Filings: `financial_year_start()`, `fy_label()`, `periods_of_year()`, `due_date()` (reads the template's
     `due_date_rule`), `sync_filings(business_id, profile, today, keep_ids)` (makes this year's filings match the
@@ -105,6 +107,8 @@ Planned: admin editors at `/api/v1/admin/compliance/...`; the CA's side of a fil
 - `create_filings(business_id, profile, today) -> int`: `sync_filings` for a new business, returns how many were added (does not commit). Used by onboarding after registering.
 - `list_filings(business, status=None, form_code=None, due_from=None, due_to=None) -> list[ComplianceItem]`.
 - `get_form_content(form_code) -> dict`: a form's Markdown texts and checklist (for the CA workspace and the assistant later).
+- `list_unfiled_filings_due_by(day) -> list[ComplianceItem]`: every business's live, not-filed filings due on or
+  before `day`, soonest first. Used by the alerts reminder job.
 - `get_filings_by_ids(filing_ids, lock=False) -> {id: ComplianceItem}`: live filings by id; `lock=True` is
   `SELECT ... FOR UPDATE` until the caller commits (does not commit). Used by marketplace (engagements).
 - `mark_filings_with_ca(filing_ids)`: status `with_ca`, filing path `ca` (does not commit). Called by marketplace
@@ -130,4 +134,4 @@ onboarding (the regulatory profile, passed in by `register_business()`), core-au
 - **The form content is a first draft** (`status: DRAFT`), not checked against the official sources yet.
 - `filed_verified` is never set yet: it needs the acknowledgement OCR (DO8).
 - A CA cannot open a filing page yet, and cannot mark a filing filed (CW3, CW5); a `with_ca` filing can only be finished by the CA.
-- No penalty on the page or the dashboard yet (AL4/AL5).
+- The penalty figures are "pending" until the `penalty_rules` amounts are verified (alerts, `docs/TODO_VERIFY.md`).
