@@ -58,7 +58,8 @@ configs (`vite.config.js`, `jsconfig.json`, `eslint.config.js`, `.prettierrc.jso
   uploads) and `apiDownload(path)` returns a file as a Blob; `lib/dates.js` `todayIso()`, `daysUntil()`,
   `daysLeftText()` ("In 12 days", "3 days ago"), `monthLabel()`, `expiresInText()` ("expires in 31 h");
   `lib/gstin.js` (the GSTIN checks, the same as the backend); `components/StatusBadge.jsx` (a coloured filing
-  status); `components/AcceptTermsGate.jsx` (the one-time consent step, shown by `RequireRole`); the public
+  status); `components/Markdown.jsx` (shows a Markdown text with react-markdown, styled with Tailwind; links
+  open in a new tab); `components/AcceptTermsGate.jsx` (the one-time consent step, shown by `RequireRole`); the public
   `/terms` page; `EngagementCard` shows a status timeline and the expiry countdown. Money is always shown with
   `formatRupees()` (Indian grouping, ₹45,00,000).
 - **Not built yet:** refresh-token cookie, notification tray, floating assistant widget.

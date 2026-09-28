@@ -4,6 +4,32 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: The filing page (CO4–CO10, CO12) and the first form content
+
+**What**
+- **New packages (asked and approved):** `PyYAML==6.0.3` (backend, reads `checklist.yaml`) and
+  `react-markdown` 10.1.0 (frontend, shows the Markdown explanation and instructions; `components/Markdown.jsx`).
+- **Form content has a first draft** in `content/forms/<FORM>/` (`status: DRAFT`): explanation, self-filing steps and
+  a document checklist for each of the 7 forms, with no amounts, rates or due dates. The API reports the status and
+  the page says "draft" until it is `DONE`. Links are written `<https://...>` (clickable without extra plugins).
+- **Status from the checklist (CO10):** for a filing the business works on itself: past due → `overdue`; nothing
+  ticked → `upcoming`; a required document missing → `docs_pending`; all required ticked → `ready`. `with_ca`,
+  `filed` and `filed_verified` are never changed by ticks. Optional checklist entries do not affect the status.
+- **Mark as filed (CO9) is one multipart request** with an optional ARN and an optional acknowledgement file, from
+  `upcoming`, `docs_pending`, `ready` or `overdue`. The file is a `documents` row (type `acknowledgement`) linked by
+  `compliance_items.acknowledgement_document_id`. A `with_ca` filing is marked by the CA (CW5). A mistaken mark can
+  be undone (`unmark-filed`) for self-filed filings only.
+- **Choosing a path (CO8) only records the intention** (`filing_path`); `with_ca` still comes from an active
+  engagement.
+- **Dashboard numbers (CO12) come from the API.** `overdue` counts every not-filed filing whose due date passed,
+  including late `with_ca` ones (the business should see them), unlike the `overdue` status (CO11).
+- `current_business_or_none()` next to `current_business()` in `utils/decorators.py` (the dashboard works before
+  registration).
+- Built on one branch as one PR together with CO11 (asked and approved), because each feature builds on the last.
+
+**Why:** these complete the business's side of a filing for the demo (calendar → filing page → file it myself or
+find a CA → proof), using the tables that already existed; no migration was needed.
+
 ## 2026-09-28: Overdue job (CO11): hourly, and "With CA" stays "With CA"
 
 **What**

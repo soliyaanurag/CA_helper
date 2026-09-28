@@ -71,7 +71,7 @@ Planned: refresh, logout.
 
 ## Service functions other modules call
 - `roles_required(*roles)`, `login_required` and `current_user()` from `app.utils.decorators`: one of the decorators on every protected endpoint (examples: `backend/app/routes/compliance.py`; `/auth/me` in `backend/app/routes/auth.py`).
-- `current_business()` from `app.utils.decorators`: the logged-in business user's registered business, or 404 `BUSINESS_NOT_FOUND` (use behind `@roles_required(UserRole.BUSINESS)`; example: `GET /compliance/items`).
+- `current_business()` from `app.utils.decorators`: the logged-in business user's registered business, or 404 `BUSINESS_NOT_FOUND` (use behind `@roles_required(UserRole.BUSINESS)`; example: `GET /compliance/items`). `current_business_or_none()`: the same, but None before registration (example: `GET /compliance/dashboard`).
 - `UserRole` from `app.models.enums`.
 - `issue_access_token(user)`, `get_active_user(user_id)`, `normalize_email(email)` from `app.services.auth_service`.
 - `require_ca_access(business_id)` (in `app/utils/decorators.py`, MA14): for CA routes that read a business's
