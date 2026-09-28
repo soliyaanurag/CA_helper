@@ -51,7 +51,7 @@ class BaseConfig:
 
     # --- Gemini (app/utils/gemini_client.py). No key: AI features use their fallback ---
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or None
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
     GEMINI_TIMEOUT_SECONDS = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "20"))
 
     # --- Rate limiting (Flask-Limiter): counters kept in memory, per process ---

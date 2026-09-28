@@ -8,7 +8,7 @@ in the same PR.
 
 **What**
 - **`google-genai` (pinned 2.25.0)** is the Gemini library; the model, key and timeout come from `.env`
-  (`GEMINI_MODEL`, default `gemini-2.5-flash`; `GEMINI_API_KEY`; `GEMINI_TIMEOUT_SECONDS`). Tests never have a key.
+  (`GEMINI_MODEL`, default `gemini-flash-latest`, an alias Google keeps pointing at the current Flash model; `GEMINI_API_KEY`; `GEMINI_TIMEOUT_SECONDS`). Tests never have a key.
 - **One wrapper, `app/utils/gemini_client.py`:** `ask_gemini()` always runs `scrub_pii()` first (GSTIN, PAN, email,
   Aadhaar-like numbers, phone → `[GSTIN]`, ...), logs only the kinds it removed, and raises 503
   `GEMINI_UNAVAILABLE` without a key or when the call fails. Every feature must work without Gemini (fallback).
