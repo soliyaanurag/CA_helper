@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router";
 
+import { AssistantWidget } from "@/components/AssistantWidget";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,8 +10,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Layout for the logged-in areas (/business, /ca, /admin): sidebar with the
- * notification bell, the role's links, user name, change password + logout, and the
- * current page (<Outlet />).
+ * notification bell, the role's links, user name, change password + logout, the
+ * current page (<Outlet />) and, for business owners and CAs, the floating AI assistant.
  * `nav` is a list of { label, path } links (NAV in routes.jsx).
  *
  * The sidebar is exactly one screen tall and stays in place while the page scrolls
@@ -67,6 +68,8 @@ export function AppShell({ role, nav }) {
       <main className="flex-1 p-8">
         <Outlet />
       </main>
+      {/* The floating AI assistant for business owners and CAs (not admins). */}
+      {(role === "business" || role === "ca") && <AssistantWidget role={role} />}
     </div>
   );
 }
