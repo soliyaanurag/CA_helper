@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { usePenaltyEstimate } from "@/api/alerts";
 import { errorMessage } from "@/api/client";
 import {
   FILINGS_KEY,
@@ -20,8 +21,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { daysLeftText, formatDate, formatDateTime } from "@/lib/dates";
+import { daysLeftText, daysUntil, formatDate, formatDateTime } from "@/lib/dates";
 import { FORM_LABELS, label } from "@/lib/labels";
+import { formatRupees } from "@/lib/money";
 
 // Statuses in which the business itself can still act on the filing.
 const OPEN_FOR_BUSINESS = ["upcoming", "docs_pending", "ready", "overdue"];
@@ -60,6 +62,8 @@ export function FilingPage() {
       {filing.isSuccess && (
         <>
           <Header page={filing.data} />
+          {!FILED.includes(filing.data.filing.status) &&
+            daysUntil(filing.data.filing.due_date) < 0 && <Penalty item={filing.data.filing} />}
           <HowToFile page={filing.data} onUpdated={showUpdated} />
           <Checklist page={filing.data} onUpdated={showUpdated} />
           <Guide page={filing.data} />
@@ -81,6 +85,72 @@ function Header({ page }) {
         {page.form_name} · due {formatDate(item.due_date)}
         {!FILED.includes(item.status) && ` · ${daysLeftText(item.due_date)}`}
       </p>
+    </div>
+  );
+}
+
+// --- What being late may cost (AL5) ------------------------------------------------------
+
+// Shown on every penalty figure: the rules are not checked against official sources yet.
+const PENDING_LABEL = "Estimate (rules pending verification)";
+
+function Penalty({ item }) {
+  const [taxDue, setTaxDue] = useState("");
+  // The amount the estimate was last asked for (only on "Estimate", not on every key).
+  const [askedTaxDue, setAskedTaxDue] = useState("");
+  const estimate = usePenaltyEstimate(item.id, askedTaxDue, true);
+
+  function onSubmit(event) {
+    event.preventDefault();
+    setAskedTaxDue(taxDue.trim());
+  }
+
+  return (
+    <Card className="ring-red-300">
+      <CardHeader>
+        <CardTitle>Late fees and interest</CardTitle>
+        <CardDescription>{estimate.data?.label ?? PENDING_LABEL}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {estimate.isPending && <p className="text-muted-foreground">Loading...</p>}
+        {estimate.isError && (
+          <p role="alert" className="text-destructive">
+            {errorMessage(estimate.error)}
+          </p>
+        )}
+        {estimate.isSuccess && <PenaltyFigures estimate={estimate.data} />}
+        <form className="flex flex-wrap items-end gap-2" onSubmit={onSubmit}>
+          <FormField
+            id="tax_due"
+            label="Tax due (₹, optional, for the interest)"
+            inputMode="decimal"
+            value={taxDue}
+            onChange={(event) => setTaxDue(event.target.value)}
+          />
+          <Button type="submit" variant="outline">
+            Estimate
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PenaltyFigures({ estimate }) {
+  const amount = (value) => (value === null ? "not available" : formatRupees(value));
+  return (
+    <div className="space-y-1">
+      <p>{estimate.days_late} days late.</p>
+      <p>Late fee: {amount(estimate.late_fee)}</p>
+      <p>Interest: {amount(estimate.interest)}</p>
+      {estimate.total !== null && (
+        <p className="font-medium">Total: {formatRupees(estimate.total)}</p>
+      )}
+      {estimate.notes.map((note) => (
+        <p key={note} className="text-muted-foreground">
+          {note}
+        </p>
+      ))}
     </div>
   );
 }

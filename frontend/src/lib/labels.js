@@ -131,6 +131,16 @@ export const ENGAGEMENT_STATUS_LABELS = {
   cancelled: "Cancelled",
 };
 
+/** What a tray notification is about (notifications.type). */
+export const NOTIFICATION_TYPE_LABELS = {
+  deadline_reminder: "Deadline reminder",
+  overdue: "Overdue filing",
+  engagement_update: "CA request update",
+  document_request: "Document request",
+  regulatory_update: "Regulatory update",
+  account: "Account",
+};
+
 /** The label for `code`, or the code itself if the map has no entry (never crash on a new value). */
 export function label(labels, code) {
   return labels[code] ?? code;

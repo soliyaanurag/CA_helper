@@ -166,3 +166,65 @@ describe("filing page", () => {
     );
   });
 });
+
+describe("late fees on the filing page", () => {
+  // A GET /alerts/penalties/<id> answer while the rules have no confirmed amount.
+  const PENDING = {
+    compliance_item_id: "f1",
+    form_code: "gstr_3b",
+    period_label: "Q1 2026-27",
+    due_date: "2026-07-22",
+    days_late: 68,
+    status: "pending",
+    late_fee: null,
+    interest: null,
+    total: null,
+    notes: ["The late fee for this form is not confirmed yet."],
+    label: "Estimate (rules pending verification)",
+  };
+  const LATE = page({ filing: { due_date: "2026-07-22", status: "overdue" } });
+
+  it("shows an estimate for an overdue filing, labelled as unverified", async () => {
+    open({
+      [`GET ${ITEM}`]: [200, LATE],
+      "GET /api/v1/alerts/penalties/f1": [200, PENDING],
+    });
+
+    const card = (await screen.findByText("Late fees and interest")).closest("[data-slot=card]");
+    expect(card).toHaveTextContent("Estimate (rules pending verification)");
+    await waitFor(() => expect(card).toHaveTextContent("68 days late."));
+    expect(card).toHaveTextContent("Late fee: not available");
+    expect(card).toHaveTextContent("The late fee for this form is not confirmed yet.");
+  });
+
+  it("adds the interest for the tax due", async () => {
+    const fetchMock = open({
+      [`GET ${ITEM}`]: [200, LATE],
+      "GET /api/v1/alerts/penalties/f1": [200, PENDING],
+      "GET /api/v1/alerts/penalties/f1?tax_due=36500": [
+        200,
+        { ...PENDING, status: "estimated", interest: "816.00", total: "816.00", notes: [] },
+      ],
+    });
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText(/Tax due/), "36500");
+    await user.click(screen.getByRole("button", { name: "Estimate" }));
+
+    expect(await screen.findByText("Total: ₹816")).toBeInTheDocument();
+    expect(screen.getByText("Interest: ₹816")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([url]) => url === "/api/v1/alerts/penalties/f1?tax_due=36500"),
+    ).toBe(true);
+  });
+
+  it("shows no penalty card before the due date", async () => {
+    const fetchMock = open();
+
+    await screen.findByRole("heading", { name: /GSTR-3B · Q2 2026-27/ });
+    expect(screen.queryByText("Late fees and interest")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => url.startsWith("/api/v1/alerts/penalties"))).toBe(
+      false,
+    );
+  });
+});
