@@ -34,9 +34,19 @@ const FILINGS = [
   filing({ id: "later", form_code: "itr", period_label: "FY 2026-27", due_date: "2027-07-31" }),
 ];
 
+// What GET /compliance/dashboard counts for FILINGS on 27 Sep 2026.
+const DASHBOARD = {
+  message: "Welcome, Test business",
+  registered: true,
+  next_deadline: FILINGS[1],
+  due_this_month: 1,
+  overdue: 1,
+  with_ca: 1,
+};
+
 function api(engagements = []) {
   return fakeApi({
-    "GET /api/v1/compliance/dashboard": [200, { message: "Welcome, Test business" }],
+    "GET /api/v1/compliance/dashboard": [200, DASHBOARD],
     "GET /api/v1/compliance/items": [200, FILINGS],
     "GET /api/v1/marketplace/my-engagements": [200, engagements],
   });
@@ -66,7 +76,10 @@ describe("business dashboard", () => {
       within(todo).getByText("Meera Shah sent a quote: accept or reject it"),
     ).toBeInTheDocument();
     expect(within(todo).getByText("Check 1 overdue filings")).toBeInTheDocument();
-    expect(within(todo).getByText(/Decide how to file GSTR-3B Aug 2026/)).toBeInTheDocument();
+    expect(within(todo).getByText(/Decide how to file GSTR-3B Aug 2026/)).toHaveAttribute(
+      "href",
+      "/business/compliance/soon",
+    );
   });
 
   it("asks an unregistered business to register", async () => {
