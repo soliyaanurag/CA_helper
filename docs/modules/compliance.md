@@ -65,7 +65,8 @@ OCR, DO8), peer insights (CO13).
     with the form's service pre-selected, none for ITR; with `self`, the "Mark as filed" form with the optional ARN
     and file); "With a CA" instead when the filing is in an open engagement or `with_ca` (the CA's name from
     `useMyEngagements()`); "Filed" once filed (date, ARN, "Open the acknowledgement", "Undo: not filed yet"); the
-    checklist ("n of m required documents ready"); the guide with two tabs (steps / what is this form), shown with
+    checklist ("n of m required documents ready"; under each entry its linked files and "Add a file", from the
+    documents module); the guide with two tabs (steps / what is this form), shown with
     `components/Markdown.jsx` (react-markdown), and a "draft" note while the content is not `DONE`.
   - `pages/business/CompliancePage.jsx`: filter chips, "Earlier this year" and one table per month; the form name
     links to the filing page.
@@ -113,6 +114,9 @@ Planned: admin editors at `/api/v1/admin/compliance/...`; the CA's side of a fil
   `SELECT ... FOR UPDATE` until the caller commits (does not commit). Used by marketplace (engagements).
 - `mark_filings_with_ca(filing_ids)`: status `with_ca`, filing path `ca` (does not commit). Called by marketplace
   when an engagement becomes `active` (the CA accepts, or the business accepts a quote).
+- `checklist_keys(form_code) -> list[str]`, `tick_checklist_entry(filing, key)` (tick + status again, does not
+  commit, 422 `UNKNOWN_CHECKLIST_KEY`) and `filings_by_acknowledgement(document_ids) -> {document id: filing}`.
+  Used by documents (a linked file ticks its checklist entry; an acknowledgement cannot be deleted from the vault).
 - `due_date(template, period_end, quarter, audit) -> date`, `financial_year_start(day)`, `periods_of_year(frequency, fy_start)`.
 
 ## Depends on

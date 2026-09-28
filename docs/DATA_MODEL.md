@@ -63,7 +63,7 @@ Column types are in the model files; this lists what each table is for and its k
 | Table | One row is... | Key fields |
 |---|---|---|
 | `documents` (SD) | an uploaded file's metadata | owner_id → users (indexed; a business user, or a CA for their Certificate of Practice), uploaded_by_id → users (can differ: a CA uploading a client's acknowledgement), doc_type, original_filename, storage_key (unique), mime_type, size_bytes, sha256, fy, period_label, ocr_status, ocr_fields (JSONB) |
-| `compliance_item_documents` | a file serving one filing (N–N) | compliance_item_id, document_id, checklist_key (never empty; `general` when not for a checklist entry), linked_by_id → users. Unique (item, document, key): one file can serve several filings. Unlinking deletes the row |
+| `compliance_item_documents` | a file serving one filing (N–N) | compliance_item_id, document_id, checklist_key (never empty; `general` when not for a checklist entry), linked_by_id → users. Unique (item, document, key): one file can serve several filings. Unlinking deletes the row. **(implemented, DO6)** linking to a checklist key ticks it; a filed filing's links are fixed |
 
 ### alerts (`models/alerts.py`)
 | Table | One row is... | Key fields |
