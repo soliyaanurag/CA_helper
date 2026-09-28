@@ -49,6 +49,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     UniqueConstraint,
+    Uuid,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -319,6 +320,10 @@ class ProBonoRequest(BaseModel):
         str_enum(ProBonoRequestStatus), default=ProBonoRequestStatus.QUEUED
     )
     note: Mapped[str] = mapped_column(String(1000), default="", server_default="")
+    # The filings (compliance item ids) the business wants free help with.
+    compliance_item_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(Uuid), default=list, server_default="{}"
+    )
     # The pro-bono engagement created for it (empty while queued).
     engagement_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("engagements.id"), unique=True

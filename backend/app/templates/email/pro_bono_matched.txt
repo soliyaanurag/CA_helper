@@ -1,0 +1,8 @@
+Hello {{ owner_name }},
+
+Good news: {{ ca_name }} has taken your pro-bono request and will help you with
+those filings for free. The filings are now marked "With CA".
+
+You can see the details in "My engagements" in CA Helper.
+
+CA Helper

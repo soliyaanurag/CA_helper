@@ -162,3 +162,51 @@ export function engagementAction(engagementId, action, body) {
     body,
   });
 }
+
+// --- Pro-bono queue (MA16) ---
+
+export const PRO_BONO_KEY = ["marketplace", "pro-bono"];
+export const PRO_BONO_QUEUE_KEY = ["marketplace", "pro-bono-queue"];
+
+// The business's pro-bono page: { eligible, reason, request, filings }.
+// Returns null if the business is not registered yet (the backend answers 404).
+async function fetchProBonoPage() {
+  try {
+    return await apiFetch("/api/v1/marketplace/pro-bono");
+  } catch (error) {
+    if (error.code === "BUSINESS_NOT_FOUND") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function useProBonoPage() {
+  return useQuery({ queryKey: PRO_BONO_KEY, queryFn: fetchProBonoPage });
+}
+
+// The business joins the queue with some filings and a short note.
+export function joinProBonoQueue(filingIds, note) {
+  return apiFetch("/api/v1/marketplace/pro-bono", {
+    method: "POST",
+    body: { compliance_item_ids: filingIds, note: note },
+  });
+}
+
+// The business leaves the queue.
+export function cancelProBonoRequest(requestId) {
+  return apiFetch("/api/v1/marketplace/pro-bono/" + requestId + "/cancel", { method: "POST" });
+}
+
+// The CA's pro-bono page: { pledged, used_this_month, verified, requests }.
+export function useProBonoQueue() {
+  return useQuery({
+    queryKey: PRO_BONO_QUEUE_KEY,
+    queryFn: () => apiFetch("/api/v1/marketplace/pro-bono-queue"),
+  });
+}
+
+// The CA takes a request from the queue (a free engagement starts at once).
+export function acceptProBonoRequest(requestId) {
+  return apiFetch("/api/v1/marketplace/pro-bono/" + requestId + "/accept", { method: "POST" });
+}

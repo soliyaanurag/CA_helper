@@ -193,4 +193,12 @@ describe("engagement card timeline", () => {
     expect(screen.getByText(/Great help/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send rating" })).not.toBeInTheDocument();
   });
+
+  it("marks a free engagement with a Pro-bono badge", async () => {
+    loginAs("business");
+    fakeApi({ [`GET ${LIST_URL}`]: [200, [engagement({ status: "active", is_pro_bono: true })]] });
+    renderApp("/business/engagements");
+
+    expect(await screen.findByText("Pro-bono")).toBeInTheDocument();
+  });
 });

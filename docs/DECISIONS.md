@@ -4,6 +4,24 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Pro-bono queue (MA16): micro businesses, the CA chooses, active at ₹0
+
+**What**
+- **Eligible:** a business whose computed MSME tier is `micro` (`PRO_BONO_TIERS` in `marketplace_service.py`). This
+  is a platform policy, not a legal value; change the list to widen it.
+- The business picks filings and joins the queue (one queued request at a time). The filings are stored on the
+  request as a uuid array (`pro_bono_requests.compliance_item_ids`, one migration); they are not reserved while
+  queued.
+- **The CA chooses** from the queue (oldest first), only if verified and with free slots this calendar month
+  (Indian time): `pro_bono_slots_per_month` minus pro-bono engagements activated this month.
+- Taking a request creates an engagement that is **already `active`** (both sides agreed), `is_pro_bono`, prices 0,
+  with the catalog service that fits each filing; filings become "With CA". Two CAs cannot take the same request
+  (the row is locked).
+
+**Why:** micro is the smallest tier, the natural "can't afford a CA" group, and it is already computed. Letting
+the CA choose is simple and fair (nobody gets free work they did not accept); automatic matching can come later.
+No quote step: the price is 0 and both sides chose each other.
+
 ## 2026-09-28: Ratings (MA17): once per completed engagement, anonymous, average computed live
 
 **What**
