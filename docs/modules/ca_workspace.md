@@ -18,7 +18,7 @@ inviting existing clients.
   - **Urgency (CW6):** a weighted sum with a reason per part: `POINTS_PER_OVERDUE_FILING` (40 each),
     `POINTS_DUE_WITHIN_3_DAYS` (25) or `POINTS_DUE_WITHIN_7_DAYS` (10) for the next deadline,
     `POINTS_PER_MISSING_DOCUMENT` (5 per required checklist entry not ticked), `POINTS_PER_OPEN_REQUEST` (3).
-    **Hook:** `regulatory_points(business_id) -> [{reason, points}]` returns `[]`; the regulatory module fills it
+    **Regulatory:** `regulatory_points(business_id) -> [{reason, points}]`: `POINTS_PER_REGULATORY_CHANGE` (15) for each approved change that affected the client in the last 30 days (`regulatory_service.active_changes_for`), reason "Regulatory update (GSTR-3B)"
     (approved changes that affect the business).
   - **Client workspace (CW3):** `get_client(user, business_id)`: the business and its profile (full, as the
     access rules allow during active work), and the CA's engaged filings, each with its checklist (ticks), its
@@ -84,14 +84,14 @@ A request: `{id, compliance_item_id, form_code, period_label, checklist_key, mes
 fulfilled_at, document_id}`.
 
 ## Service functions other modules call
-- `regulatory_points(business_id) -> [{reason, points}]`: **for the regulatory module to fill** (extra urgency).
+- `regulatory_points(business_id) -> [{reason, points}]`: extra urgency from approved regulatory changes (reads `regulatory_service.active_changes_for`).
 
 ## Depends on
 marketplace (`active_work`, `active_cas_of_business`, `complete_if_all_filed`, `own_profile_id`,
 `require_ca_access`), compliance (`get_filings_by_ids`, `checklist_with_ticks`, `checklist_progress`,
 `checklist_keys`, `mark_filed_by_ca`, `DONE_STATUSES`, `FORM_FOLDERS`), documents (`documents_by_filing`,
 `attach_document`, `GENERAL_KEY`), onboarding (`get_business`, `get_my_business`), alerts (`notify`),
-regulatory (urgency input, later).
+regulatory (`active_changes_for`, `forms_text`: urgency input).
 
 ## Contracts (don't change without telling the team)
 - Every read of client data goes through `ca_has_active_access` (rule 5): start each CA route with

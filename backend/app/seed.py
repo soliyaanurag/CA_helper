@@ -14,7 +14,8 @@ sample CAs get prices so some typical price ranges show up. The legal rule
 thresholds and the obligation templates of the 7 forms are seeded too, all marked
 TODO_VERIFY until someone checks them (docs/TODO_VERIFY.md). The penalty rules of the 7
 forms are seeded with every amount empty (NULL, TODO_VERIFY): no amount is confirmed yet.
-The official NIC activity codes are loaded from content/reference/nic_2008.csv.
+The official NIC activity codes are loaded from content/reference/nic_2008.csv, and the
+regulatory monitor's news sources are added.
 
 Every seed function
 must be safe to re-run (it skips rows that already exist) and must not commit:
@@ -38,6 +39,7 @@ from app.models import (
     CaProfile,
     CaService,
     CatalogService,
+    NewsSource,
     NicCode,
     ObligationTemplate,
     PenaltyRule,
@@ -52,6 +54,7 @@ from app.models.marketplace import (  # noqa: F401 (SERVICE_SPECIALIZATIONS: use
     CaVerificationStatus,
     ServiceUnit,
 )
+from app.models.regulatory import NewsSourceKind
 from app.services.auth_service import normalize_email
 from app.utils.passwords import hash_password
 
@@ -632,6 +635,24 @@ def seed_nic_codes() -> None:
             existing.add(row["code"])
 
 
+# News sources for the regulatory monitor (RE1): (name, url, kind, enabled). Each one's
+# robots.txt was checked on 2026-09-28 and allows our bot; the scanner checks it again on
+# every run. The CBIC page is off until an admin switches it on (a busy home page).
+NEWS_SOURCES = [
+    ("TaxGuru: GST news", "https://taxguru.in/category/goods-and-service-tax/feed/", "rss", True),
+    ("TaxGuru: Income tax news", "https://taxguru.in/category/income-tax/feed/", "rss", True),
+    ("CBIC GST portal (home page)", "https://cbic-gst.gov.in/", "html", False),
+]
+
+
+def seed_news_sources() -> None:
+    for name, url, kind, enabled in NEWS_SOURCES:
+        if not db.session.scalar(select(NewsSource.id).where(NewsSource.url == url)):
+            db.session.add(
+                NewsSource(name=name, url=url, kind=NewsSourceKind(kind), enabled=enabled)
+            )
+
+
 # (name, function) in dependency order: users first, other data may refer to them.
 SEEDS = [
     ("demo users", seed_demo_users),
@@ -642,6 +663,7 @@ SEEDS = [
     ("obligation templates", seed_obligation_templates),
     ("penalty rules", seed_penalty_rules),
     ("NIC codes", seed_nic_codes),
+    ("news sources", seed_news_sources),
 ]
 
 

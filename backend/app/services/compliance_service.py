@@ -693,6 +693,17 @@ def list_unfiled_filings_due_by(day: date) -> list[ComplianceItem]:
     return list(db.session.scalars(stmt))
 
 
+def business_ids_with_open_filings(form_codes) -> set:
+    """The businesses that still have a live, not-filed filing of one of these forms
+    (used by the regulatory module to find who a rule change affects)."""
+    stmt = select(ComplianceItem.business_id).where(
+        ComplianceItem.form_code.in_(list(form_codes)),
+        ComplianceItem.status.not_in(DONE_STATUSES),
+        ComplianceItem.deleted_at.is_(None),
+    )
+    return set(db.session.scalars(stmt))
+
+
 # --- Worker job (CO11) ---------------------------------------------------------------
 
 # The business still has to act on filings in these states, so they turn "overdue" once

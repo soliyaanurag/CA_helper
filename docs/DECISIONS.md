@@ -4,6 +4,27 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Regulatory monitor (RE1–RE6, X2 news job)
+
+**What**
+- **No new package:** the web is read with the standard library (`urllib.request`, `urllib.robotparser`,
+  `xml.etree` for RSS, a regular expression for links on web pages). One polite request per source per day, our own
+  user agent `CAHelperBot/1.0`; `robots.txt` is checked on every run and a site we cannot read it from is skipped.
+- **Sources:** TaxGuru's GST and income-tax RSS feeds (their robots.txt allows it; checked 2026-09-28) and the
+  CBIC GST home page (off by default). PIB refused our requests (403), so it is not used.
+- **Keyword filter before Gemini:** only articles naming one of our 7 forms and a change word go to Gemini, at most
+  10 per run (quota). Gemini's JSON is checked against our own codes; nothing it invents is kept.
+- **Keyword fallback:** without Gemini a change is still saved from the title (marked `extracted_by: keywords` and
+  shown as "Found by keywords (no AI)"), so the monitor works without a key; the admin reads the article.
+- **Nothing is sent before an admin approves** (module contract). Approval tells businesses with a not-filed filing
+  of the forms that fit the change's GST schemes / entity types / states (tray + email), their active CAs (tray),
+  and adds 15 urgency points for 30 days. Due dates are never changed automatically.
+- The Gemini client retries a 429/503 answer up to 3 times (Gemini often answers "high demand" for a moment).
+
+**Why:** the monitor must stay explainable and safe: public news only, the site's rules respected, an admin in the
+loop before anyone is alarmed, and no legal value (a due date) changed by a scraper or a model (rule 3).
+
+
 ## 2026-09-28: Gemini client and NIC code suggestion (ON9, ON10, ON11)
 
 **What**

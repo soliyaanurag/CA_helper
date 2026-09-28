@@ -17,7 +17,7 @@ two CAs, never mixes them up.
 
 Urgency (CW6): a simple weighted sum, each part with its reason, so the CA sees why a
 client is flagged. The weights are the constants below; regulatory changes add points
-through regulatory_points() (0 until the regulatory module fills it).
+through regulatory_points() (approved changes from the regulatory module).
 """
 
 import logging
@@ -37,6 +37,7 @@ from app.services import (
     documents_service,
     marketplace_service,
     onboarding_service,
+    regulatory_service,
 )
 
 log = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ POINTS_DUE_WITHIN_3_DAYS = 25  # the next deadline is 0 to 3 days away
 POINTS_DUE_WITHIN_7_DAYS = 10  # 4 to 7 days away
 POINTS_PER_MISSING_DOCUMENT = 5  # a required checklist entry not ticked
 POINTS_PER_OPEN_REQUEST = 3  # a document asked for and not received yet
+POINTS_PER_REGULATORY_CHANGE = 15  # an approved rule change affected this client (30 days)
 
 
 def get_dashboard(user: User) -> dict:
@@ -84,9 +86,15 @@ def _open_requests(engagement_ids, item_ids=None) -> list[DocumentRequest]:
 
 
 def regulatory_points(business_id) -> list[dict]:
-    """Extra urgency from approved regulatory changes that affect this business:
-    [{reason, points}]. The regulatory module fills this in; for now there are none."""
-    return []
+    """Extra urgency from approved regulatory changes that affected this business in the
+    last 30 days (regulatory module, RE5): [{reason, points}], one per change."""
+    points = []
+    for change in regulatory_service.active_changes_for(business_id):
+        forms = regulatory_service.forms_text(change.form_codes)
+        points.append(
+            {"reason": f"Regulatory update ({forms})", "points": POINTS_PER_REGULATORY_CHANGE}
+        )
+    return points
 
 
 def _urgency(filings, open_request_count: int, business_id, today: date) -> dict:

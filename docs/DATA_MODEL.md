@@ -96,7 +96,7 @@ Column types are in the model files; this lists what each table is for and its k
 |---|---|---|
 | `news_sources` | a site or feed we scrape | name, url (unique), kind, enabled |
 | `news_articles` | a scraped article | source_id, url (unique), title, published_at, content, content_hash (SHA-256, unique) |
-| `regulatory_changes` | a change extracted from an article | article_id, change_type, summary, form_codes (`varchar[]` of form codes, CHECK `known_form_codes`), affected_categories (JSONB), dates (JSONB), status, reviewed_at, reviewed_by_id → users |
+| `regulatory_changes` | a change extracted from an article | article_id, change_type, summary, form_codes (`varchar[]` of form codes, CHECK `known_form_codes`), affected_categories (JSONB: `extracted_by` `ai`/`keywords`, optional `gst_schemes`, `entity_types`, `states` lists; a missing list = everyone), dates (JSONB: optional `old_due_date`, `new_due_date` as YYYY-MM-DD, `period`), status, reviewed_at, reviewed_by_id → users |
 | `regulatory_change_matches` | a business affected by an approved change (N–N) | change_id, business_id (indexed), notified_at. Unique (change, business) |
 
 ### assistant (`models/assistant.py`)
