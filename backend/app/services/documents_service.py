@@ -3,6 +3,7 @@
 add_document(owner_id, uploaded_by_id, upload, doc_type) -> Document   store a file (no commit)
 read_document(document_id) -> (Document, bytes)                        its metadata and contents
 remove_document(document_id)                                           soft delete (no commit)
+document_ids_for_filings(filing_ids) -> set                            documents linked to filings
 
 The file itself is encrypted in storage (app/utils/storage.py); the `documents` row
 keeps its name, type, size and SHA-256. Who may read a document is decided by the
@@ -12,9 +13,11 @@ calling module (e.g. only admins read a CA's certificate).
 import hashlib
 import logging
 
+from sqlalchemy import select
+
 from app.errors import ApiError
 from app.extensions import db
-from app.models import Document
+from app.models import ComplianceItemDocument, Document
 from app.models.base import utcnow
 from app.models.documents import DocumentType
 from app.utils import storage
@@ -58,3 +61,19 @@ def remove_document(document_id) -> None:
     if document is not None and document.deleted_at is None:
         document.is_active = False
         document.deleted_at = utcnow()
+
+
+def document_ids_for_filings(filing_ids) -> set:
+    """The ids of the live documents linked to any of these filings (compliance_item_documents).
+
+    Used by marketplace to decide which documents a CA may open (MA14).
+    """
+    stmt = (
+        select(ComplianceItemDocument.document_id)
+        .join(Document, ComplianceItemDocument.document_id == Document.id)
+        .where(
+            ComplianceItemDocument.compliance_item_id.in_(filing_ids),
+            Document.deleted_at.is_(None),
+        )
+    )
+    return set(db.session.scalars(stmt))

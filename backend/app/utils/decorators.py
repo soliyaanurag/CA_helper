@@ -14,8 +14,13 @@
 - The role is checked against the user row in the database, not only the token
   claim, so a role change takes effect at once.
 
-Planned: `ca_has_active_access(ca_id, business_id)`, the only way a CA may read a
-business's data (true only while an engagement or approved invite is active).
+A CA reads a business's data only through the access checks in marketplace_service
+(MA14, CLAUDE.md rule 5). In a CA route, call require_ca_access(business_id) first:
+
+    @roles_required(UserRole.CA)
+    def get_client_filings(business_id):
+        require_ca_access(business_id)          # 404 unless an ACTIVE engagement
+        ...
 """
 
 from collections.abc import Callable
@@ -29,6 +34,7 @@ from app.errors import ApiError
 from app.extensions import db
 from app.models import Business, User
 from app.models.enums import UserRole
+from app.services import marketplace_service
 
 
 def current_user() -> User:
@@ -67,3 +73,16 @@ def roles_required(*roles: UserRole) -> Callable:
 def login_required(view: Callable) -> Callable:
     """Allow the endpoint for any logged-in, active user (every role)."""
     return roles_required(*UserRole)(view)
+
+
+def require_ca_access(business_id) -> None:
+    """Stop unless the logged-in CA has an ACTIVE engagement with this business.
+
+    Answers 404 BUSINESS_NOT_FOUND (not 403), so a CA cannot even find out that a
+    business exists. Call only behind @roles_required(UserRole.CA).
+    """
+    ca_profile_id = marketplace_service.own_profile_id(current_user())
+    if ca_profile_id is None or not marketplace_service.ca_has_active_access(
+        ca_profile_id, business_id
+    ):
+        raise ApiError(404, "BUSINESS_NOT_FOUND", "This business was not found.")

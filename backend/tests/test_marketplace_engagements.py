@@ -12,13 +12,17 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from flask_jwt_extended import verify_jwt_in_request
 
+from app.errors import ApiError
 from app.models import (
     Business,
     CaProfile,
     CaService,
     CatalogService,
     ComplianceItem,
+    ComplianceItemDocument,
+    Document,
     Engagement,
     EngagementItem,
     ObligationTemplate,
@@ -26,11 +30,13 @@ from app.models import (
 )
 from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus, FilingPath
+from app.models.documents import DocumentType
 from app.models.enums import FormCode, UserRole
 from app.models.marketplace import CaVerificationStatus, EngagementStatus
 from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.seed import seed_service_catalog
 from app.services import marketplace_service
+from app.utils.decorators import require_ca_access
 from worker import build_scheduler
 
 BASE = "/api/v1/marketplace"
@@ -772,3 +778,125 @@ def test_worker_runs_the_expiry_job_every_15_minutes(app):
 
     assert job is not None
     assert job.trigger.interval == timedelta(minutes=15)
+
+
+# --- MA14: what a CA may see of a business -------------------------------------------
+
+
+def _add_document(database, owner, filing=None, name="sales.pdf"):
+    """A document owned by the business owner, linked to `filing` when given."""
+    document = Document(
+        owner_id=owner.id,
+        uploaded_by_id=owner.id,
+        doc_type=DocumentType.SALES_REGISTER,
+        original_filename=name,
+        storage_key="test-" + str(uuid.uuid4()),
+        mime_type="application/pdf",
+        size_bytes=10,
+        sha256="0" * 64,
+    )
+    database.session.add(document)
+    database.session.flush()
+    if filing is not None:
+        database.session.add(
+            ComplianceItemDocument(
+                compliance_item_id=filing.id, document_id=document.id, linked_by_id=owner.id
+            )
+        )
+    database.session.commit()
+    return document
+
+
+def test_access_only_while_the_engagement_is_active(client, setup):
+    ca, business = setup["ca"], setup["business"]
+    engagement = request_gst(client, setup)
+    assert marketplace_service.ca_has_active_access(ca.id, business.id) is False  # requested
+
+    action(client, setup["ca_headers"], engagement["id"], "accept")
+    assert marketplace_service.ca_has_active_access(ca.id, business.id) is True
+
+    action(client, setup["ca_headers"], engagement["id"], "complete")
+    assert marketplace_service.ca_has_active_access(ca.id, business.id) is False
+
+
+def test_access_is_per_ca_and_per_business(client, setup, make_ca, make_business):
+    engagement = request_gst(client, setup)
+    action(client, setup["ca_headers"], engagement["id"], "accept")
+    _, other_ca = make_ca({"gstr_3b": "700"}, name="Other CA")
+    _, other_business = make_business("Someone Else")
+
+    assert marketplace_service.ca_has_active_access(other_ca.id, setup["business"].id) is False
+    assert marketplace_service.ca_has_active_access(setup["ca"].id, other_business.id) is False
+
+
+def test_each_ca_sees_only_the_filings_they_work_on(client, setup, make_ca, auth_headers):
+    business, catalog = setup["business"], setup["catalog"]
+    # CA 1 does GSTR-3B, CA 2 does GSTR-1, for the same business.
+    first = send_request(client, setup, (setup["gst_3b"], catalog["gstr_3b"])).get_json()
+    action(client, setup["ca_headers"], first["id"], "accept")
+    second_user, second_ca = make_ca({"gstr_1": "500"}, name="Second CA")
+    second = send_request(
+        client, setup, (setup["gst_1"], catalog["gstr_1"]), ca=second_ca
+    ).get_json()
+    action(client, auth_headers(second_user), second["id"], "accept")
+
+    assert marketplace_service.active_engagement_item_ids(setup["ca"].id, business.id) == {
+        setup["gst_3b"].id
+    }
+    assert marketplace_service.active_engagement_item_ids(second_ca.id, business.id) == {
+        setup["gst_1"].id
+    }
+
+
+def test_open_items_cover_requests_but_not_ended_ones(client, setup):
+    ca, business = setup["ca"], setup["business"]
+    engagement = request_gst(client, setup)
+
+    both = {setup["gst_3b"].id, setup["gst_1"].id}
+    assert marketplace_service.open_engagement_item_ids(ca.id, business.id) == both
+    assert marketplace_service.active_engagement_item_ids(ca.id, business.id) == set()
+
+    action(client, setup["ca_headers"], engagement["id"], "decline")
+    assert marketplace_service.open_engagement_item_ids(ca.id, business.id) == set()
+
+
+def test_documents_only_of_filings_in_active_work(client, setup, database):
+    owner, ca = setup["owner"], setup["ca"]
+    linked = _add_document(database, owner, setup["gst_3b"], "sales.pdf")
+    acknowledgement = _add_document(database, owner, None, "ack.pdf")
+    filing = database.session.get(ComplianceItem, setup["gst_1"].id)
+    filing.acknowledgement_document_id = acknowledgement.id
+    database.session.commit()
+    unrelated = _add_document(database, owner, None, "other.pdf")
+    engagement = request_gst(client, setup)
+
+    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is False  # not active yet
+
+    action(client, setup["ca_headers"], engagement["id"], "accept")
+    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is True
+    assert marketplace_service.ca_can_access_document(ca.id, acknowledgement.id) is True
+    assert marketplace_service.ca_can_access_document(ca.id, unrelated.id) is False
+
+    action(client, setup["ca_headers"], engagement["id"], "complete")
+    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is False
+
+
+def test_require_ca_access_for_ca_routes(app, client, setup, make_user, auth_headers):
+    business = setup["business"]
+    engagement = request_gst(client, setup)
+    no_profile_ca = make_user(role=UserRole.CA)
+
+    def check(headers):
+        with app.test_request_context(headers=headers):
+            verify_jwt_in_request()
+            require_ca_access(business.id)
+
+    # Only a request so far, and a CA without a profile: 404 BUSINESS_NOT_FOUND.
+    for headers in [setup["ca_headers"], auth_headers(no_profile_ca)]:
+        with pytest.raises(ApiError) as error:
+            check(headers)
+        assert error.value.status == 404
+        assert error.value.code == "BUSINESS_NOT_FOUND"
+
+    action(client, setup["ca_headers"], engagement["id"], "accept")
+    check(setup["ca_headers"])  # active: no error

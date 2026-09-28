@@ -27,7 +27,9 @@ None yet.
 core-auth (`ca_has_active_access`), marketplace (engagements), compliance (items), documents (vault), regulatory (urgency input).
 
 ## Contracts (don't change without telling the team)
-- Every read of client data goes through `ca_has_active_access` (rule 5)
+- Every read of client data goes through `ca_has_active_access` (rule 5): start each CA route with
+  `require_ca_access(business_id)` (`app/utils/decorators.py`) and show only `active_engagement_item_ids(...)`
+  filings and documents allowed by `ca_can_access_document(...)` (marketplace, MA14)
 
 ## Known issues
 None yet.

@@ -590,11 +590,14 @@ Who may read what. Every endpoint enforces these through the role decorators and
 | A CA after the engagement is `completed`, `declined`, `expired` or `cancelled` | nothing of that business, except the rating of their own engagement |
 | An admin | all metadata, **never document contents** |
 
-Planned service functions (marketplace), the only way a CA's access is decided:
+Service functions (marketplace, built in MA14), the only way a CA's access is decided:
 - `ca_has_active_access(ca_profile_id, business_id)`: true while an engagement between them is `active`.
 - `open_engagement_item_ids(ca_profile_id, business_id)`: the compliance items in their open engagements.
 - `ca_can_access_document(ca_profile_id, document_id)`: true only for a document linked to one of the filings of
   an active engagement.
+- Also `active_engagement_item_ids(ca_profile_id, business_id)` (the filings in active engagements only) and, for
+  routes, `require_ca_access(business_id)` in `app/utils/decorators.py` (404 unless active access). Fulfilled
+  document requests (ca_workspace) are not included yet: that table has no code.
 
 The turnover bracket shown before acceptance is computed from `annual_turnover`; the amount itself is not shown.
 
