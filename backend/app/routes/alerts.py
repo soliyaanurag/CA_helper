@@ -9,7 +9,7 @@
     GET  /alerts/penalties                     late fees of my overdue filings (business)
     GET  /alerts/penalties/<item_id>?tax_due=  one filing's penalty estimate (business)
 
-The reminder job also runs on demand: `flask alerts send-reminders` (for demos).
+The reminder job also runs on demand: `flask alerts send-reminders [--date YYYY-MM-DD]`.
 
 Routes stay thin: parse input (app/schemas/), call one service function, serialize
 the result. No queries and no db.session here (docs/PATTERNS.md, "Foundations").
@@ -102,9 +102,12 @@ def estimate_penalty(args, item_id):
     return alerts_service.estimate_penalty(current_business(), item_id, args.get("tax_due"))
 
 
-# `flask alerts send-reminders`: run the daily reminder job now (for demos and testing).
+# `flask alerts send-reminders [--date 2026-10-06]`: run the daily reminder job now, for
+# demos and testing. --date runs it as if it were that day (the reminders it records then
+# count as sent, so the real day sends them no second time).
 @blp.cli.command("send-reminders")
-def send_reminders_command():
-    """Send today's deadline and overdue reminders now (what the worker does at 08:00)."""
-    count = alerts_service.send_reminders()
+@click.option("--date", "day", type=click.DateTime(formats=["%Y-%m-%d"]), help="YYYY-MM-DD")
+def send_reminders_command(day):
+    """Send the deadline and overdue reminders now (what the worker does every morning)."""
+    count = alerts_service.send_reminders(day.date() if day else None)
     click.echo(f"Recorded {count} reminder(s).")

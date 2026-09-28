@@ -235,8 +235,18 @@ def test_worker_runs_the_reminders_every_morning(app):
     assert str(job.trigger) == "cron[hour='8', minute='15']"
 
 
-def test_reminders_run_on_demand_from_the_command_line(app, business):
+def test_reminders_run_on_demand_from_the_command_line(app, business, database):
     result = app.test_cli_runner().invoke(args=["alerts", "send-reminders"])
 
     assert result.exit_code == 0, result.output
     assert "reminder(s)" in result.output
+
+
+def test_the_command_can_run_as_of_another_day(app, business, database):
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(args=["alerts", "send-reminders", "--date", "2026-10-06"])
+
+    assert result.exit_code == 0, result.output
+    assert "Recorded 1 reminder(s)." in result.output
+    assert database.session.query(ReminderLog).one().kind == "t_minus_7"
