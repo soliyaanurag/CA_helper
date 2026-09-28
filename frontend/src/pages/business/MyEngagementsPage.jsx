@@ -119,6 +119,13 @@ function BusinessActions({ engagement }) {
         Withdraw request
       </Button>
     );
+  } else if (engagement.status === "expired" || engagement.status === "declined") {
+    // The CA did not take it: the filings are free, so offer to pick another CA.
+    buttons = (
+      <Button asChild>
+        <Link to="/business/marketplace">Find another CA</Link>
+      </Button>
+    );
   }
 
   return (

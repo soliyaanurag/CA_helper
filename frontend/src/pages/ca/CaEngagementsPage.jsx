@@ -7,6 +7,7 @@ import { EngagementCard } from "@/components/EngagementCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isPast } from "@/lib/dates";
 import { FORM_LABELS, label } from "@/lib/labels";
 
 // The groups on the page, in order, and which statuses belong to each.
@@ -86,8 +87,18 @@ function CaActions({ engagement }) {
     setBusy(false);
   }
 
+  // After 48 hours the CA can no longer answer; the worker will close the request.
+  const answerTimeOver =
+    engagement.status === "requested" && engagement.expires_at && isPast(engagement.expires_at);
+
   let buttons = null;
-  if (engagement.status === "requested" && !quoting) {
+  if (answerTimeOver) {
+    buttons = (
+      <p className="text-muted-foreground">
+        The 48 hours to answer are over. This request will close automatically.
+      </p>
+    );
+  } else if (engagement.status === "requested" && !quoting) {
     buttons = (
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => run("accept")} disabled={busy}>

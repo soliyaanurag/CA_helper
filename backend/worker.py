@@ -14,6 +14,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
+from app.services import marketplace_service
 
 log = logging.getLogger("worker")
 
@@ -43,6 +44,14 @@ def build_scheduler(app: Flask) -> AppScheduler:
     scheduler = AppScheduler(app)
     # Feature jobs go here, each calling a service function. Cron times are IST, e.g.
     #   scheduler.add_job(alerts_service.send_reminders, "cron", hour=8, id="alerts.reminders")
+
+    # MA12: every 15 minutes, requests unanswered for 48 hours expire.
+    scheduler.add_job(
+        marketplace_service.expire_old_requests,
+        "interval",
+        minutes=15,
+        id="marketplace.expire_requests",
+    )
     return scheduler
 
 

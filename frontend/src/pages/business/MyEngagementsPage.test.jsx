@@ -106,7 +106,12 @@ describe("engagement card timeline", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-09-27T21:30:00Z") });
     loginAs("business");
     // Requested; expires at 2026-09-29T04:30Z, 31 hours after "now".
-    fakeApi({ "GET /api/v1/marketplace/my-engagements": [200, [engagement()]] });
+    fakeApi({
+      "GET /api/v1/marketplace/my-engagements": [
+        200,
+        [engagement({ expires_at: "2026-09-29T04:30:00Z" })],
+      ],
+    });
     renderApp("/business/engagements");
 
     const progress = await screen.findByRole("list", { name: "Progress" });
@@ -126,5 +131,17 @@ describe("engagement card timeline", () => {
     const progress = await screen.findByRole("list", { name: "Progress" });
     expect(progress).toHaveTextContent("✓ Requested→ ● Declined");
     expect(screen.queryByText(/expires in/)).not.toBeInTheDocument();
+  });
+
+  it("offers to find another CA when a request expired", async () => {
+    loginAs("business");
+    fakeApi({ [`GET ${LIST_URL}`]: [200, [engagement({ status: "expired" })]] });
+    renderApp("/business/engagements");
+
+    expect(await screen.findByText("Expired")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Find another CA" })).toHaveAttribute(
+      "href",
+      "/business/marketplace",
+    );
   });
 });

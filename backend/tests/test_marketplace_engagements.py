@@ -30,6 +30,8 @@ from app.models.enums import FormCode, UserRole
 from app.models.marketplace import CaVerificationStatus, EngagementStatus
 from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.seed import seed_service_catalog
+from app.services import marketplace_service
+from worker import build_scheduler
 
 BASE = "/api/v1/marketplace"
 _numbers = iter(range(100000, 999999))
@@ -697,3 +699,76 @@ def test_cas_offering_my_filings_come_first_with_their_prices(
     # Before registering nothing changes: the usual order (experience, name), no ranking data.
     assert [row["full_name"] for row in plain] == ["Aaron Far", "Zara Near"]
     assert all(row["my_prices"] == [] and row["same_city"] is None for row in plain)
+
+
+# --- MA12: requests nobody answers within 48 hours expire -----------------------------
+
+
+def _make_overdue(database, engagement_id):
+    """Move a request's answer deadline into the past (instead of waiting 48 hours)."""
+    row = database.session.get(Engagement, uuid.UUID(engagement_id))
+    row.expires_at = utcnow() - timedelta(minutes=1)
+    database.session.commit()
+
+
+def test_expire_job_expires_only_overdue_requests(client, setup, mailbox, database, make_ca):
+    overdue = request_gst(client, setup)
+    _make_overdue(database, overdue["id"])
+    # A fresh request (another CA, another business filing) must stay requested.
+    _, other_ca = make_ca({"gstr_3b": "700"}, name="Other CA")
+    mailbox.clear()
+
+    count = marketplace_service.expire_old_requests()
+
+    assert count == 1
+    database.session.expire_all()
+    assert database.session.get(Engagement, uuid.UUID(overdue["id"])).status == "expired"
+    # The business is told, with the service to look for again.
+    assert mailbox[0]["To"] == setup["owner"].email
+    assert "GSTR-3B filing" in mailbox[0].get_content()
+    # The filings are free again: another CA can be requested.
+    again = send_request(client, setup, (setup["gst_3b"], setup["catalog"]["gstr_3b"]), ca=other_ca)
+    assert again.status_code == 201
+
+
+def test_expire_job_leaves_quotes_and_answered_requests(client, setup, database):
+    quoted = request_gst(client, setup)
+    prices = []
+    for item in quoted["items"]:
+        prices.append({"engagement_item_id": item["id"], "price": "900"})
+    action(
+        client, setup["ca_headers"], quoted["id"], "quote", {"reason": "Busy.", "prices": prices}
+    )
+    _make_overdue(database, quoted["id"])
+
+    count = marketplace_service.expire_old_requests()
+
+    assert count == 0
+    database.session.expire_all()
+    assert database.session.get(Engagement, uuid.UUID(quoted["id"])).status == "quoted"
+
+
+@pytest.mark.parametrize("name", ["accept", "decline", "quote"])
+def test_ca_cannot_answer_after_48_hours(client, setup, database, name):
+    engagement = request_gst(client, setup)
+    _make_overdue(database, engagement["id"])
+    body = None
+    if name == "quote":
+        body = {
+            "reason": "Late.",
+            "prices": [{"engagement_item_id": engagement["items"][0]["id"], "price": "1"}],
+        }
+
+    response = action(client, setup["ca_headers"], engagement["id"], name, body)
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "REQUEST_EXPIRED"
+
+
+def test_worker_runs_the_expiry_job_every_15_minutes(app):
+    scheduler = build_scheduler(app)
+
+    job = scheduler.get_job("marketplace.expire_requests")
+
+    assert job is not None
+    assert job.trigger.interval == timedelta(minutes=15)
