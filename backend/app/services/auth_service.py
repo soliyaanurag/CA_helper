@@ -9,6 +9,7 @@ reset_password(email, code, new_password)             sets a new password with t
 change_password(user, current_password, new_password) for a logged-in user
 accept_terms(user)                                    records consent (for accounts from before it)
 list_users(role, search, page, page_size) / count_users_by_role()   for the admin screens
+get_user_for_admin(user_id) / set_user_active(user, active)          suspend / reactivate (AD4)
 issue_access_token(user) -> str                       JWT for a logged-in user
 get_active_user(user_id) -> User | None               used by the JWT user loader
 normalize_email(email) -> str
@@ -215,7 +216,11 @@ def authenticate(email: str, password: str) -> User:
     if not verify_password(user.password_hash, password):
         raise ApiError(401, "INVALID_CREDENTIALS", "Wrong email or password.")
     if not _is_live(user):
-        raise ApiError(403, "ACCOUNT_INACTIVE", "This account is inactive.")
+        raise ApiError(
+            403,
+            "ACCOUNT_INACTIVE",
+            "This account is suspended. Contact the CA Helper team if you think this is a mistake.",
+        )
     if user.email_verified_at is None:
         raise ApiError(403, "EMAIL_NOT_VERIFIED", "Verify your email before logging in.")
 
@@ -322,6 +327,28 @@ def list_users(role: UserRole | None, search: str | None, page: int, page_size: 
         stmt = stmt.where(User.full_name.ilike(pattern) | User.email.ilike(pattern))
     result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
     return {"items": result.items, "page": page, "page_size": page_size, "total": result.total}
+
+
+def get_user_for_admin(user_id) -> User:
+    """A live (not deleted) account by id. 404 USER_NOT_FOUND."""
+    user = db.session.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise ApiError(404, "USER_NOT_FOUND", "This account was not found.")
+    return user
+
+
+def set_user_active(user: User, active: bool) -> None:
+    """Suspend (False) or reactivate (True) an account (AD4). A suspended user cannot log in,
+    and any token they still hold stops working at once (jwt_handlers). Does not commit."""
+    user.is_active = active
+
+
+def names_of(user_ids) -> dict:
+    """{user id: full name} for these accounts (the audit log shows who did what)."""
+    if len(user_ids) == 0:
+        return {}
+    stmt = select(User.id, User.full_name).where(User.id.in_(user_ids))
+    return dict(db.session.execute(stmt).all())
 
 
 def count_users_by_role() -> dict:

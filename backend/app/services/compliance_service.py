@@ -24,6 +24,8 @@ get_filings_by_ids(ids, lock) -> dict               filings by id (used by marke
 mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
 mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
 list_unfiled_filings_due_by(day) -> list            not-filed filings due by a date (used by alerts)
+peer_insights(business, item_id) -> dict            how similar businesses file this form (CO13)
+filing_stats(today) -> dict                         filings by status and the overdue rate (admin)
 
 How forms and due dates work: each row of `obligation_templates` says which
 businesses a form applies to (`applicability`, matched against the regulatory
@@ -35,6 +37,7 @@ import calendar
 import logging
 import re
 from datetime import date
+from zoneinfo import ZoneInfo
 
 import yaml
 from sqlalchemy import or_, select
@@ -53,7 +56,7 @@ from app.models.base import today_in_india, utcnow
 from app.models.compliance import ComplianceStatus, FilingPath, Frequency
 from app.models.documents import DocumentType
 from app.models.enums import FormCode
-from app.services import documents_service
+from app.services import documents_service, onboarding_service
 
 log = logging.getLogger(__name__)
 
@@ -723,3 +726,107 @@ def mark_overdue_filings(today: date | None = None) -> int:
     if len(late) > 0:
         log.info("Marked %d filing(s) overdue", len(late))
     return len(late)
+
+
+# --- Peer insights (CO13) and the admin's numbers (AD5) --------------------------------
+
+# A group's figures are shown only when at least this many businesses have filed the form
+# (fewer would say little and could point at one business). A product rule, not a legal one.
+MIN_PEER_BUSINESSES = 10
+
+
+def filed_on_time(filing: ComplianceItem) -> bool:
+    """Filed on or before its due date, in Indian time."""
+    filed_day = filing.filed_at.astimezone(ZoneInfo("Asia/Kolkata")).date()
+    return filed_day <= filing.due_date
+
+
+def _path_figures(filings, total: int) -> dict:
+    on_time = sum(1 for filing in filings if filed_on_time(filing))
+    return {
+        "count": len(filings),
+        "share_pct": round(len(filings) * 100 / total) if total else None,
+        "on_time_pct": round(on_time * 100 / len(filings)) if filings else None,
+    }
+
+
+def _figures(form_code, business_ids=None) -> dict | None:
+    """Self-filed vs via a CA, and each path's on-time rate, over the filed filings of
+    `form_code` (of `business_ids`, or of every business). None below MIN_PEER_BUSINESSES."""
+    stmt = select(ComplianceItem).where(
+        ComplianceItem.form_code == form_code,
+        ComplianceItem.status.in_(DONE_STATUSES),
+        ComplianceItem.filed_at.is_not(None),
+        ComplianceItem.deleted_at.is_(None),
+    )
+    if business_ids is not None:
+        stmt = stmt.where(ComplianceItem.business_id.in_(business_ids))
+    filings = list(db.session.scalars(stmt))
+    businesses = {filing.business_id for filing in filings}
+    if len(businesses) < MIN_PEER_BUSINESSES:
+        return None
+    self_filed = [f for f in filings if f.filing_path == FilingPath.SELF]
+    with_ca = [f for f in filings if f.filing_path == FilingPath.CA]
+    total = len(self_filed) + len(with_ca)
+    return {
+        "business_count": len(businesses),
+        "filing_count": total,
+        "self": _path_figures(self_filed, total),
+        "ca": _path_figures(with_ca, total),
+    }
+
+
+def peer_insights(business, item_id) -> dict:
+    """How businesses like this one file this form (CO13): the share filed by the business
+    itself and through a CA, and how often each path was on time.
+
+    Segment: the same entity type and MSME tier. Shown only with at least
+    MIN_PEER_BUSINESSES businesses; otherwise the figures over every business
+    ("overall"), or nothing ("none") when even those are too few.
+    """
+    filing = _own_filing(business, item_id)
+    tier = onboarding_service.get_msme_tier(business)
+    scope = "none"
+    figures = None
+    if tier is not None:
+        segment = onboarding_service.business_ids_in_segment(business.entity_type, tier)
+        figures = _figures(filing.form_code, segment)
+        if figures is not None:
+            scope = "segment"
+    if figures is None:
+        figures = _figures(filing.form_code)
+        if figures is not None:
+            scope = "overall"
+    return {
+        "form_code": filing.form_code,
+        "scope": scope,
+        "entity_type": business.entity_type,
+        "msme_tier": tier,
+        "min_businesses": MIN_PEER_BUSINESSES,
+        **(figures or {"business_count": 0, "filing_count": 0, "self": None, "ca": None}),
+    }
+
+
+def filing_stats(today: date | None = None) -> dict:
+    """For the admin dashboard (AD5): live filings by status, and the overdue rate: of the
+    filings whose due date has passed, the share not filed on time (still unfiled, or filed
+    after the due date), in percent (None before anything was due)."""
+    today = today or today_in_india()
+    by_status = {status.value: 0 for status in ComplianceStatus}
+    due = 0
+    late = 0
+    for filing in db.session.scalars(
+        select(ComplianceItem).where(ComplianceItem.deleted_at.is_(None))
+    ):
+        by_status[filing.status.value] += 1
+        if filing.due_date < today:
+            due += 1
+            done = filing.status in DONE_STATUSES and filing.filed_at is not None
+            if not done or not filed_on_time(filing):
+                late += 1
+    return {
+        "filings_by_status": by_status,
+        "filings_due_so_far": due,
+        "filings_late": late,
+        "overdue_rate": round(late * 100 / due, 1) if due else None,
+    }

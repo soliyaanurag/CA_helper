@@ -16,6 +16,19 @@ class AdminStatsSchema(Schema):
     businesses = fields.Integer(required=True)
     cas_by_status = fields.Dict(keys=fields.String(), values=fields.Integer(), required=True)
     open_engagements = fields.Integer(required=True)
+    filings_by_status = fields.Dict(
+        keys=fields.String(),
+        values=fields.Integer(),
+        required=True,
+        metadata={"description": "AD5"},
+    )
+    filings_due_so_far = fields.Integer(required=True, metadata={"description": "Due date passed"})
+    filings_late = fields.Integer(
+        required=True, metadata={"description": "Of those: not filed, or filed after the due date"}
+    )
+    overdue_rate = fields.Float(
+        allow_none=True, metadata={"description": "filings_late / filings_due_so_far, in percent"}
+    )
 
 
 class AdminUserArgsSchema(PageArgsSchema):
@@ -71,3 +84,28 @@ def _not_blank(value: str) -> None:
 
 class RejectCaInputSchema(Schema):
     reason = fields.String(required=True, validate=[validate.Length(1, 500), _not_blank])
+
+
+class SuspendUserInputSchema(Schema):
+    """POST /admin/users/<id>/suspend: an optional reason, kept in the audit log."""
+
+    reason = fields.String(load_default=None, validate=validate.Length(max=500))
+
+
+class AuditLogArgsSchema(PageArgsSchema):
+    pass
+
+
+class AuditLogEntrySchema(Schema):
+    id = fields.UUID(required=True)
+    admin_name = fields.String(allow_none=True)
+    action = fields.String(required=True, metadata={"description": 'e.g. "user.suspend"'})
+    target_type = fields.String(required=True, metadata={"description": '"user", "ca_profile"'})
+    target_id = fields.UUID(allow_none=True)
+    target_name = fields.String(allow_none=True)
+    details = fields.Dict(allow_none=True)
+    created_at = fields.DateTime(required=True)
+
+
+class AuditLogPageSchema(PageSchema):
+    items = fields.List(fields.Nested(AuditLogEntrySchema), required=True)

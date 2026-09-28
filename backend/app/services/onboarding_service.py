@@ -8,6 +8,7 @@ compute_profile(business, today) -> dict  the profile values plus a "why" for ea
 get_business(business_id) -> Business     one business by id (used by marketplace)
 get_msme_tier(business) -> str | None     "micro", "small", ... (used by marketplace pro-bono)
 get_itr_form(business) -> str | None      its profile's ITR form, e.g. "itr_5" (used by marketplace)
+business_ids_in_segment(entity, tier)     live businesses of one type and MSME tier (peer insights)
 
 The profile is computed from legal thresholds stored in `rule_thresholds` (read
 with _threshold()); no legal number is written in this file (CLAUDE.md rule 3).
@@ -346,3 +347,17 @@ def get_msme_tier(business: Business) -> str | None:
     if profile is None:
         return None
     return profile.msme_tier.value
+
+
+def business_ids_in_segment(entity_type, msme_tier) -> set:
+    """The live businesses with this entity type and MSME tier (peer insights, CO13)."""
+    stmt = (
+        select(Business.id)
+        .join(RegulatoryProfile, RegulatoryProfile.business_id == Business.id)
+        .where(
+            Business.deleted_at.is_(None),
+            Business.entity_type == entity_type,
+            RegulatoryProfile.msme_tier == msme_tier,
+        )
+    )
+    return set(db.session.scalars(stmt))

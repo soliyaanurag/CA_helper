@@ -8,6 +8,7 @@
     POST /compliance/items/<id>/mark-filed       filed it myself, with the acknowledgement (CO9)
     POST /compliance/items/<id>/unmark-filed     undo a mistaken "mark as filed"
     GET  /compliance/items/<id>/acknowledgement  the uploaded acknowledgement file
+    GET  /compliance/items/<id>/peer-insights    how similar businesses file it (CO13)
     GET  /compliance/forms/<form_code>           a form's explanation, instructions, checklist (CO6)
 
 Routes stay thin: parse input (app/schemas/), call one service function, serialize
@@ -31,6 +32,7 @@ from app.schemas.compliance import (
     ItemListArgsSchema,
     MarkFiledFileSchema,
     MarkFiledFormSchema,
+    PeerInsightsSchema,
 )
 from app.services import compliance_service
 from app.utils.decorators import (
@@ -131,6 +133,15 @@ def get_acknowledgement(item_id):
     return send_file(
         io.BytesIO(data), mimetype=document.mime_type, download_name=document.original_filename
     )
+
+
+# How businesses like this one file this form: themselves or through a CA, and on time (CO13).
+@blp.route("/compliance/items/<uuid:item_id>/peer-insights", methods=["GET"])
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, PeerInsightsSchema)
+@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND, FILING_NOT_FOUND")
+def get_peer_insights(item_id):
+    return compliance_service.peer_insights(current_business(), item_id)
 
 
 # A form's explanation, self-filing instructions and document checklist (any logged-in user).
