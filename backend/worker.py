@@ -14,7 +14,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
 from app import create_app
-from app.services import compliance_service, marketplace_service
+from app.services import alerts_service, compliance_service, marketplace_service
 
 log = logging.getLogger("worker")
 
@@ -60,6 +60,12 @@ def build_scheduler(app: Flask) -> AppScheduler:
         "interval",
         minutes=15,
         id="marketplace.expire_requests",
+    )
+
+    # AL2: every morning, deadline (T-7/T-3/T-1) and overdue reminders, by tray and email.
+    # 08:15, after the hourly overdue job has had a chance to run.
+    scheduler.add_job(
+        alerts_service.send_reminders, "cron", hour=8, minute=15, id="alerts.reminders"
     )
     return scheduler
 

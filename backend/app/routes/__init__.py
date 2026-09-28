@@ -7,6 +7,7 @@
     marketplace.py   /api/v1/marketplace/...
     onboarding.py    /api/v1/onboarding/...
     admin.py         /api/v1/admin/...
+    alerts.py        /api/v1/alerts/...
 
 Add a new feature's blueprint to BLUEPRINTS below. Routes stay thin: parse input
 (app/schemas/), call one service function (app/services/), serialize the result.
@@ -14,7 +15,16 @@ Add a new feature's blueprint to BLUEPRINTS below. Routes stay thin: parse input
 
 from flask_smorest import Api
 
-from app.routes import admin, auth, ca_workspace, compliance, health, marketplace, onboarding
+from app.routes import (
+    admin,
+    alerts,
+    auth,
+    ca_workspace,
+    compliance,
+    health,
+    marketplace,
+    onboarding,
+)
 
 # Every feature route lives under this prefix (docs/API_CONVENTIONS.md).
 # /api/health, /api/docs and /api/openapi.json stay unversioned.
@@ -27,6 +37,7 @@ BLUEPRINTS = [
     ca_workspace.blp,
     marketplace.blp,
     admin.blp,
+    alerts.blp,
 ]
 
 

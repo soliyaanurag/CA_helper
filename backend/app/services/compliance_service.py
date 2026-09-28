@@ -17,6 +17,7 @@ get_acknowledgement(business, item_id)              the uploaded acknowledgement
 get_filings_by_ids(ids, lock) -> dict               filings by id (used by marketplace)
 mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
 mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
+list_unfiled_filings_due_by(day) -> list            not-filed filings due by a date (used by alerts)
 
 How forms and due dates work: each row of `obligation_templates` says which
 businesses a form applies to (`applicability`, matched against the regulatory
@@ -584,6 +585,24 @@ def mark_filings_with_ca(filing_ids) -> None:
     for filing in get_filings_by_ids(filing_ids).values():
         filing.status = ComplianceStatus.WITH_CA
         filing.filing_path = FilingPath.CA
+
+
+# --- Used by the alerts module (reminders) --------------------------------------------
+
+
+def list_unfiled_filings_due_by(day: date) -> list[ComplianceItem]:
+    """Every business's live filings that are not filed yet and are due on or before `day`,
+    soonest due first. The reminder job picks from these."""
+    stmt = (
+        select(ComplianceItem)
+        .where(
+            ComplianceItem.due_date <= day,
+            ComplianceItem.status.not_in(DONE_STATUSES),
+            ComplianceItem.deleted_at.is_(None),
+        )
+        .order_by(ComplianceItem.due_date)
+    )
+    return list(db.session.scalars(stmt))
 
 
 # --- Worker job (CO11) ---------------------------------------------------------------

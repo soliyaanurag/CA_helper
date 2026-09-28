@@ -1,0 +1,10 @@
+Hello {{ name }},
+
+{{ title }}
+
+{{ body }}
+
+You can see it in the notification tray (the bell) in CA Helper.
+To change which emails you get, open "Notification settings".
+
+CA Helper

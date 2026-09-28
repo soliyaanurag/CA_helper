@@ -12,7 +12,8 @@ passwords nobody knows, so they cannot log in) fill the marketplace list. The
 service catalog is seeded here too (an admin editor comes later), and the four
 sample CAs get prices so some typical price ranges show up. The legal rule
 thresholds and the obligation templates of the 7 forms are seeded too, all marked
-TODO_VERIFY until someone checks them (docs/TODO_VERIFY.md).
+TODO_VERIFY until someone checks them (docs/TODO_VERIFY.md). The penalty rules of the 7
+forms are seeded with every amount empty (NULL, TODO_VERIFY): no amount is confirmed yet.
 
 Every seed function
 must be safe to re-run (it skips rows that already exist) and must not commit:
@@ -35,6 +36,7 @@ from app.models import (
     CaService,
     CatalogService,
     ObligationTemplate,
+    PenaltyRule,
     RuleThreshold,
     User,
 )
@@ -577,6 +579,33 @@ def seed_obligation_templates() -> None:
             )
 
 
+# One penalty rule per form: (form, where to look), every amount empty until it is confirmed
+# from an official source (docs/TODO_VERIFY.md, "Penalties"). The sections named are only
+# pointers for whoever verifies them, and must be checked too.
+PENALTY_RULES = [
+    (FormCode.GSTR_1, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
+    (FormCode.GSTR_3B, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
+    (FormCode.CMP_08, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
+    (FormCode.GSTR_4, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
+    (FormCode.TDS_24Q, "TODO_VERIFY: Income-tax Act s.234E (late fee)"),
+    (FormCode.TDS_26Q, "TODO_VERIFY: Income-tax Act s.234E (late fee)"),
+    (FormCode.ITR, "TODO_VERIFY: Income-tax Act s.234F (flat late fee) and s.234A (interest)"),
+]
+
+
+def seed_penalty_rules() -> None:
+    for form, source in PENALTY_RULES:
+        exists = db.session.scalar(
+            select(PenaltyRule.id).where(
+                PenaltyRule.form_code == form, PenaltyRule.effective_from == RULES_FROM
+            )
+        )
+        if not exists:
+            db.session.add(
+                PenaltyRule(form_code=form, source_reference=source, effective_from=RULES_FROM)
+            )
+
+
 # (name, function) in dependency order: users first, other data may refer to them.
 SEEDS = [
     ("demo users", seed_demo_users),
@@ -585,6 +614,7 @@ SEEDS = [
     ("CA prices", seed_ca_prices),
     ("rule thresholds", seed_rule_thresholds),
     ("obligation templates", seed_obligation_templates),
+    ("penalty rules", seed_penalty_rules),
 ]
 
 
