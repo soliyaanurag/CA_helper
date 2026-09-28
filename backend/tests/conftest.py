@@ -12,6 +12,9 @@ Fixtures:
     mailbox      emails "sent" during the test (list of EmailMessage); emptied before each test
     upload_dir   the temporary folder uploaded files are written to (autouse)
     legal_rules  the seeded rule thresholds and obligation templates (app/seed.py), committed
+    business_with_filings
+                 a registered QRMP business (no TDS) with this year's filings, created on
+                 27 Sep 2026; its owner is `database.session.get(User, business.user_id)`
 
 Rate-limit counters are cleared before every test (autouse), so login tests
 never hit the limit because of earlier tests.
@@ -21,6 +24,7 @@ automatically if it does not exist. It needs `make infra` to be running.
 """
 
 import re
+from datetime import date
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -30,11 +34,13 @@ from sqlalchemy.exc import OperationalError
 from app import create_app
 from app.extensions import db as _db
 from app.extensions import limiter
-from app.models import User
+from app.models import Business, RegulatoryProfile, User
 from app.models.base import utcnow
 from app.models.enums import UserRole
+from app.models.onboarding import EntityType, GstScheme
 from app.seed import seed_obligation_templates, seed_rule_thresholds
 from app.services.auth_service import issue_access_token
+from app.services.compliance_service import create_filings
 from app.utils.email import outbox
 from app.utils.passwords import hash_password
 
@@ -173,3 +179,34 @@ def legal_rules(database):
     seed_rule_thresholds()
     seed_obligation_templates()
     database.session.commit()
+
+
+@pytest.fixture()
+def business_with_filings(make_user, legal_rules, database):
+    """A QRMP business (GSTR-1, GSTR-3B quarterly, ITR; no TDS) with this year's filings,
+    made on 27 Sep 2026. Q1 is due in July (overdue), Q2's GSTR-1 on 13 Oct 2026."""
+    owner = make_user(role=UserRole.BUSINESS, full_name="Asha Rao")
+    business = Business(
+        user_id=owner.id,
+        legal_name="Asha Traders",
+        entity_type=EntityType.PROPRIETORSHIP,
+        state="Maharashtra",
+        address="Pune",
+        description="Retail shop",
+        annual_turnover=4_500_000,
+        investment_amount=800_000,
+        pan="ABCDE1234F",
+        phone="9876543210",
+        gst_registered=True,
+        gstin="27ABCDE1234F1Z5",
+        deducts_tds=False,
+        pays_salary_above_limit=False,
+    )
+    database.session.add(business)
+    database.session.commit()
+    profile = RegulatoryProfile(
+        gst_scheme=GstScheme.REGULAR_QRMP, audit_applicable=False, files_24q=False, files_26q=False
+    )
+    create_filings(business.id, profile, date(2026, 9, 27))
+    database.session.commit()
+    return business

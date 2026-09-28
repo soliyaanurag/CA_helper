@@ -42,12 +42,17 @@ def current_user() -> User:
     return get_current_user()
 
 
+def current_business_or_none() -> Business | None:
+    """The logged-in business user's registered business, or None before registration."""
+    return db.session.scalar(
+        select(Business).where(Business.user_id == current_user().id, Business.deleted_at.is_(None))
+    )
+
+
 def current_business() -> Business:
     """The logged-in business user's registered business. Call only behind
     @roles_required(UserRole.BUSINESS). 404 BUSINESS_NOT_FOUND before registration."""
-    business = db.session.scalar(
-        select(Business).where(Business.user_id == current_user().id, Business.deleted_at.is_(None))
-    )
+    business = current_business_or_none()
     if business is None:
         raise ApiError(404, "BUSINESS_NOT_FOUND", "Register your business first.")
     return business
