@@ -10,6 +10,10 @@ import { cn } from "@/lib/utils";
  * Layout for the logged-in areas (/business, /ca, /admin): sidebar with the
  * role's links, user name, change password + logout, and the current page (<Outlet />).
  * `nav` is a list of { label, path } links (NAV in routes.jsx).
+ *
+ * The sidebar is exactly one screen tall and stays in place while the page scrolls
+ * (sticky top-0 h-screen), so the name, "Change password" and "Log out" are always
+ * visible at its bottom. If there are more links than fit, only the link list scrolls.
  */
 export function AppShell({ role, nav }) {
   const { user, logout } = useAuth();
@@ -18,12 +22,15 @@ export function AppShell({ role, nav }) {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-muted/40 p-4">
+      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-muted/40 p-4">
         <Link to={home} className="text-lg font-semibold">
           CA Helper
         </Link>
         <p className="text-xs text-muted-foreground">{title}</p>
-        <nav className="mt-6 flex flex-col gap-1" aria-label={`${title} navigation`}>
+        <nav
+          className="mt-6 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+          aria-label={`${title} navigation`}
+        >
           {nav.map((item) => (
             <NavLink
               key={item.path}
@@ -40,7 +47,7 @@ export function AppShell({ role, nav }) {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto space-y-2 border-t pt-4">
+        <div className="space-y-2 border-t pt-4">
           <p className="truncate text-sm">{user?.full_name}</p>
           <Button asChild variant="ghost" size="sm" className="w-full">
             <Link to={`${home}/change-password`}>Change password</Link>
