@@ -4,10 +4,11 @@
 Business registration (mandatory + conditional fields), the rule engine that derives the regulatory profile (MSME tier, GST scheme, ITR form, presumptive eligibility, tax audit, TDS returns) with a "why" for every line, NIC code selection, OCR auto-fill and the profile lifecycle check.
 
 ## What exists now
-Registration, editing and the regulatory profile work (ON1–ON8), and the NIC activity code (ON9, ON10).
+Registration, editing and the regulatory profile work (ON1–ON8), the NIC activity code (ON9, ON10) and OCR auto-fill (ON13).
 - **Backend:**
   - `routes/onboarding.py`: `POST`, `GET` and `PUT /api/v1/onboarding/business`, `GET /api/v1/onboarding/states` (business role only).
   - **Editing (ON8):** `update_business(business, data)` saves the form, recomputes the profile in place and syncs this year's filings (`compliance_service.sync_filings()`), then returns what changed: the profile lines (codes before and after) and the filings added, reactivated, removed, moved and kept because a CA has them (`marketplace_service.open_filing_ids()`).
+  - **OCR auto-fill (ON13):** `POST /api/v1/onboarding/autofill` (multipart `file`, business role, 10 per minute) → `read_registration_document(upload)`: the upload checks (`storage.check_file`), local OCR (`utils/ocr.py`) and `document_text.read_registration()` → `{found: {pan?, gstin?, legal_name?, state?, entity_type?}}`. The file is read in memory and **never stored**; nothing is saved to the business. 422 `DOCUMENT_UNREADABLE`. Frontend: "Fill in from your GST certificate or PAN card" at the top of the registration form (not when editing) fills the found fields (and ticks "GST registered" when a GSTIN was found) and says which, so the user checks them.
   - **GSTIN checks (ON3):** `app/utils/gstin.py`: the mod-36 check character, the state code must be the chosen state's, and characters 3–12 must be the PAN; one error message each. The frontend has the same checks in `lib/gstin.js`.
   - **States:** a dropdown from `content/reference/gst_states.json` (states and UTs with their GST codes, source note, **TODO_VERIFY**). `businesses.state` still holds the name; a name typed before the list existed is flagged (`state_needs_review`) and must be chosen again on the next edit.
   - **Amounts in explanations** use the Indian format (`format_inr()` in `app/utils/money.py`: ₹45,00,000).
@@ -44,6 +45,7 @@ Created by migration `schema: complete data model`; `businesses.gst_composition`
 | POST | `/api/v1/onboarding/nic-suggestions` | business | `{picks: [{code, description, reason, source: "ai" \| "keywords"}] (≤3), shortlist: [{code, description}], ai_used}` (nothing saved) · 404 `BUSINESS_NOT_FOUND` · 429 (10 per minute) |
 | GET | `/api/v1/onboarding/nic-codes?q=` | business | `[{code, description}]`, at most 20 (fewer than 2 characters → `[]`) |
 | PUT | `/api/v1/onboarding/business/nic-code` | business | body `{code}` → `{code, description}` · 404 `BUSINESS_NOT_FOUND` · 422 `UNKNOWN_NIC_CODE` |
+| POST | `/api/v1/onboarding/autofill` | business, 10 per minute | multipart `file` (GST certificate or PAN card) → `{found: {pan?, gstin?, legal_name?, state?, entity_type?}}` · 400 `FILE_EMPTY`, `FILE_TYPE_NOT_ALLOWED`, `FILE_TOO_LARGE` · 422 `DOCUMENT_UNREADABLE`; nothing is stored |
 
 `GET`, `POST` and `PUT /onboarding/business` also return `nic_code: {code, description}` or `null`.
 

@@ -5,17 +5,29 @@ Encrypted upload/download of documents (acknowledgements, checklist documents), 
 
 ## What exists now
 The vault (DO2–DO7): upload, list with filters, download, soft delete, and links between documents and filings
-(per checklist entry). OCR is not built yet; `on_document_uploaded()` is where it plugs in.
+(per checklist entry). Local OCR (B2): every upload is read (ON12), acknowledgements verify filings (DO8) and files
+that look like another type are flagged (DO9).
 - **Encrypted storage** (core-infra): `app/utils/storage.py` `save_file(data, mime_type)` checks the type by the
   file's first bytes (PDF, JPG, PNG only) and the size (`MAX_UPLOAD_MB`), encrypts with Fernet and writes it to
   `UPLOAD_DIR` (default `backend/instance/uploads`, gitignored) under a random key; `open_file(key)`,
   `delete_file(key)`. Tests: `tests/test_storage.py`.
 - **Backend** (`services/documents_service.py`, `routes/documents.py`, `schemas/documents.py`):
   - `add_document(owner_id, uploaded_by_id, upload, doc_type)` stores the file, adds and flushes the `documents`
-    row (name, type, size, SHA-256; no commit), then calls **`on_document_uploaded(document)`**. Every upload goes
-    through it: vault, acknowledgement (compliance), Certificate of Practice (marketplace).
-  - **`on_document_uploaded(document)` is a no-op: the OCR hook (DO8, DO9).** Local OCR will read the file there
-    and fill `ocr_status` / `ocr_fields`; it does not commit and must never send the file anywhere (rule 2).
+    row (name, type, size, SHA-256; no commit), then calls **`on_document_uploaded(document, data)`**. Every upload
+    goes through it: vault, acknowledgement (compliance), Certificate of Practice (marketplace).
+  - **`on_document_uploaded(document, data)` (ON12):** reads the file locally (`utils/ocr.py`) and stores only
+    non-personal facts in `ocr_fields` (`utils/document_text.read_proof_fields`: `acknowledgement_no`,
+    `filing_date`, `form_codes`, `months`, `months_with_year`, `financial_years`, `quarters`, `type_guess`), with
+    `ocr_status` `processed`; an unreadable file gets `failed` and `{"error": "..."}`. The text, PAN, GSTIN and
+    names are never stored (rule 4). OCR never makes an upload fail. No commit.
+  - **Type check (DO9):** `type_warning(document)` is the guessed type when it differs from the uploaded type
+    (never for `other`); every listed document has `type_warning` (null when fine). The vault shows "Looks like:
+    Bank statement" under the type.
+  - **Proof of filing (DO8):** `verify_acknowledgement(document, filing) -> {verified, problems,
+    acknowledgement_no, filing_date}`: the file must name the form, show the period (a month: its name with the
+    financial year, or "092026"; a quarter: the financial year with "Q2" or one of its months; a year: the financial
+    year, or for ITR the assessment year after it), have a number (equal to the typed one, if any) and a filing date
+    on or after the period's end. Used by compliance when a filing is marked filed (CO10).
   - Upload (DO2): type (any `DocumentType` but `certificate_of_practice`), optional `fy` (`2026-27`) and
     `period_label`. With `compliance_item_id` (+ `checklist_key`, default `general`) the same request links the file
     to that filing; the link is checked **before** the file is stored, and a linked file without its own FY or
@@ -49,8 +61,9 @@ The vault (DO2–DO7): upload, list with filters, download, soft delete, and lin
   acknowledgement for the CA, admin 403, links tick, general links, several filings, upload-and-link, key and
   filing checks, unlink, filed filings fixed, `with_ca` filings, delete rules); frontend `DocumentsPage.test.jsx`
   and the "filing page documents" tests in `FilingPage.test.jsx`.
-- The OCR helper (`app/utils/ocr.py`) does not exist yet, nor its packages (pytesseract, PyMuPDF) or the Tesseract
-  binary in the conda env.
+- OCR runs in the upload request (a text PDF: milliseconds; a photo: well under a second on a laptop).
+- **Tests:** `tests/test_ocr.py` (reading PDFs, photos and scans; the facts found; nothing personal stored; type
+  warning; verified / not verified filings, typed ARN, unreadable file, undo, the CA path; auto-fill).
 
 ## Tables
 Created by migration `schema: complete data model`; no migration in this module yet. Columns, constraints and status
@@ -84,7 +97,8 @@ links: [{id, compliance_item_id, form_code, period_label, checklist_key}], ackno
   The CA workspace opens files with `/api/v1/documents/{id}/file`.
 - `attach_document(business, user, document_id, item_id, key) -> Document` (link without commit; ca_workspace
   fulfils a request with it), `documents_by_filing(filings) -> {filing id: [file]}` (the CA's client workspace).
-- Planned: `verify_acknowledgement(document_id)` (used by compliance, ca_workspace).
+- `verify_acknowledgement(document, filing) -> dict` (DO8; used by compliance for the business and the CA),
+  `type_warning(document)` (DO9).
 
 ## Depends on
 core-infra (encrypted storage, OCR), compliance (`get_filings_by_ids`, `checklist_keys`, `tick_checklist_entry`,
@@ -95,7 +109,8 @@ other while it is being imported. Keep it that way.
 
 ## Contracts (don't change without telling the team)
 - Files are encrypted at rest and never leave the server (rule 2); OCR is local only
-- Every upload calls `on_document_uploaded(document)` once, after the row has an id and before the commit
+- Every upload calls `on_document_uploaded(document, data)` once, after the row has an id and before the commit
+- `ocr_fields` holds only non-personal facts (never text, PAN, GSTIN or names)
 - A CA opens a document only through `ca_can_access_document`; admins never get contents from these routes
 - A filed filing's links and acknowledgement cannot be removed or deleted (they are its proof)
 
