@@ -74,7 +74,9 @@ Planned: refresh, logout.
 - `current_business()` from `app.utils.decorators`: the logged-in business user's registered business, or 404 `BUSINESS_NOT_FOUND` (use behind `@roles_required(UserRole.BUSINESS)`; example: `GET /compliance/items`).
 - `UserRole` from `app.models.enums`.
 - `issue_access_token(user)`, `get_active_user(user_id)`, `normalize_email(email)` from `app.services.auth_service`.
-- Planned: `ca_has_active_access(ca_id, business_id)`.
+- `require_ca_access(business_id)` (in `app/utils/decorators.py`, MA14): for CA routes that read a business's
+  data; 404 `BUSINESS_NOT_FOUND` unless the logged-in CA has an active engagement with it. It calls
+  `marketplace_service.ca_has_active_access(ca_profile_id, business_id)`.
 
 ## Depends on
 core-infra (`send_email()` in `app/utils/email.py`), marketplace (engagement status for `ca_has_active_access`).

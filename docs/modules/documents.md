@@ -21,6 +21,8 @@ None yet. Planned: `/api/v1/documents/...` (upload, list, download).
 
 ## Service functions other modules call
 - `add_document(owner_id, uploaded_by_id, upload, doc_type) -> Document` (no commit), `read_document(document_id) -> (Document, bytes)`, `remove_document(document_id)` (no commit). Used by marketplace (certificate) and admin (download).
+- `document_ids_for_filings(filing_ids) -> set`: live documents linked to those filings (used by marketplace's
+  `ca_can_access_document`, MA14).
 - Planned: `verify_acknowledgement(document_id)` (used by compliance, ca_workspace).
 
 ## Depends on

@@ -17,6 +17,13 @@ list_business_engagements(business) -> list          the business's engagements,
 list_ca_engagements(user) -> list                    the CA's engagements, newest first
 accept_request / send_quote / decline_request / complete_engagement(user, id)    CA actions
 expire_old_requests() -> int                         worker job: unanswered requests expire (MA12)
+
+Access checks (MA14): the ONLY way to decide what a CA may see of a business (CLAUDE.md rule 5):
+ca_has_active_access(ca_profile_id, business_id) -> bool     an ACTIVE engagement between them?
+active_engagement_item_ids(ca_profile_id, business_id)      filings the CA works on (active)
+open_engagement_item_ids(ca_profile_id, business_id)        filings in a request or active work
+ca_can_access_document(ca_profile_id, document_id) -> bool  a document of one of those filings?
+own_profile_id(user) -> uuid | None                          the logged-in CA's profile id
 accept_quote / reject_quote / withdraw_request(business, id)                    business actions
 
 Engagement lifecycle: requested -> active (the CA accepts at the listed prices), or
@@ -1027,3 +1034,77 @@ def _service_names(engagement: Engagement) -> str:
         if service.name not in names:
             names.append(service.name)
     return ", ".join(names)
+
+
+# --- Access checks (MA14): what a CA may see of a business ------------------------------
+# docs/DATA_MODEL.md, "Who may read what". Only an ACTIVE engagement gives access to the
+# business's data, and only to the filings in it. After the engagement ends (completed,
+# declined, expired, cancelled) the CA sees nothing of that business any more.
+
+
+def own_profile_id(user: User):
+    """The logged-in CA's profile id, or None if they have not saved a profile."""
+    profile = _find_profile(user)
+    if profile is None:
+        return None
+    return profile.id
+
+
+def ca_has_active_access(ca_profile_id, business_id) -> bool:
+    """True while the CA has an ACTIVE engagement with the business."""
+    stmt = select(Engagement.id).where(
+        Engagement.ca_profile_id == ca_profile_id,
+        Engagement.business_id == business_id,
+        Engagement.status == EngagementStatus.ACTIVE,
+    )
+    return db.session.scalar(stmt) is not None
+
+
+def _item_ids(ca_profile_id, business_id, statuses) -> set:
+    """The filings in this CA's engagements with this business that have one of `statuses`."""
+    stmt = (
+        select(EngagementItem.compliance_item_id)
+        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
+        .where(
+            Engagement.ca_profile_id == ca_profile_id,
+            Engagement.business_id == business_id,
+            Engagement.status.in_(statuses),
+        )
+    )
+    return set(db.session.scalars(stmt))
+
+
+def active_engagement_item_ids(ca_profile_id, business_id) -> set:
+    """The filings the CA works on for this business (in ACTIVE engagements only).
+
+    A business may have two CAs (e.g. one for GST, one for ITR): each sees only their own.
+    """
+    return _item_ids(ca_profile_id, business_id, [EngagementStatus.ACTIVE])
+
+
+def open_engagement_item_ids(ca_profile_id, business_id) -> set:
+    """The filings in the CA's open engagements with this business (requested, quoted or
+    active): what a CA may see a summary of while deciding on a request."""
+    return _item_ids(ca_profile_id, business_id, OPEN_STATUSES)
+
+
+def ca_can_access_document(ca_profile_id, document_id) -> bool:
+    """True only for a document linked to a filing of one of the CA's ACTIVE engagements:
+    a document attached to the filing, or the filing's acknowledgement."""
+    stmt = (
+        select(EngagementItem.compliance_item_id)
+        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
+        .where(
+            Engagement.ca_profile_id == ca_profile_id,
+            Engagement.status == EngagementStatus.ACTIVE,
+        )
+    )
+    filing_ids = set(db.session.scalars(stmt))
+    if len(filing_ids) == 0:
+        return False
+
+    allowed = documents_service.document_ids_for_filings(filing_ids)
+    for filing in compliance_service.get_filings_by_ids(filing_ids).values():
+        if filing.acknowledgement_document_id is not None:
+            allowed.add(filing.acknowledgement_document_id)
+    return document_id in allowed

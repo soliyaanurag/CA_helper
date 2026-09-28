@@ -147,7 +147,21 @@ status.
 Planned: admin verification and the service catalog under `/api/v1/admin/...`.
 
 ## Service functions other modules call
-None yet. Planned: `has_active_engagement(ca_id, business_id)` (used by `ca_has_active_access`), `engagement_status_for(item_id)` (used by compliance).
+Access checks (MA14), the ONLY way to decide what a CA may see of a business (CLAUDE.md rule 5; rules in
+`docs/DATA_MODEL.md`, "Who may read what"):
+- `ca_has_active_access(ca_profile_id, business_id) -> bool`: an `active` engagement between them.
+- `active_engagement_item_ids(ca_profile_id, business_id) -> set`: the filings the CA works on (active only); with
+  two CAs on one business, each gets only their own.
+- `open_engagement_item_ids(ca_profile_id, business_id) -> set`: filings in their requested, quoted or active
+  engagements (what a CA may see a summary of while deciding).
+- `ca_can_access_document(ca_profile_id, document_id) -> bool`: a document linked to one of those active filings
+  (`compliance_item_documents`) or its acknowledgement.
+- `own_profile_id(user)`: the logged-in CA's profile id (None without a profile).
+- In a CA route: `require_ca_access(business_id)` from `app/utils/decorators.py` → 404 `BUSINESS_NOT_FOUND`
+  unless active access. Access ends when the engagement ends (completed, declined, expired, cancelled).
+
+Also used by other modules: `open_filing_ids(filing_ids)` (onboarding), the admin helpers (admin).
+Planned: `engagement_status_for(item_id)` (compliance).
 
 ## Depends on
 core-auth (users, roles, `current_business()`), compliance (`list_filings`, `get_filings_by_ids`,

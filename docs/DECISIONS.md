@@ -4,6 +4,21 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Access checks (MA14): only an ACTIVE engagement opens a business to a CA
+
+**What**
+- `marketplace_service.ca_has_active_access(ca_profile_id, business_id)` is true only while an engagement between
+  them is `active`; `active_engagement_item_ids` gives the filings of those engagements (so two CAs on one business
+  each see only their own); `open_engagement_item_ids` adds requested and quoted ones (for a summary while
+  deciding); `ca_can_access_document` allows only documents linked to active filings or their acknowledgement.
+- CA routes call `require_ca_access(business_id)` (`app/utils/decorators.py`), which answers 404
+  `BUSINESS_NOT_FOUND` (not 403) without access.
+- Access ends with the engagement (completed, declined, expired, cancelled); no read-only period after completion.
+
+**Why:** it follows the "Who may read what" table in `DATA_MODEL.md` and CLAUDE.md rule 5. A 404 does not reveal
+that a business exists. Ending access at completion is the simplest safe rule; a read-only period can be added
+later if CAs need to download acknowledgements after finishing.
+
 ## 2026-09-28: Request expiry (MA12): a 15-minute worker job, plus a check on every answer
 
 **What**
