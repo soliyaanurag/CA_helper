@@ -90,6 +90,7 @@ make infra          # Postgres + Mailpit in Docker (waits until healthy)
 make migrate        # apply database migrations
 make seed           # demo users, one per role (logins in "Quick start (manual)")
 make seed-demo      # optional: fictional demo data for every flow ("Demo script" below)
+make assistant-ingest  # the AI assistant's knowledge base from content/ (needs GEMINI_API_KEY; re-run after content changes)
 make dev-backend    # API (python main.py) with auto-reload -> http://localhost:8000
 make dev-worker     # background jobs (APScheduler), separate process
 make dev-frontend   # Vite dev server                      -> http://localhost:5173

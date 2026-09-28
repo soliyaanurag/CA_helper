@@ -102,8 +102,8 @@ Column types are in the model files; this lists what each table is for and its k
 ### assistant (`models/assistant.py`)
 | Table | One row is... | Key fields |
 |---|---|---|
-| `kb_chunks` | a chunk of our content or an official FAQ | source_path, title, url, chunk_index, content, embedding `vector(768)` (pgvector). Unique (source_path, chunk_index). No FKs, no user data; no vector index yet (exact search is fast enough at this size) |
-| `chat_messages` (SD) | one message of a user's assistant chat | user_id → users (indexed), role, content, citations (JSONB) |
+| `kb_chunks` | a chunk of our content or an official FAQ | source_path, title, url, chunk_index, content, embedding `vector(768)` (pgvector). Unique (source_path, chunk_index). No FKs, no user data; no vector index yet (exact search is fast enough at this size). Filled by `flask assistant ingest` from `content/forms/` and `content/faqs/` |
+| `chat_messages` (SD) | one message of a user's assistant chat | user_id → users (indexed), role, content, citations (JSONB; for an answer `{sources: [{number, title, url, source_path, excerpt}], ask_a_ca, ai_used}`, empty for a question) |
 
 ### admin (`models/admin.py`)
 | Table | One row is... | Key fields |
