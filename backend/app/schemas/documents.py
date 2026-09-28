@@ -41,6 +41,12 @@ class DocumentSchema(Schema):
     fy = fields.String(allow_none=True, metadata={"description": 'e.g. "2026-27"'})
     period_label = fields.String(allow_none=True, metadata={"description": 'e.g. "Apr 2026"'})
     ocr_status = fields.Enum(OcrStatus, by_value=True, required=True)
+    type_warning = fields.Enum(
+        DocumentType,
+        by_value=True,
+        allow_none=True,
+        metadata={"description": "What the file looks like when it differs from doc_type (DO9)"},
+    )
     created_at = fields.DateTime(required=True)
     links = fields.List(
         fields.Nested(DocumentLinkSchema),

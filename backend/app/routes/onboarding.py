@@ -7,6 +7,7 @@
     POST /api/v1/onboarding/nic-suggestions  business only   up to 3 suggested NIC codes
     GET  /api/v1/onboarding/nic-codes?q=     business only   search the NIC list
     PUT  /api/v1/onboarding/business/nic-code  business only  save the confirmed NIC code
+    POST /api/v1/onboarding/autofill   business only   read a GST certificate / PAN card (OCR)
 
 Each route only checks who is calling, reads the input, calls one function in
 app/services/onboarding_service.py and returns its result as JSON.
@@ -18,6 +19,7 @@ from app.errors import ErrorSchema
 from app.extensions import limiter
 from app.models.enums import UserRole
 from app.schemas.onboarding import (
+    AutofillSchema,
     BusinessInputSchema,
     GstStateSchema,
     MyBusinessSchema,
@@ -26,6 +28,7 @@ from app.schemas.onboarding import (
     NicCodeSchema,
     NicSearchQuerySchema,
     NicSuggestionSchema,
+    RegistrationUploadSchema,
 )
 from app.services import onboarding_service
 from app.utils.decorators import current_business, current_user, roles_required
@@ -102,3 +105,17 @@ def set_nic_code(data):
 @blp.response(200, GstStateSchema(many=True))
 def list_states():
     return onboarding_service.list_states()
+
+
+# ON13: read a GST certificate or PAN card (locally, not stored) to fill the form.
+@blp.route("/onboarding/autofill", methods=["POST"])
+@limiter.limit("10 per minute")
+@roles_required(UserRole.BUSINESS)
+@blp.arguments(RegistrationUploadSchema, location="files")
+@blp.response(200, AutofillSchema)
+@blp.alt_response(
+    400, schema=ErrorSchema, description="FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, FILE_TOO_LARGE"
+)
+@blp.alt_response(422, schema=ErrorSchema, description="DOCUMENT_UNREADABLE")
+def autofill(files):
+    return onboarding_service.read_registration_document(files["file"])

@@ -12,6 +12,7 @@ business_ids_in_segment(entity, tier)     live businesses of one type and MSME t
 suggest_nic_codes(business) -> dict       up to 3 real NIC codes for its description (ON10)
 search_nic_codes(query) -> list           manual search of the NIC list
 set_nic_code(business, code) -> NicCode   save the code the user confirmed
+read_registration_document(upload) -> dict  values read from a GST certificate / PAN card (ON13)
 
 The profile is computed from legal thresholds stored in `rule_thresholds` (read
 with _threshold()); no legal number is written in this file (CLAUDE.md rule 3).
@@ -31,7 +32,7 @@ from app.models import Business, NicCode, RegulatoryProfile, RuleThreshold, User
 from app.models.base import today_in_india, utcnow
 from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.services import compliance_service
-from app.utils import gemini_client
+from app.utils import document_text, gemini_client, ocr, storage
 from app.utils.gstin import GST_STATES
 from app.utils.money import format_inr
 
@@ -663,3 +664,32 @@ def business_ids_in_segment(entity_type, msme_tier) -> set:
         )
     )
     return set(db.session.scalars(stmt))
+
+
+# ---------------------------------------------------------------------------
+# OCR auto-fill (ON13)
+# ---------------------------------------------------------------------------
+
+
+def read_registration_document(upload) -> dict:
+    """Read a GST registration certificate or PAN card locally and suggest form values.
+
+    Returns {"found": {pan?, gstin?, legal_name?, state?, entity_type?}}. The file is read
+    in memory and thrown away: nothing is stored and nothing is saved to the business;
+    the user checks the values in the form first (CLAUDE.md rules 2 and 4).
+    Storage checks: 400 FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, FILE_TOO_LARGE.
+    422 DOCUMENT_UNREADABLE when no text could be read.
+    """
+    data = upload.read()
+    storage.check_file(data, upload.mimetype)
+    try:
+        text = ocr.extract_text(data, upload.mimetype)
+    except ocr.OcrError as error:
+        raise ApiError(
+            422, "DOCUMENT_UNREADABLE", f"We could not read this file. {error}"
+        ) from error
+    found = document_text.read_registration(text)
+    if "entity_type" in found:
+        found["entity_type"] = EntityType(found["entity_type"])
+    log.info("Auto-fill read %d field(s) from a document", len(found))
+    return {"found": found}
