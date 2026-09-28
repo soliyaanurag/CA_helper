@@ -78,10 +78,16 @@ export function monthLabel(isoDate) {
 export function expiresInText(isoTimestamp) {
   const minutes = Math.floor((new Date(isoTimestamp) - new Date()) / MILLISECONDS_PER_MINUTE);
   if (minutes <= 0) {
-    return "expired";
+    // The worker marks the request "expired" within 15 minutes; until then it is still requested.
+    return "answer time over";
   }
   if (minutes < 60) {
     return "expires in " + minutes + " min";
   }
   return "expires in " + Math.floor(minutes / 60) + " h";
+}
+
+// True once a moment (e.g. a request's answer deadline) has passed.
+export function isPast(isoTimestamp) {
+  return new Date(isoTimestamp) <= new Date();
 }

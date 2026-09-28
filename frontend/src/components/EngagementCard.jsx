@@ -164,8 +164,8 @@ export function EngagementCard({ engagement, title, children }) {
   );
 }
 
-// True while the engagement waits for an answer and has a deadline ("expires in 31 h").
+// True while a request waits for the CA's answer and has a deadline ("expires in 31 h").
+// Only requests expire; a quote waits for the business without a deadline.
 function isWaiting(engagement) {
-  const waiting = engagement.status === "requested" || engagement.status === "quoted";
-  return waiting && Boolean(engagement.expires_at);
+  return engagement.status === "requested" && Boolean(engagement.expires_at);
 }

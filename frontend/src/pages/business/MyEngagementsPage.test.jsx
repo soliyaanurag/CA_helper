@@ -106,7 +106,12 @@ describe("engagement card timeline", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-09-27T21:30:00Z") });
     loginAs("business");
     // Requested; expires at 2026-09-29T04:30Z, 31 hours after "now".
-    fakeApi({ "GET /api/v1/marketplace/my-engagements": [200, [engagement()]] });
+    fakeApi({
+      "GET /api/v1/marketplace/my-engagements": [
+        200,
+        [engagement({ expires_at: "2026-09-29T04:30:00Z" })],
+      ],
+    });
     renderApp("/business/engagements");
 
     const progress = await screen.findByRole("list", { name: "Progress" });

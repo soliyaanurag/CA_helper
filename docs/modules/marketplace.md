@@ -77,7 +77,9 @@ for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
   reason). The business pages: "Find a CA" shows "GSTR-3B from ₹600" for the business's filings, a "Same city"
   badge and greys CAs offering none; the request page groups filings by quarter of their due date with "Select
   all in Q2" and folds unpriced ones under "Not offered by this CA (n)"; engagement cards show a timeline
-  (Requested → Active → Completed, ✓ ● ○) and "expires in 31 h" while requested or quoted.
+  (Requested → Active → Completed, ✓ ● ○) and "expires in 31 h" while requested (quotes do not expire); once the 48 hours are over it reads "answer time
+  over" and the CA's card shows "This request will close automatically" instead of the answer buttons, until
+  the worker marks it `expired`.
 - **Tests (new):** `tests/test_admin_ca_verification.py` (certificate upload, type check, re-verification,
   pro-bono; admin side), the ranking test in `test_marketplace_engagements.py`; `CaProfilePage.test.jsx`,
   `CaServicesPage.test.jsx`, `MarketplacePage.test.jsx`, `RequestCaPage.test.jsx`, `MyEngagementsPage.test.jsx`.
