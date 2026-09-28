@@ -28,6 +28,15 @@ def _code_list(codes: tuple[str, ...], what: str) -> fields.List:
     )
 
 
+def _in_list_order(all_codes: tuple, chosen: list) -> list:
+    """The chosen codes once each, in the order of `all_codes` (e.g. CA_LANGUAGES)."""
+    result = []
+    for code in all_codes:
+        if code in chosen:
+            result.append(code)
+    return result
+
+
 class CaProfileInputSchema(Schema):
     """PUT /marketplace/ca-profile: everything the CA fills in."""
 
@@ -50,10 +59,8 @@ class CaProfileInputSchema(Schema):
         """Trim text; store each code once, in a fixed order."""
         for key in ("cop_number", "city", "about"):
             data[key] = data[key].strip()
-        data["languages"] = [code for code in CA_LANGUAGES if code in data["languages"]]
-        data["specializations"] = [
-            code for code in CA_SPECIALIZATIONS if code in data["specializations"]
-        ]
+        data["languages"] = _in_list_order(CA_LANGUAGES, data["languages"])
+        data["specializations"] = _in_list_order(CA_SPECIALIZATIONS, data["specializations"])
         return data
 
 
@@ -73,7 +80,10 @@ class CaProfileSchema(Schema):
     updated_at = fields.DateTime(required=True)
     pro_bono_slots_per_month = fields.Integer(required=True)
     rejection_reason = fields.String(allow_none=True)  # set by an admin when rejecting
-    has_certificate = fields.Function(lambda profile: profile.cop_document_id is not None)
+    has_certificate = fields.Method("_has_certificate")
+
+    def _has_certificate(self, profile) -> bool:
+        return profile.cop_document_id is not None
 
 
 class CertificateUploadSchema(Schema):
@@ -92,6 +102,13 @@ class CaListArgsSchema(PageArgsSchema):
     service = fields.String(validate=validate.Length(max=50))
 
 
+class MyPriceSchema(Schema):
+    """The CA's price for one of the business's filing forms."""
+
+    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    price = fields.Decimal(as_string=True, places=2, required=True)
+
+
 class CaListItemSchema(Schema):
     """A verified CA as businesses see them (no CoP number, no capacity)."""
 
@@ -107,13 +124,8 @@ class CaListItemSchema(Schema):
     price = fields.Decimal(as_string=True, places=2, allow_none=True)
     # For a registered business: the CA's price for each of its open filing forms (empty:
     # they offer none), and whether the CA's city is in its address (null otherwise).
-    my_prices = fields.List(fields.Nested(lambda: MyPriceSchema()), required=True)
+    my_prices = fields.List(fields.Nested(MyPriceSchema), required=True)
     same_city = fields.Boolean(allow_none=True)
-
-
-class MyPriceSchema(Schema):
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
-    price = fields.Decimal(as_string=True, places=2, required=True)
 
 
 class CaListPageSchema(PageSchema):

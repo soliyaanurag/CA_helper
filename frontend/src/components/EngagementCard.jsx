@@ -26,9 +26,35 @@ function total(items, priceName) {
 
 // The steps shown for each status, e.g. Requested → Active → Completed.
 function stepsFor(status) {
-  if (status === "quoted") return ["requested", "quoted", "active", "completed"];
-  if (["declined", "expired", "cancelled"].includes(status)) return ["requested", status];
+  if (status === "quoted") {
+    return ["requested", "quoted", "active", "completed"];
+  }
+  if (status === "declined" || status === "expired" || status === "cancelled") {
+    return ["requested", status];
+  }
   return ["requested", "active", "completed"];
+}
+
+// How a step looks: bold for the current one, grey for done ones, lighter for the rest.
+function stepClass(index, current) {
+  if (index === current) {
+    return "font-semibold";
+  }
+  if (index < current) {
+    return "text-muted-foreground";
+  }
+  return "text-muted-foreground/60";
+}
+
+// ✓ for a done step, ● for the current one, ○ for one still to come.
+function stepMark(index, current) {
+  if (index < current) {
+    return "✓ ";
+  }
+  if (index === current) {
+    return "● ";
+  }
+  return "○ ";
 }
 
 /** Where the engagement is: ✓ done steps, ● the current one (bold), ○ steps still to come. */
@@ -41,16 +67,10 @@ function Timeline({ status }) {
         <li
           key={step}
           aria-current={index === current ? "step" : undefined}
-          className={
-            index === current
-              ? "font-semibold"
-              : index < current
-                ? "text-muted-foreground"
-                : "text-muted-foreground/60"
-          }
+          className={stepClass(index, current)}
         >
           {index > 0 && <span aria-hidden="true">→ </span>}
-          {index < current ? "✓ " : index === current ? "● " : "○ "}
+          {stepMark(index, current)}
           {label(ENGAGEMENT_STATUS_LABELS, step)}
         </li>
       ))}
@@ -79,7 +99,7 @@ export function EngagementCard({ engagement, title, children }) {
         </CardTitle>
         <CardDescription>
           Requested {formatDateTime(engagement.requested_at)}
-          {["requested", "quoted"].includes(engagement.status) && engagement.expires_at && (
+          {isWaiting(engagement) && (
             <span className="font-medium text-amber-800">
               {" "}
               · {expiresInText(engagement.expires_at)}
@@ -142,4 +162,10 @@ export function EngagementCard({ engagement, title, children }) {
       </CardContent>
     </Card>
   );
+}
+
+// True while the engagement waits for an answer and has a deadline ("expires in 31 h").
+function isWaiting(engagement) {
+  const waiting = engagement.status === "requested" || engagement.status === "quoted";
+  return waiting && Boolean(engagement.expires_at);
 }

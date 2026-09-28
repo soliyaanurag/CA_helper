@@ -57,7 +57,11 @@ function ProfileReminder() {
   const profile = useCaProfile();
   const menu = useCaServices();
   if (!profile.isSuccess) return null;
-  const reminder = REMINDERS[profile.data?.verification_status ?? "missing"];
+  let status = "missing"; // no profile saved yet
+  if (profile.data) {
+    status = profile.data.verification_status;
+  }
+  const reminder = REMINDERS[status];
   if (!reminder) return null; // verified
 
   return (
@@ -82,17 +86,20 @@ function ProfileReminder() {
 /** The steps to being listed: profile, certificate, prices, then the admin's check. */
 function SetupChecklist({ profile, hasPrices }) {
   const steps = [
-    ["Profile", Boolean(profile)],
-    ["Certificate uploaded", Boolean(profile?.has_certificate)],
-    ["Prices set", hasPrices],
+    { name: "Profile", done: Boolean(profile) },
+    { name: "Certificate uploaded", done: Boolean(profile && profile.has_certificate) },
+    { name: "Prices set", done: hasPrices },
   ];
-  const status = profile?.verification_status;
+  let status = null;
+  if (profile) {
+    status = profile.verification_status;
+  }
   return (
     <ul aria-label="Setup checklist" className="space-y-1 pt-2 text-sm">
-      {steps.map(([name, done]) => (
-        <li key={name}>
-          <span aria-hidden="true">{done ? "✓" : "✗"}</span> {name}
-          <span className="sr-only">{done ? ": done" : ": to do"}</span>
+      {steps.map((step) => (
+        <li key={step.name}>
+          <span aria-hidden="true">{step.done ? "✓" : "✗"}</span> {step.name}
+          <span className="sr-only">{step.done ? ": done" : ": to do"}</span>
         </li>
       ))}
       <li>
