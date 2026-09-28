@@ -14,6 +14,9 @@ set_checklist_tick(business, item_id, key, ticked)  tick / untick one checklist 
 mark_filed(business, user, item_id, ack_no, upload) the business filed it itself (CO9)
 unmark_filed(business, item_id) -> dict             undo a mistaken "mark as filed"
 get_acknowledgement(business, item_id)              the uploaded acknowledgement file
+checklist_with_ticks(filing) -> list                the checklist with ticks (used by ca_workspace)
+checklist_progress(filing) -> dict                  required ready / total and what is missing
+mark_filed_by_ca(business, ca_user, item_id, ...)   the CA filed it (CW5; no commit)
 checklist_keys(form_code) -> list                   a form's checklist keys (used by documents)
 tick_checklist_entry(filing, key)                   tick an entry a document answers (documents)
 filings_by_acknowledgement(doc_ids) -> dict         filings whose acknowledgement these are
@@ -447,10 +450,7 @@ def get_filing(business, item_id) -> dict:
     explanation and instructions, the checklist with ticks, and the acknowledgement."""
     filing = _own_filing(business, item_id)
     content = get_form_content(filing.form_code)
-    ticked = _ticked_keys(filing)
-    checklist = []
-    for entry in content["checklist"]:
-        checklist.append({**entry, "ticked": entry["key"] in ticked})
+    checklist = checklist_with_ticks(filing)
     acknowledgement = None
     if filing.acknowledgement_document_id is not None:
         document, _ = documents_service.read_document(filing.acknowledgement_document_id)
@@ -526,21 +526,26 @@ def mark_filed(business, user: User, item_id, acknowledgement_no=None, upload=No
         raise ApiError(409, "FILING_WITH_CA", "Your CA is handling this filing.")
     if filing.status not in SELF_FILEABLE_STATUSES:
         raise ApiError(409, "ALREADY_FILED", "This filing is already marked as filed.")
-    if upload is not None:
-        document = documents_service.add_document(
-            user.id, user.id, upload, DocumentType.ACKNOWLEDGEMENT
-        )
-        document.fy = filing.fy
-        document.period_label = filing.period_label
-        db.session.flush()  # gives document.id
-        filing.acknowledgement_document_id = document.id
-    filing.status = ComplianceStatus.FILED
-    filing.filing_path = FilingPath.SELF
-    filing.filed_at = utcnow()
-    filing.acknowledgement_no = acknowledgement_no or None
+    _record_filed(filing, user.id, user, FilingPath.SELF, acknowledgement_no, upload)
     db.session.commit()
     log.info("Filing %s marked filed by its business", filing.id)
     return get_filing(business, item_id)
+
+
+def _record_filed(filing, owner_id, uploader: User, path, acknowledgement_no, upload) -> None:
+    """Status "filed" with the optional ARN and acknowledgement file (owned by the business
+    owner, uploaded by `uploader`). Does not commit."""
+    if upload is not None:
+        document = documents_service.add_document(
+            owner_id, uploader.id, upload, DocumentType.ACKNOWLEDGEMENT
+        )
+        document.fy = filing.fy
+        document.period_label = filing.period_label
+        filing.acknowledgement_document_id = document.id
+    filing.status = ComplianceStatus.FILED
+    filing.filing_path = path
+    filing.filed_at = utcnow()
+    filing.acknowledgement_no = acknowledgement_no or None
 
 
 def unmark_filed(business, item_id) -> dict:
@@ -568,6 +573,47 @@ def get_acknowledgement(business, item_id):
     if filing.acknowledgement_document_id is None:
         raise ApiError(404, "ACKNOWLEDGEMENT_MISSING", "No acknowledgement was uploaded.")
     return documents_service.read_document(filing.acknowledgement_document_id)
+
+
+# --- Used by the ca_workspace module (CW3, CW5, CW6, CW7) ------------------------------
+
+
+def checklist_with_ticks(filing: ComplianceItem) -> list[dict]:
+    """The form's checklist entries, each with `ticked`: [{key, label, required, help, ticked}]."""
+    ticked = _ticked_keys(filing)
+    entries = []
+    for entry in _checklist_of(filing.form_code):
+        entries.append({**entry, "ticked": entry["key"] in ticked})
+    return entries
+
+
+def checklist_progress(filing: ComplianceItem) -> dict:
+    """How ready a filing's documents are: {required_total, required_ready, missing (the
+    labels of the required entries not ticked yet)}."""
+    required = [entry for entry in checklist_with_ticks(filing) if entry["required"]]
+    missing = [entry["label"] for entry in required if not entry["ticked"]]
+    return {
+        "required_total": len(required),
+        "required_ready": len(required) - len(missing),
+        "missing": missing,
+    }
+
+
+def mark_filed_by_ca(business, ca_user: User, item_id, acknowledgement_no=None, upload=None):
+    """The CA of an active engagement filed it (CW5): like mark_filed, with the path "ca".
+    The acknowledgement belongs to the business owner; the CA is its uploader. Does not
+    commit; the caller checks the CA's access first.
+
+    409 ALREADY_FILED; 409 FILING_NOT_WITH_CA unless the filing is "With CA".
+    """
+    filing = _own_filing(business, item_id)
+    if filing.status in DONE_STATUSES:
+        raise ApiError(409, "ALREADY_FILED", "This filing is already marked as filed.")
+    if filing.status != ComplianceStatus.WITH_CA:
+        raise ApiError(409, "FILING_NOT_WITH_CA", "This filing is not with you.")
+    _record_filed(filing, business.user_id, ca_user, FilingPath.CA, acknowledgement_no, upload)
+    log.info("Filing %s marked filed by its CA", filing.id)
+    return filing
 
 
 # --- Used by the documents module (the vault, DO6) ------------------------------------

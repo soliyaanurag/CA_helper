@@ -294,7 +294,9 @@ def send_reminders(today: date | None = None) -> int:
         ]
         ca_user = ca_users.get(filing.id)
         if ca_user is not None:
-            recipients.append((ca_user, f"{business.legal_name}: {title}", "/ca/engagements"))
+            recipients.append(
+                (ca_user, f"{business.legal_name}: {title}", f"/ca/clients/{business.id}")
+            )
         for user, user_title, link in recipients:
             if not user.is_active or user.deleted_at is not None:
                 continue

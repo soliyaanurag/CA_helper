@@ -15,6 +15,9 @@ delete_document(business, document_id)                          soft delete, unl
 link_document(business, user, document_id, item_id, key) -> dict  a file serves a filing (DO6)
 unlink_document(business, link_id)                              remove that link (DO6)
 
+For ca_workspace: attach_document(...) (link_document without the commit),
+documents_by_filing(filings) -> dict (each filing's files and acknowledgement).
+
 The file itself is encrypted in storage (app/utils/storage.py); the `documents` row
 keeps its name, type, size and SHA-256. A document is linked to a filing per checklist
 key (`compliance_item_documents`), or with the key "general" when it answers no
@@ -45,6 +48,8 @@ log = logging.getLogger(__name__)
 
 # The checklist key of a link that answers no checklist entry.
 GENERAL_KEY = "general"
+# How documents_by_filing() marks a filing's acknowledgement.
+ACKNOWLEDGEMENT_KEY = "acknowledgement"
 
 
 def add_document(owner_id, uploaded_by_id, upload, doc_type: DocumentType) -> Document:
@@ -359,12 +364,57 @@ def link_document(business, user: User, document_id, item_id, checklist_key: str
 
     404 DOCUMENT_NOT_FOUND, FILING_NOT_FOUND; 409 FILING_LOCKED; 422 UNKNOWN_CHECKLIST_KEY.
     """
+    document = attach_document(business, user, document_id, item_id, checklist_key)
+    db.session.commit()
+    return _describe([document])[0]
+
+
+def attach_document(business, user: User, document_id, item_id, checklist_key: str) -> Document:
+    """link_document without the commit (ca_workspace fulfils a document request with it).
+
+    404 DOCUMENT_NOT_FOUND, FILING_NOT_FOUND; 409 FILING_LOCKED; 422 UNKNOWN_CHECKLIST_KEY.
+    """
     document = _own_document(business, document_id)
     filing = _open_filing(business, item_id)
     _check_key(filing, checklist_key)
     _link(filing, document, checklist_key, user)
-    db.session.commit()
-    return _describe([document])[0]
+    return document
+
+
+def documents_by_filing(filings) -> dict:
+    """{filing id: [{document_id, original_filename, doc_type, size_bytes, created_at,
+    checklist_key}]}: the live files linked to each filing, then its acknowledgement
+    (checklist_key "acknowledgement"). For the CA's client workspace (CW3)."""
+    result = {filing.id: [] for filing in filings}
+    stmt = (
+        select(ComplianceItemDocument, Document)
+        .join(Document, ComplianceItemDocument.document_id == Document.id)
+        .where(
+            ComplianceItemDocument.compliance_item_id.in_(list(result)),
+            Document.deleted_at.is_(None),
+        )
+        .order_by(Document.created_at)
+    )
+    rows = [
+        (link.compliance_item_id, link.checklist_key, doc) for link, doc in db.session.execute(stmt)
+    ]
+    for filing in filings:
+        if filing.acknowledgement_document_id is not None:
+            document = db.session.get(Document, filing.acknowledgement_document_id)
+            if document is not None and document.deleted_at is None:
+                rows.append((filing.id, ACKNOWLEDGEMENT_KEY, document))
+    for filing_id, checklist_key, document in rows:
+        result[filing_id].append(
+            {
+                "document_id": document.id,
+                "original_filename": document.original_filename,
+                "doc_type": document.doc_type,
+                "size_bytes": document.size_bytes,
+                "created_at": document.created_at,
+                "checklist_key": checklist_key,
+            }
+        )
+    return result
 
 
 def unlink_document(business, link_id) -> None:
