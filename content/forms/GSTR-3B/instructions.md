@@ -1,31 +1,34 @@
 ---
 form: GSTR-3B
-status: TODO
+status: DRAFT
 ---
 
 # How to file GSTR-3B yourself
 
-<!-- TODO: step-by-step self-filing guide. Shown on the item page. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## Before you start
-- TODO: what to keep ready (links to the checklist in `checklist.yaml`)
-- TODO: login details needed for the official portal
+Tick the documents in the checklist on this page, and keep your login details ready.
 
-## Steps on the official portal
-1. TODO: open the official portal (link)
-2. TODO: ...
-3. TODO: submit and download the acknowledgement
+## Steps
+1. Log in to the GST portal and open **Services → Returns → Returns Dashboard**.
+2. Choose the financial year and the period, then open **GSTR-3B → Prepare online**.
+3. Check the sales figures, which are filled in from your GSTR-1.
+4. Check the input tax credit against **GSTR-2B** (the statement of credit from your suppliers).
+5. Save, then **Proceed to payment**: pay any tax due from the electronic cash or credit ledger.
+6. **File** with DSC or EVC (OTP) and download the acknowledgement with the **ARN**.
 
 ## After filing
-Upload the acknowledgement on the item page. The app reads the acknowledgement/ARN number, date and period
-(locally, with OCR) and marks the item **Filed–verified**.
+Click **Mark as filed** on this page and upload the acknowledgement (PDF or photo), so you and your CA can
+always find it.
 
 ## Common mistakes
-- TODO
+- Claiming credit that is not in GSTR-2B.
+- Filing without paying the tax due.
+- Sales figures that do not match GSTR-1.
 
 ## Official sources
-- TODO
+- GST portal: <https://www.gst.gov.in>
+- GST portal user manuals (GSTR-3B): <https://tutorial.gst.gov.in>

@@ -1,16 +1,27 @@
 # Document checklist for CMP-08.
-# Status: TODO. Replace the example item with real ones.
+# Status: DRAFT (review, then set status: DONE).
 #
-# Used by: the checklist UI on the item page and OCR document-type checks.
+# Used by: the checklist on the filing page (and OCR document-type checks later).
 # Each item:
 #   key       stable snake_case id (never rename once used; ticks are stored against it)
 #   label     text shown to the user
 #   required  true if a CA normally cannot file without it
 #   help      optional one-line hint
 form: CMP-08
-status: TODO
+status: DRAFT
 items:
-  - key: todo_example_document
-    label: "TODO: first document the user should have"
+  - key: quarter_turnover
+    label: "Total sales of the quarter"
     required: true
-    help: "TODO: where the user can find it"
+    help: "From your sales register or bank credits"
+  - key: reverse_charge_purchases
+    label: "Purchases under reverse charge"
+    required: false
+    help: "Only if you have any"
+  - key: tax_payment_funds
+    label: "Money in the bank to pay the GST due"
+    required: true
+  - key: gst_portal_login
+    label: "GST portal username and password"
+    required: true
+    help: "And the registered mobile for the OTP"

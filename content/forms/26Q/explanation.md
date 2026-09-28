@@ -1,32 +1,30 @@
 ---
 form: 26Q
-status: TODO
+status: DRAFT
 ---
 
 # 26Q: what it is and why it matters
 
-<!-- TODO: write this page in plain language for a small-business owner. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
-
-Tracked in v1 as: TDS statement for businesses deducting TDS on non-salary payments. Frequency: Quarterly.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## What is it?
-TODO: one short paragraph, no jargon.
+26Q is the quarterly **TDS return for payments other than salary**, such as contractor bills, professional fees, commission or rent. You report the TDS you deducted from each payee.
 
 ## Who has to file it?
-TODO: describe in words which businesses need it. The app decides this from the regulatory profile.
+Businesses that deduct TDS on such payments. The app shows it when your profile says you deduct TDS. You need a TAN.
 
 ## How often, and for which period?
-TODO: explain the rhythm and which period each filing covers. Exact due dates come from the due-date rules.
+Quarterly, one return per quarter of the financial year. The due date is shown on this page and in your calendar.
 
 ## What happens if it is late or skipped?
-TODO: describe the consequences in words. Amounts come from the penalty rules.
+A late return brings a late fee for each day, and the people you paid cannot see their TDS in their tax records until it is filed.
 
 ## Filing it yourself vs. with a CA
-TODO: when self-filing is reasonable and when a CA helps.
+Filing it yourself is possible with the free return preparation utility, if you have few payees. A CA helps with many payees, lower-deduction certificates or corrections.
 
 ## Official sources
-- TODO: official portal / FAQ links used for this page
+- Income-tax e-filing portal: <https://www.incometax.gov.in>
+- Protean (TIN-NSDL): <https://www.protean-tinpan.com>
+- TRACES: <https://www.tdscpc.gov.in>

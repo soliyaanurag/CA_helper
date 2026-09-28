@@ -1,31 +1,33 @@
 ---
 form: 24Q
-status: TODO
+status: DRAFT
 ---
 
 # How to file 24Q yourself
 
-<!-- TODO: step-by-step self-filing guide. Shown on the item page. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## Before you start
-- TODO: what to keep ready (links to the checklist in `checklist.yaml`)
-- TODO: login details needed for the official portal
+Tick the documents in the checklist on this page, and keep your login details ready.
 
-## Steps on the official portal
-1. TODO: open the official portal (link)
-2. TODO: ...
-3. TODO: submit and download the acknowledgement
+## Steps
+1. Download the free **Return Preparation Utility (RPU)** for TDS from the Protean (TIN-NSDL) website.
+2. Enter your TAN details, the TDS challans you paid, and each employee's PAN, salary and TDS.
+3. Validate the file with the **File Validation Utility (FVU)**; fix any errors it shows.
+4. Log in to the income-tax e-filing portal with your TAN, and upload the validated TDS return (or submit it at a TIN facilitation centre).
+5. Keep the acknowledgement (token number) of the upload.
 
 ## After filing
-Upload the acknowledgement on the item page. The app reads the acknowledgement/ARN number, date and period
-(locally, with OCR) and marks the item **Filed–verified**.
+Click **Mark as filed** on this page and upload the acknowledgement (PDF or photo), so you and your CA can
+always find it.
 
 ## Common mistakes
-- TODO
+- Wrong or missing employee PAN.
+- A challan entered with the wrong amount or date.
 
 ## Official sources
-- TODO
+- Income-tax e-filing portal: <https://www.incometax.gov.in>
+- Protean (TIN-NSDL): <https://www.protean-tinpan.com>
+- TRACES: <https://www.tdscpc.gov.in>

@@ -1,32 +1,29 @@
 ---
 form: GSTR-1
-status: TODO
+status: DRAFT
 ---
 
 # GSTR-1: what it is and why it matters
 
-<!-- TODO: write this page in plain language for a small-business owner. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
-
-Tracked in v1 as: GST return for regular GST taxpayers. Frequency: Monthly or quarterly (QRMP).
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## What is it?
-TODO: one short paragraph, no jargon.
+GSTR-1 is the GST return in which you report your **sales**: every invoice you issued in the period, the credit and debit notes, and a summary by product or service (HSN/SAC code). Your customers' tax credit depends on it: what you report here appears in their own GST records.
 
 ## Who has to file it?
-TODO: describe in words which businesses need it. The app decides this from the regulatory profile.
+Businesses registered under the regular GST scheme. The app shows it when your profile says "Regular" GST. Businesses in the composition scheme do not file it.
 
 ## How often, and for which period?
-TODO: explain the rhythm and which period each filing covers. Exact due dates come from the due-date rules.
+Monthly, or quarterly if you are in the QRMP scheme (your profile shows which). Each return covers the sales of that month or quarter. The due date is shown on this page and in your calendar.
 
 ## What happens if it is late or skipped?
-TODO: describe the consequences in words. Amounts come from the penalty rules.
+A late GSTR-1 means a late fee for each day, and your customers may not see the tax credit for your invoices, which can hurt the relationship. A late return also blocks the next period's return.
 
 ## Filing it yourself vs. with a CA
-TODO: when self-filing is reasonable and when a CA helps.
+Filing it yourself works well when you have a small number of invoices and keep them in order. A CA helps when you have many invoices, exports, credit notes or amendments to earlier periods.
 
 ## Official sources
-- TODO: official portal / FAQ links used for this page
+- GST portal: <https://www.gst.gov.in>
+- GST portal user manuals (GSTR-1): <https://tutorial.gst.gov.in>

@@ -1,32 +1,30 @@
 ---
 form: 24Q
-status: TODO
+status: DRAFT
 ---
 
 # 24Q: what it is and why it matters
 
-<!-- TODO: write this page in plain language for a small-business owner. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
-
-Tracked in v1 as: TDS statement for businesses deducting TDS on salaries. Frequency: Quarterly.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## What is it?
-TODO: one short paragraph, no jargon.
+24Q is the quarterly **TDS return for salaries**. When you deduct income tax from your employees' salaries (TDS), you deposit it with the government and then report, in 24Q, how much was deducted for each employee.
 
 ## Who has to file it?
-TODO: describe in words which businesses need it. The app decides this from the regulatory profile.
+Employers who deduct TDS on salaries. The app shows it when your profile says you deduct TDS and pay salaries above the taxable limit. You need a TAN.
 
 ## How often, and for which period?
-TODO: explain the rhythm and which period each filing covers. Exact due dates come from the due-date rules.
+Quarterly, one return per quarter of the financial year. The due date is shown on this page and in your calendar.
 
 ## What happens if it is late or skipped?
-TODO: describe the consequences in words. Amounts come from the penalty rules.
+A late return brings a late fee for each day, and your employees cannot see their TDS in their tax records (Form 26AS) until it is filed.
 
 ## Filing it yourself vs. with a CA
-TODO: when self-filing is reasonable and when a CA helps.
+Filing it yourself is possible with the free return preparation utility, if you have few employees. A CA helps with many employees, changes in tax regime, or corrections to earlier quarters.
 
 ## Official sources
-- TODO: official portal / FAQ links used for this page
+- Income-tax e-filing portal: <https://www.incometax.gov.in>
+- Protean (TIN-NSDL): <https://www.protean-tinpan.com>
+- TRACES: <https://www.tdscpc.gov.in>

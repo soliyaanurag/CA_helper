@@ -1,16 +1,38 @@
 # Document checklist for ITR.
-# Status: TODO. Replace the example item with real ones.
+# Status: DRAFT (review, then set status: DONE).
 #
-# Used by: the checklist UI on the item page and OCR document-type checks.
+# Used by: the checklist on the filing page (and OCR document-type checks later).
 # Each item:
 #   key       stable snake_case id (never rename once used; ticks are stored against it)
 #   label     text shown to the user
 #   required  true if a CA normally cannot file without it
 #   help      optional one-line hint
 form: ITR
-status: TODO
+status: DRAFT
 items:
-  - key: todo_example_document
-    label: "TODO: first document the user should have"
+  - key: pan_aadhaar
+    label: "PAN and Aadhaar (linked)"
     required: true
-    help: "TODO: where the user can find it"
+  - key: ais_26as
+    label: "AIS and Form 26AS from the e-filing portal"
+    required: true
+    help: "Shows income and TDS the department knows about"
+  - key: bank_statements
+    label: "Bank statements of the year"
+    required: true
+  - key: profit_and_loss
+    label: "Profit and loss account and balance sheet"
+    required: false
+    help: "Not needed under the presumptive scheme"
+  - key: tds_certificates
+    label: "TDS certificates (Form 16A) received"
+    required: false
+    help: "If clients deducted TDS from your payments"
+  - key: gst_returns
+    label: "GST returns of the year"
+    required: false
+    help: "If you are GST registered"
+  - key: audit_report
+    label: "Tax audit report"
+    required: false
+    help: "Only if a tax audit applies to you"

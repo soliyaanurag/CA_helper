@@ -1,32 +1,29 @@
 ---
 form: GSTR-4
-status: TODO
+status: DRAFT
 ---
 
 # GSTR-4: what it is and why it matters
 
-<!-- TODO: write this page in plain language for a small-business owner. -->
-
-> **Content rule:** no legal thresholds, rates or due dates in this file. They come from the rule tables
-> (verified values listed in `docs/TODO_VERIFY.md`). Describe *what* and *why* in plain language; the app
-> inserts the numbers.
-
-Tracked in v1 as: Return for composition-scheme taxpayers. Frequency: Yearly.
+<!-- DRAFT: written for the first demo; review it against the official sources below and then set
+     status: DONE. Content rule (content/README.md): no legal thresholds, rates or due dates in this file;
+     the app shows them from the rule tables. -->
 
 ## What is it?
-TODO: one short paragraph, no jargon.
+GSTR-4 is the **yearly** GST return of a business in the composition scheme. It brings together the quarterly CMP-08 statements and adds the year's purchases.
 
 ## Who has to file it?
-TODO: describe in words which businesses need it. The app decides this from the regulatory profile.
+Businesses that were in the composition scheme during the financial year. The app shows it when your profile says "Composition".
 
 ## How often, and for which period?
-TODO: explain the rhythm and which period each filing covers. Exact due dates come from the due-date rules.
+Once a year, for the whole financial year. The due date is shown on this page and in your calendar.
 
 ## What happens if it is late or skipped?
-TODO: describe the consequences in words. Amounts come from the penalty rules.
+A late return brings a late fee for each day. It also keeps the year open, which can delay later changes to your registration.
 
 ## Filing it yourself vs. with a CA
-TODO: when self-filing is reasonable and when a CA helps.
+If your CMP-08 statements were filed correctly, most of GSTR-4 is filled in for you. A CA helps if figures differ from your books or you left the scheme during the year.
 
 ## Official sources
-- TODO: official portal / FAQ links used for this page
+- GST portal: <https://www.gst.gov.in>
+- GST portal user manuals (GSTR-4): <https://tutorial.gst.gov.in>
