@@ -21,6 +21,8 @@ import { ProBonoPage } from "@/pages/business/ProBonoPage";
 import { RequestCaPage } from "@/pages/business/RequestCaPage";
 import { CaAlertsPage } from "@/pages/ca/CaAlertsPage";
 import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
+import { CaBatchesPage } from "@/pages/ca/CaBatchesPage";
+import { CaClientPage } from "@/pages/ca/CaClientPage";
 import { CaEngagementsPage } from "@/pages/ca/CaEngagementsPage";
 import { CaProBonoPage } from "@/pages/ca/CaProBonoPage";
 import { CaProfilePage } from "@/pages/ca/CaProfilePage";
@@ -62,6 +64,7 @@ export const NAV = {
     { label: "My engagements", path: "/ca/engagements" },
     { label: "Pro-bono queue", path: "/ca/pro-bono" },
     { label: "My clients", path: "/ca/clients" },
+    { label: "Deadline batches", path: "/ca/batches" },
     { label: "Notification settings", path: "/ca/alerts" },
   ],
   admin: [
@@ -125,6 +128,8 @@ export const appRoutes = [
     { path: "engagements", element: <CaEngagementsPage /> },
     { path: "pro-bono", element: <CaProBonoPage /> },
     { path: "clients", element: <CaWorkspacePage /> },
+    { path: "clients/:businessId", element: <CaClientPage /> },
+    { path: "batches", element: <CaBatchesPage /> },
     { path: "alerts", element: <CaAlertsPage /> },
   ]),
   roleArea("admin", [

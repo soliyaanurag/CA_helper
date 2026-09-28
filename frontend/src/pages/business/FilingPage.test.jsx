@@ -371,3 +371,79 @@ describe("filing page documents", () => {
     ).toBe(true);
   });
 });
+
+describe("documents the CA asked for", () => {
+  const REQUESTS = "/api/v1/ca-workspace/document-requests?compliance_item_id=f1";
+  const REQUEST = {
+    id: "r1",
+    compliance_item_id: "f1",
+    form_code: "gstr_3b",
+    period_label: "Q2 2026-27",
+    checklist_key: "gstr_2b",
+    message: "The 2B for the quarter",
+    status: "open",
+    created_at: "2026-09-25T10:00:00Z",
+    fulfilled_at: null,
+    document_id: null,
+    ca_name: "Meera Shah",
+  };
+
+  it("sends a vault file for the request", async () => {
+    const fetchMock = open({
+      [`GET ${REQUESTS}`]: [200, [REQUEST]],
+      [`GET ${VAULT}`]: [200, documents(vaultFile("d7", "2b-q2.pdf"))],
+      "POST /api/v1/ca-workspace/document-requests/r1/fulfil": [
+        200,
+        { ...REQUEST, status: "fulfilled" },
+      ],
+    });
+    const user = userEvent.setup();
+
+    expect(await screen.findByText("Your CA asked for documents")).toBeInTheDocument();
+    expect(screen.getByText(/Meera Shah: “The 2B for the quarter”/)).toBeInTheDocument();
+    await user.selectOptions(
+      await screen.findByLabelText("or choose from your vault"),
+      "2b-q2.pdf",
+    );
+    await user.click(screen.getByRole("button", { name: "Send to my CA" }));
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(sentBody(fetchMock, "/api/v1/ca-workspace/document-requests/r1/fulfil")),
+      ).toEqual({ document_id: "d7" }),
+    );
+  });
+
+  it("uploads a new file, then sends it", async () => {
+    const fetchMock = open({
+      [`GET ${REQUESTS}`]: [200, [REQUEST]],
+      [`GET ${VAULT}`]: [200, documents()],
+      "POST /api/v1/documents": [201, vaultFile("d8", "2b.pdf")],
+      "POST /api/v1/ca-workspace/document-requests/r1/fulfil": [
+        200,
+        { ...REQUEST, status: "fulfilled" },
+      ],
+    });
+    const user = userEvent.setup();
+
+    await user.upload(
+      await screen.findByLabelText("Upload a file"),
+      new File(["%PDF-1.4"], "2b.pdf", { type: "application/pdf" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Send to my CA" }));
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(sentBody(fetchMock, "/api/v1/ca-workspace/document-requests/r1/fulfil")),
+      ).toEqual({ document_id: "d8" }),
+    );
+    expect(sentBody(fetchMock, "/api/v1/documents").get("file").name).toBe("2b.pdf");
+  });
+
+  it("shows nothing when the CA asked for nothing", async () => {
+    open({ [`GET ${REQUESTS}`]: [200, []] });
+
+    await screen.findByRole("heading", { name: /GSTR-3B · Q2 2026-27/ });
+    expect(screen.queryByText("Your CA asked for documents")).not.toBeInTheDocument();
+  });
+});

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { usePenaltyEstimate } from "@/api/alerts";
+import { CA_WORKSPACE_KEY, fulfilDocumentRequest, useMyDocumentRequests } from "@/api/caWorkspace";
 import { errorMessage } from "@/api/client";
 import {
   FILINGS_KEY,
@@ -77,6 +78,7 @@ export function FilingPage() {
           {!FILED.includes(filing.data.filing.status) &&
             daysUntil(filing.data.filing.due_date) < 0 && <Penalty item={filing.data.filing} />}
           <HowToFile page={filing.data} onUpdated={showUpdated} />
+          <CaRequests page={filing.data} />
           <Checklist page={filing.data} onUpdated={showUpdated} />
           <Guide page={filing.data} />
         </>
@@ -678,6 +680,117 @@ function AddDocument({ item, entryKey, links, onAdded, onCancel }) {
         </p>
       )}
     </div>
+  );
+}
+
+// --- Documents the CA asked for (CW4) -------------------------------------------------
+
+function CaRequests({ page }) {
+  const item = page.filing;
+  const requests = useMyDocumentRequests(item.id);
+  const queryClient = useQueryClient();
+  if (!requests.isSuccess || requests.data.length === 0) return null;
+
+  const labels = { general: "A document" };
+  for (const entry of page.checklist) labels[entry.key] = entry.label;
+
+  // The request was answered: the file, the ticks and the to-dos changed.
+  function refresh() {
+    queryClient.invalidateQueries({ queryKey: CA_WORKSPACE_KEY });
+    queryClient.invalidateQueries({ queryKey: DOCUMENTS_KEY });
+    queryClient.invalidateQueries({ queryKey: filingKey(item.id) });
+    queryClient.invalidateQueries({ queryKey: FILINGS_KEY });
+  }
+
+  return (
+    <Card className="ring-amber-300">
+      <CardHeader>
+        <CardTitle>Your CA asked for documents</CardTitle>
+        <CardDescription>Send each file here; your CA is told when it arrives.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        {requests.data.map((request) => (
+          <AnswerRequest
+            key={request.id}
+            request={request}
+            what={label(labels, request.checklist_key)}
+            onAnswered={refresh}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Answer one request with a new file (uploaded to the vault first) or a vault file.
+function AnswerRequest({ request, what, onAnswered }) {
+  const vault = useDocuments({ page_size: 100 });
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const file = formElement.elements.file.files[0];
+    const documentId = new FormData(formElement).get("document_id");
+    if (!file && !documentId) {
+      setError("Choose a file to upload, or one from your vault.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const chosen = file ? (await uploadDocument(file, { doc_type: "other" })).id : documentId;
+      await fulfilDocumentRequest(request.id, chosen);
+      onAnswered();
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="space-y-2 rounded-lg border p-3" onSubmit={onSubmit}>
+      <p>
+        <span className="font-medium">{what}</span> · {request.ca_name}: “{request.message}”
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <Label htmlFor={"answer-file-" + request.id}>Upload a file</Label>
+          <Input
+            id={"answer-file-" + request.id}
+            name="file"
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={"answer-vault-" + request.id}>or choose from your vault</Label>
+          <select
+            id={"answer-vault-" + request.id}
+            name="document_id"
+            defaultValue=""
+            className={SELECT_CLASS}
+          >
+            <option value="">{vault.isPending ? "Loading..." : "Choose a file"}</option>
+            {(vault.data?.items ?? []).map((document) => (
+              <option key={document.id} value={document.id}>
+                {document.original_filename}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" size="sm" disabled={busy}>
+          Send to my CA
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 
