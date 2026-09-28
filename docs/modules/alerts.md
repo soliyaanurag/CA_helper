@@ -21,7 +21,8 @@ every amount still empty) and the estimator on the filing page and the dashboard
     late. Windows (`REMINDER_WINDOWS`): 4–7 days before → `t_minus_7`, 2–3 → `t_minus_3`, 0–1 → `t_minus_1`, after
     the due date → `overdue`. Only the current window's reminder is sent, each kind once per filing
     (`reminder_log`). A filing **due before the business registered** gets none. The owner (and the CA of an
-    **active** engagement on that filing, `marketplace_service.active_ca_users_by_filing`) gets a tray entry per
+    **active** engagement on that filing, `marketplace_service.active_ca_users_by_filing`, linked to
+    `/ca/clients/{business}`) gets a tray entry per
     filing; each person then gets **one summary email per run** (`reminders.txt`) listing the reminders whose type
     they have not switched off. Inactive or deleted users get nothing.
   - Penalties (AL5): `estimate_penalty(business, item_id, tax_due)` uses the `penalty_rules` row in force on the
@@ -80,8 +81,8 @@ Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backe
 
 ## Service functions other modules call
 - `notify(user, type, title, body, link=None, email=False) -> Notification` (does not commit; call it before your
-  commit). Used by marketplace (engagement events, `email=False`: it sends its own emails). Planned: ca_workspace
-  (document requests), regulatory (approved changes), with `email=True`.
+  commit). Used by marketplace (engagement events, `email=False`: it sends its own emails) and ca_workspace
+  (document requests, "your CA filed it", `email=True`). Planned: regulatory (approved changes), `email=True`.
 - `queue_email(to, subject, template, **context)`: send an email only once the transaction commits.
 
 ## Depends on
@@ -102,5 +103,4 @@ neither uses the other while it is being imported. Keep it that way (no `from ..
 - GST late fees and caps that depend on turnover, and fees that differ for CGST/SGST, cannot be expressed: one
   rule per form and period. Interest needs the tax due, which we do not store.
 - No "dismiss" for tray entries yet (the column exists).
-- Reminders for a `with_ca` filing link the CA to `/ca/engagements`; the CA workspace (PR 3) will give a better link.
 - `--date` in the CLI records reminders as sent for that day; use it on demo data only.

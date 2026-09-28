@@ -88,7 +88,7 @@ Column types are in the model files; this lists what each table is for and its k
 ### ca_workspace (`models/ca_workspace.py`)
 | Table | One row is... | Key fields |
 |---|---|---|
-| `document_requests` | a CA's request for one document | engagement_id (indexed), compliance_item_id, checklist_key, message, status, fulfilled_at, document_id → documents (the file that answered it) |
+| `document_requests` **(implemented, CW4)** | a CA's request for one document | engagement_id (indexed), compliance_item_id, checklist_key, message, status, fulfilled_at, document_id → documents (the file that answered it) |
 | `ca_notes` (SD) | a CA's private note about a client | ca_profile_id, business_id (indexed together), body |
 
 ### regulatory (`models/regulatory.py`)
@@ -596,8 +596,11 @@ Service functions (marketplace, built in MA14), the only way a CA's access is de
 - `ca_can_access_document(ca_profile_id, document_id)`: true only for a document linked to one of the filings of
   an active engagement.
 - Also `active_engagement_item_ids(ca_profile_id, business_id)` (the filings in active engagements only) and, for
-  routes, `require_ca_access(business_id)` in `app/utils/decorators.py` (404 unless active access). Fulfilled
-  document requests (ca_workspace) are not included yet: that table has no code.
+  routes, `require_ca_access(business_id)` in `app/utils/decorators.py` (404 unless active access). A fulfilled
+  document request links its file to the filing (`compliance_item_documents`), so it is covered by
+  `ca_can_access_document` without a separate rule.
+- **Capacity (MA7):** a CA with as many active clients (businesses with an `active` engagement) as `capacity` is
+  hidden from the list and gets no new clients (409 `CA_AT_CAPACITY`).
 
 The turnover bracket shown before acceptance is computed from `annual_turnover`; the amount itself is not shown.
 

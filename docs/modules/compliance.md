@@ -114,6 +114,11 @@ Planned: admin editors at `/api/v1/admin/compliance/...`; the CA's side of a fil
   `SELECT ... FOR UPDATE` until the caller commits (does not commit). Used by marketplace (engagements).
 - `mark_filings_with_ca(filing_ids)`: status `with_ca`, filing path `ca` (does not commit). Called by marketplace
   when an engagement becomes `active` (the CA accepts, or the business accepts a quote).
+- `checklist_with_ticks(filing) -> list[dict]`, `checklist_progress(filing) -> {required_total, required_ready,
+  missing}` and `mark_filed_by_ca(business, ca_user, item_id, acknowledgement_no, upload)` (a `with_ca` filing →
+  `filed`, path `ca`, acknowledgement owned by the business owner; no commit; 409 `ALREADY_FILED`,
+  `FILING_NOT_WITH_CA`). Used by ca_workspace (CW3, CW5, CW6, CW7). `mark_filed` and `mark_filed_by_ca` share
+  `_record_filed()`.
 - `checklist_keys(form_code) -> list[str]`, `tick_checklist_entry(filing, key)` (tick + status again, does not
   commit, 422 `UNKNOWN_CHECKLIST_KEY`) and `filings_by_acknowledgement(document_ids) -> {document id: filing}`.
   Used by documents (a linked file ticks its checklist entry; an acknowledgement cannot be deleted from the vault).

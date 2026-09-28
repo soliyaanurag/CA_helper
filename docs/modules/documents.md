@@ -81,7 +81,9 @@ links: [{id, compliance_item_id, form_code, period_label, checklist_key}], ackno
 - `document_ids_for_filings(filing_ids) -> set`: live documents linked to those filings (used by marketplace's
   `ca_can_access_document`, MA14).
 - `get_document_file(user, document_id) -> (Document, bytes)`: the access-checked download (owner or allowed CA).
-  The CA workspace (PR 3) can link to `/api/v1/documents/{id}/file` directly.
+  The CA workspace opens files with `/api/v1/documents/{id}/file`.
+- `attach_document(business, user, document_id, item_id, key) -> Document` (link without commit; ca_workspace
+  fulfils a request with it), `documents_by_filing(filings) -> {filing id: [file]}` (the CA's client workspace).
 - Planned: `verify_acknowledgement(document_id)` (used by compliance, ca_workspace).
 
 ## Depends on
@@ -98,7 +100,7 @@ other while it is being imported. Keep it that way.
 - A filed filing's links and acknowledgement cannot be removed or deleted (they are its proof)
 
 ## Known issues
-- CAs cannot list a client's documents or upload yet: the CA workspace (PR 3, CW3/CW4/CW5) adds that. Fulfilled
-  document requests are not yet part of `ca_can_access_document`.
+- A CA sees a client's files in the CA workspace (`documents_by_filing`) and uploads only acknowledgements (CW5);
+  a fulfilled document request links its file to the filing, so `ca_can_access_document` covers it.
 - Deleting keeps the encrypted file on disk (soft delete); nothing cleans up old files.
 - The vault shows at most 100 files in the filing page's "link one from your vault" list.
