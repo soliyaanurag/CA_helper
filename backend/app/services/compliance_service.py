@@ -14,6 +14,9 @@ set_checklist_tick(business, item_id, key, ticked)  tick / untick one checklist 
 mark_filed(business, user, item_id, ack_no, upload) the business filed it itself (CO9)
 unmark_filed(business, item_id) -> dict             undo a mistaken "mark as filed"
 get_acknowledgement(business, item_id)              the uploaded acknowledgement file
+checklist_keys(form_code) -> list                   a form's checklist keys (used by documents)
+tick_checklist_entry(filing, key)                   tick an entry a document answers (documents)
+filings_by_acknowledgement(doc_ids) -> dict         filings whose acknowledgement these are
 get_filings_by_ids(ids, lock) -> dict               filings by id (used by marketplace)
 mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
 mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
@@ -486,8 +489,17 @@ def set_checklist_tick(business, item_id, key: str, ticked: bool) -> dict:
     422 UNKNOWN_CHECKLIST_KEY for a key that is not in the form's checklist.
     """
     filing = _own_filing(business, item_id)
-    keys = [entry["key"] for entry in _checklist_of(filing.form_code)]
-    if key not in keys:
+    _set_tick(filing, key, ticked)
+    db.session.commit()
+    return get_filing(business, item_id)
+
+
+def _set_tick(filing: ComplianceItem, key: str, ticked: bool) -> None:
+    """Add or remove one tick, then work out the status again. Does not commit.
+
+    422 UNKNOWN_CHECKLIST_KEY for a key that is not in the form's checklist.
+    """
+    if key not in checklist_keys(filing.form_code):
         raise ApiError(422, "UNKNOWN_CHECKLIST_KEY", "This checklist entry does not exist.")
     existing = db.session.scalar(
         select(ChecklistTick).where(
@@ -500,8 +512,6 @@ def set_checklist_tick(business, item_id, key: str, ticked: bool) -> dict:
         db.session.delete(existing)
     db.session.flush()  # so _refresh_status sees the change
     _refresh_status(filing, today_in_india())
-    db.session.commit()
-    return get_filing(business, item_id)
 
 
 def mark_filed(business, user: User, item_id, acknowledgement_no=None, upload=None) -> dict:
@@ -558,6 +568,35 @@ def get_acknowledgement(business, item_id):
     if filing.acknowledgement_document_id is None:
         raise ApiError(404, "ACKNOWLEDGEMENT_MISSING", "No acknowledgement was uploaded.")
     return documents_service.read_document(filing.acknowledgement_document_id)
+
+
+# --- Used by the documents module (the vault, DO6) ------------------------------------
+
+
+def checklist_keys(form_code) -> list[str]:
+    """The keys of a form's checklist entries, in checklist order."""
+    return [entry["key"] for entry in _checklist_of(form_code)]
+
+
+def tick_checklist_entry(filing: ComplianceItem, key: str) -> None:
+    """Tick one checklist entry (a document was linked to it) and update the status.
+    Does not commit. 422 UNKNOWN_CHECKLIST_KEY for a key not in the form's checklist."""
+    _set_tick(filing, key, True)
+
+
+def filings_by_acknowledgement(document_ids) -> dict:
+    """{document id: ComplianceItem} for the live filings whose acknowledgement is one of
+    these documents."""
+    if len(document_ids) == 0:
+        return {}
+    stmt = select(ComplianceItem).where(
+        ComplianceItem.acknowledgement_document_id.in_(document_ids),
+        ComplianceItem.deleted_at.is_(None),
+    )
+    filings = {}
+    for filing in db.session.scalars(stmt):
+        filings[filing.acknowledgement_document_id] = filing
+    return filings
 
 
 # --- Used by the marketplace module (engagements) ------------------------------------

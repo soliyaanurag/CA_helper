@@ -8,6 +8,7 @@
     onboarding.py    /api/v1/onboarding/...
     admin.py         /api/v1/admin/...
     alerts.py        /api/v1/alerts/...
+    documents.py     /api/v1/documents/...
 
 Add a new feature's blueprint to BLUEPRINTS below. Routes stay thin: parse input
 (app/schemas/), call one service function (app/services/), serialize the result.
@@ -21,6 +22,7 @@ from app.routes import (
     auth,
     ca_workspace,
     compliance,
+    documents,
     health,
     marketplace,
     onboarding,
@@ -38,6 +40,7 @@ BLUEPRINTS = [
     marketplace.blp,
     admin.blp,
     alerts.blp,
+    documents.blp,
 ]
 
 
