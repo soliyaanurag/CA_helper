@@ -43,7 +43,7 @@ def build_scheduler(app: Flask) -> AppScheduler:
     """Create the scheduler with every job."""
     scheduler = AppScheduler(app)
     # Feature jobs go here, each calling a service function. Cron times are IST, e.g.
-    #   scheduler.add_job(alerts_service.send_reminders, "cron", hour=8, id="alerts.reminders")
+    #   scheduler.add_job(<module>_service.send_digest, "cron", hour=8, id="<module>.digest")
 
     # CO11: every hour, late filings the business has not started become "overdue".
     # Hourly (not once at midnight), so a worker started late in the day catches up soon.

@@ -4,6 +4,34 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Alerts: tray, email settings, reminders, penalty estimator (AL1–AL5)
+
+**What**
+- **One `notify()` for every tray entry** (`alerts_service`). It never commits. Its email (if `email=True` and the
+  user allows that type) is queued on the database session and sent by an `after_commit` listener, so it goes out
+  only if the caller's single commit succeeds; a rollback drops it.
+- **Engagement and account emails stay always on** (transactional) and unchanged: marketplace keeps sending them
+  itself and only adds `notify(email=False)` for the tray. The settings page shows "CA request update: always
+  emailed" instead of a switch. Switchable: deadline reminders, overdue, document requests, regulatory updates.
+  Completing an engagement adds a tray entry only (it never emailed).
+- **Reminder timing:** daily at 08:15 IST (after the hourly overdue job), plus `flask alerts send-reminders
+  [--date]` for demos. Windows, not exact days: 4–7 days before → T-7, 2–3 → T-3, 0–1 → T-1, after the due date →
+  overdue; only the current window's reminder is sent (a missed one is not sent late); each kind once per filing
+  (`reminder_log`). **No reminder for a filing due before the business registered.** One summary email per person
+  per run, with a tray entry per filing. The CA of an **active** engagement on the filing is reminded too.
+- **Penalty rules are seeded with every amount NULL** (`TODO_VERIFY`): no value is confirmed from an official source
+  yet; a later small PR fills verified values. The migration makes `late_fee_per_day` and `annual_interest_rate`
+  nullable and adds **`flat_late_fee`** (the ITR's fee is fixed, not per day). NULL means "not confirmed", never 0.
+- **Estimator:** the rule in force on the filing's due date; late fee = flat fee, or days late × daily fee (nil-return
+  fee for nil returns) capped at the maximum; interest only when the business types the tax due (we do not store
+  tax amounts). The dashboard "penalty exposure" adds late fees only. Every figure carries the label "Estimate
+  (rules pending verification)".
+- alerts ↔ marketplace import each other's service modules (reminders need the CA; engagement events need
+  `notify`). It works because both use `from app.services import <module>` and neither calls the other at import time.
+
+**Why:** the simplest design that keeps "one commit per service", never emails about something that was not saved,
+does not spam a business that registers mid-year, and never shows an invented legal amount.
+
 ## 2026-09-28: The filing page (CO4–CO10, CO12) and the first form content
 
 **What**

@@ -111,8 +111,13 @@ for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
   `pages/business/ProBonoPage.jsx` (`/business/pro-bono`, nav "Pro-bono help") and `pages/ca/CaProBonoPage.jsx`
   (`/ca/pro-bono`, nav "Pro-bono queue"); a "Pro-bono" badge on engagement cards. Tests: the MA16 section of
   `tests/test_marketplace_engagements.py`, `ProBonoPage.test.jsx`, `CaProBonoPage.test.jsx`.
+- **Tray notifications (AL1, alerts module):** every engagement event that emails someone (new request → the CA;
+  accept, quote, decline, expiry, pro-bono match → the business) also adds a tray entry with
+  `alerts_service.notify(..., email=False)` before the commit (`_notify_business()`); completion adds a tray entry
+  for the business only. The emails are unchanged and always sent. Tests: the AL1 section of
+  `tests/test_marketplace_engagements.py`.
 - **Not yet:** OCR of the certificate, the admin catalog editor, CA capacity limits, objective CA metrics
-  (response time, completion rate), the in-app notification tray (engagement news is email only).
+  (response time, completion rate).
 
 ## Tables
 - `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
@@ -186,13 +191,15 @@ Access checks (MA14), the ONLY way to decide what a CA may see of a business (CL
 - In a CA route: `require_ca_access(business_id)` from `app/utils/decorators.py` → 404 `BUSINESS_NOT_FOUND`
   unless active access. Access ends when the engagement ends (completed, declined, expired, cancelled).
 
-Also used by other modules: `open_filing_ids(filing_ids)` (onboarding), the admin helpers (admin).
+Also used by other modules: `open_filing_ids(filing_ids)` (onboarding), the admin helpers (admin),
+`active_ca_users_by_filing(filing_ids) -> {filing id: User}` (the CA of an active engagement on each filing; alerts
+reminders).
 Planned: `engagement_status_for(item_id)` (compliance).
 
 ## Depends on
 core-auth (users, roles, `current_business()`), compliance (`list_filings`, `get_filings_by_ids`,
 `mark_filings_with_ca`), onboarding (`get_business`), core-infra (`send_email`; the worker runs the 48 h expiry,
-MA12), documents (CoP upload, later).
+MA12), documents (CoP upload, later), alerts (`notify()` for tray entries).
 
 ## Contracts (don't change without telling the team)
 - Unverified CAs never appear in listings (`list_verified_cas()` filters on `verified` and a live account)
