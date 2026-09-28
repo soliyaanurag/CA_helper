@@ -63,7 +63,7 @@ Column types are in the model files; this lists what each table is for and its k
 | Table | One row is... | Key fields |
 |---|---|---|
 | `documents` (SD) | an uploaded file's metadata | owner_id → users (indexed; a business user, or a CA for their Certificate of Practice), uploaded_by_id → users (can differ: a CA uploading a client's acknowledgement), doc_type, original_filename, storage_key (unique), mime_type, size_bytes, sha256, fy, period_label, ocr_status, ocr_fields (JSONB) |
-| `compliance_item_documents` | a file serving one filing (N–N) | compliance_item_id, document_id, checklist_key (never empty; `general` when not for a checklist entry), linked_by_id → users. Unique (item, document, key): one file can serve several filings. Unlinking deletes the row |
+| `compliance_item_documents` | a file serving one filing (N–N) | compliance_item_id, document_id, checklist_key (never empty; `general` when not for a checklist entry), linked_by_id → users. Unique (item, document, key): one file can serve several filings. Unlinking deletes the row. **(implemented, DO6)** linking to a checklist key ticks it; a filed filing's links are fixed |
 
 ### alerts (`models/alerts.py`)
 | Table | One row is... | Key fields |
@@ -88,7 +88,7 @@ Column types are in the model files; this lists what each table is for and its k
 ### ca_workspace (`models/ca_workspace.py`)
 | Table | One row is... | Key fields |
 |---|---|---|
-| `document_requests` | a CA's request for one document | engagement_id (indexed), compliance_item_id, checklist_key, message, status, fulfilled_at, document_id → documents (the file that answered it) |
+| `document_requests` **(implemented, CW4)** | a CA's request for one document | engagement_id (indexed), compliance_item_id, checklist_key, message, status, fulfilled_at, document_id → documents (the file that answered it) |
 | `ca_notes` (SD) | a CA's private note about a client | ca_profile_id, business_id (indexed together), body |
 
 ### regulatory (`models/regulatory.py`)
@@ -596,8 +596,11 @@ Service functions (marketplace, built in MA14), the only way a CA's access is de
 - `ca_can_access_document(ca_profile_id, document_id)`: true only for a document linked to one of the filings of
   an active engagement.
 - Also `active_engagement_item_ids(ca_profile_id, business_id)` (the filings in active engagements only) and, for
-  routes, `require_ca_access(business_id)` in `app/utils/decorators.py` (404 unless active access). Fulfilled
-  document requests (ca_workspace) are not included yet: that table has no code.
+  routes, `require_ca_access(business_id)` in `app/utils/decorators.py` (404 unless active access). A fulfilled
+  document request links its file to the filing (`compliance_item_documents`), so it is covered by
+  `ca_can_access_document` without a separate rule.
+- **Capacity (MA7):** a CA with as many active clients (businesses with an `active` engagement) as `capacity` is
+  hidden from the list and gets no new clients (409 `CA_AT_CAPACITY`).
 
 The turnover bracket shown before acceptance is computed from `annual_turnover`; the amount itself is not shown.
 

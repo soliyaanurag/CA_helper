@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { usePenaltyExposure } from "@/api/alerts";
+import { useMyDocumentRequests } from "@/api/caWorkspace";
 import { errorMessage } from "@/api/client";
 import { useComplianceDashboard, useFilings } from "@/api/compliance";
 import { useMyEngagements } from "@/api/marketplace";
@@ -126,7 +127,16 @@ function NumberCard({ title, value, note, alert }) {
 }
 
 function ToDo({ filings, engagements }) {
+  const requests = useMyDocumentRequests();
   const tasks = [];
+  // Documents a CA asked for (CW4), first: someone is waiting for them.
+  for (const request of requests.data ?? []) {
+    tasks.push({
+      key: request.id,
+      text: `${request.ca_name} asked for a document for ${label(FORM_LABELS, request.form_code)} ${request.period_label}: ${request.message}`,
+      to: `/business/compliance/${request.compliance_item_id}`,
+    });
+  }
   for (const engagement of engagements) {
     if (engagement.status === "quoted") {
       tasks.push({

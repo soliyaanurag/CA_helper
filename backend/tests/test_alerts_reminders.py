@@ -217,7 +217,7 @@ def test_the_ca_of_an_active_engagement_is_reminded_too(business, make_user, dat
         "Asha Traders: GSTR-1 (Q2 2026-27) is due in 7 days"
     ]
     ca_note = database.session.query(Notification).filter_by(user_id=ca_user.id).one()
-    assert ca_note.link == "/ca/engagements"
+    assert ca_note.link == f"/ca/clients/{business.id}"
     assert sorted(message["To"] for message in mailbox) == sorted(
         [ca_user.email, database.session.get(User, business.user_id).email]
     )

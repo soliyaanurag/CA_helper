@@ -54,12 +54,13 @@ const EXPOSURE = {
   items: [],
 };
 
-function api(engagements = [], exposure = EXPOSURE) {
+function api(engagements = [], exposure = EXPOSURE, requests = []) {
   return fakeApi({
     "GET /api/v1/compliance/dashboard": [200, DASHBOARD],
     "GET /api/v1/compliance/items": [200, FILINGS],
     "GET /api/v1/marketplace/my-engagements": [200, engagements],
     "GET /api/v1/alerts/penalties": [200, exposure],
+    "GET /api/v1/ca-workspace/document-requests": [200, requests],
   });
 }
 
@@ -91,6 +92,33 @@ describe("business dashboard", () => {
       "href",
       "/business/compliance/soon",
     );
+  });
+
+  it("lists the documents a CA asked for first", async () => {
+    loginAs("business");
+    api([], EXPOSURE, [
+      {
+        id: "r1",
+        compliance_item_id: "f9",
+        form_code: "gstr_1",
+        period_label: "Q2 2026-27",
+        checklist_key: "hsn_summary",
+        message: "The HSN summary please",
+        status: "open",
+        created_at: "2026-09-25T10:00:00Z",
+        fulfilled_at: null,
+        document_id: null,
+        ca_name: "Meera Shah",
+      },
+    ]);
+    renderApp("/business");
+
+    const todo = (await screen.findByRole("heading", { name: "To do" })).closest("section");
+    const first = await within(todo).findByText(
+      "Meera Shah asked for a document for GSTR-1 Q2 2026-27: The HSN summary please",
+    );
+    expect(first).toHaveAttribute("href", "/business/compliance/f9");
+    expect(within(todo).getAllByRole("link")[0]).toBe(first);
   });
 
   it("asks an unregistered business to register", async () => {

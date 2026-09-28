@@ -116,8 +116,16 @@ for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
   `alerts_service.notify(..., email=False)` before the commit (`_notify_business()`); completion adds a tray entry
   for the business only. The emails are unchanged and always sent. Tests: the AL1 section of
   `tests/test_marketplace_engagements.py`.
-- **Not yet:** OCR of the certificate, the admin catalog editor, CA capacity limits, objective CA metrics
-  (response time, completion rate).
+- **Capacity (MA7):** `ca_profiles.capacity` is the most businesses a CA has **active** engagements with (paid
+  and pro-bono). A full CA is hidden from "Find a CA" (`list_verified_cas`), and a new request, the CA's accept,
+  the business's accept-quote and a pro-bono match that would add a client answer 409 `CA_AT_CAPACITY` ("This CA is
+  not taking new clients right now…"). A business that is already an active client always fits. Tests: the MA7
+  section of `tests/test_marketplace_engagements.py`.
+- **For the CA workspace:** `active_work(ca_profile_id)`, `active_cas_of_business(business_id)` and
+  `complete_if_all_filed(engagement_id)`: when the CA marks an engagement's last filing filed, the engagement
+  completes by itself (tray entry for the business; the "complete" action still works).
+- **Not yet:** OCR of the certificate, the admin catalog editor, objective CA metrics (response time, completion
+  rate).
 
 ## Tables
 - `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
@@ -191,7 +199,9 @@ Access checks (MA14), the ONLY way to decide what a CA may see of a business (CL
 - In a CA route: `require_ca_access(business_id)` from `app/utils/decorators.py` → 404 `BUSINESS_NOT_FOUND`
   unless active access. Access ends when the engagement ends (completed, declined, expired, cancelled).
 
-Also used by other modules: `open_filing_ids(filing_ids)` (onboarding), the admin helpers (admin),
+Also used by other modules: `active_work(ca_profile_id) -> [(engagement id, business id, filing id)]`,
+`active_cas_of_business(business_id) -> {engagement id: CA User}`, `complete_if_all_filed(engagement_id) -> bool`
+(no commit) and `active_client_ids(ca_profile_id)` (ca_workspace), `open_filing_ids(filing_ids)` (onboarding), the admin helpers (admin),
 `active_ca_users_by_filing(filing_ids) -> {filing id: User}` (the CA of an active engagement on each filing; alerts
 reminders).
 Planned: `engagement_status_for(item_id)` (compliance).

@@ -1224,3 +1224,93 @@ def test_a_refused_action_adds_nothing_to_the_tray(client, setup, database):
 
     assert response.status_code == 409
     assert [row[0] for row in tray(database, setup["owner"])] == ["Your CA declined your request"]
+
+
+# --- MA7: capacity (the most active clients a CA takes) ---------------------------------
+
+
+def _set_capacity(database, ca, capacity):
+    ca.capacity = capacity
+    database.session.commit()
+
+
+def _other_client(client, make_business, add_filing, auth_headers, catalog, ca):
+    """A second business that requests the CA for one GSTR-3B; returns (headers, response)."""
+    owner, business = make_business("Second Shop")
+    filing = add_filing(business, FormCode.GSTR_3B, "Aug 2026", days=0)
+    headers = auth_headers(owner)
+    body = request_body(ca, (filing, catalog["gstr_3b"]))
+    return headers, client.post(f"{BASE}/engagements", json=body, headers=headers)
+
+
+def test_a_full_ca_is_hidden_and_takes_no_new_clients(
+    client, setup, database, make_business, add_filing, auth_headers
+):
+    _set_capacity(database, setup["ca"], 1)
+    engagement = request_gst(client, setup)
+    action(client, setup["ca_headers"], engagement["id"], "accept")  # 1 active client: full
+
+    listed = client.get(f"{BASE}/cas", headers=setup["business_headers"]).get_json()
+    assert str(setup["ca"].id) not in [row["id"] for row in listed["items"]]
+
+    _, response = _other_client(
+        client, make_business, add_filing, auth_headers, setup["catalog"], setup["ca"]
+    )
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "CA_AT_CAPACITY"
+    assert "not taking new clients" in response.get_json()["error"]["message"]
+
+
+def test_an_existing_client_still_fits(client, setup, database, add_filing):
+    _set_capacity(database, setup["ca"], 1)
+    first = send_request(client, setup, (setup["gst_3b"], setup["catalog"]["gstr_3b"])).get_json()
+    action(client, setup["ca_headers"], first["id"], "accept")
+
+    second = send_request(client, setup, (setup["gst_1"], setup["catalog"]["gstr_1"]))
+    assert second.status_code == 201
+    accepted = action(client, setup["ca_headers"], second.get_json()["id"], "accept")
+    assert accepted.get_json()["status"] == "active"
+
+
+def test_accepting_or_a_quote_cannot_go_over_capacity(
+    client, setup, database, make_business, add_filing, auth_headers
+):
+    other_headers, pending = _other_client(
+        client, make_business, add_filing, auth_headers, setup["catalog"], setup["ca"]
+    )
+    quoted = pending.get_json()
+    action(
+        client,
+        setup["ca_headers"],
+        quoted["id"],
+        "quote",
+        {
+            "reason": "More work",
+            "prices": [{"engagement_item_id": quoted["items"][0]["id"], "price": "900"}],
+        },
+    )
+    engagement = request_gst(client, setup)
+    _set_capacity(database, setup["ca"], 1)
+    action(client, setup["ca_headers"], engagement["id"], "accept")  # now full
+
+    response = action(client, other_headers, quoted["id"], "accept-quote")
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "CA_AT_CAPACITY"
+
+
+def test_a_pro_bono_match_counts_towards_capacity(
+    client, setup, database, make_business, add_filing, auth_headers
+):
+    give_profile(database, setup["business"], ItrForm.ITR_3)
+    _pledge(database, setup["ca"], 2)
+    _set_capacity(database, setup["ca"], 1)
+    headers, pending = _other_client(
+        client, make_business, add_filing, auth_headers, setup["catalog"], setup["ca"]
+    )
+    action(client, setup["ca_headers"], pending.get_json()["id"], "accept")  # full
+    request_id = _join(client, setup, [setup["gst_3b"]]).get_json()["id"]
+
+    response = client.post(f"{BASE}/pro-bono/{request_id}/accept", headers=setup["ca_headers"])
+
+    assert response.get_json()["error"]["code"] == "CA_AT_CAPACITY"

@@ -4,6 +4,53 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: CA workspace (CW2–CW7) and CA capacity (MA7)
+
+**What**
+- **Built on the vault branch and sent as one PR with it** (asked by the team): the workspace needs the vault's
+  links and downloads.
+- **A CA's clients are the businesses with an active engagement;** every workspace route names the business and
+  checks `require_ca_access` first, then keeps to the filings of the CA's active engagements (`active_work`).
+- **Urgency is a weighted sum of named constants** (overdue 40 each, next deadline within 3 days 25 / within 7
+  days 10, each missing required document 5, each unanswered request 3), each part shown as a "why flagged" line.
+  `regulatory_points()` is the hook for regulatory changes (0 for now).
+- **Document requests:** one checklist entry (or `general`) of an engaged, not-filed filing. The business answers
+  with a vault file; the file is linked to the filing under that key (ticking it), which is also what lets the CA
+  open it. No new access rule was needed. Emails use the `document_request` setting.
+- **The CA marks one filing filed** (ARN and acknowledgement optional), reusing the business's mark-filed code
+  (`_record_filed`). The acknowledgement belongs to the business owner. The engagement **completes by itself when
+  its last filing is filed**; the manual "Mark as completed" stays. Open requests for that filing are cancelled.
+- **Capacity = active clients** (distinct businesses with an active engagement, pro-bono included). A full CA is
+  hidden from "Find a CA" and anything that would add a client answers 409 `CA_AT_CAPACITY`; an existing client
+  can still add filings.
+- CA reminders (alerts) now link to `/ca/clients/{business}` instead of `/ca/engagements`.
+
+**Why:** the simplest workspace that lets a CA see exactly their active work, ask for what is missing, file, and
+see which client needs attention first, with every score explainable line by line.
+
+## 2026-09-28: Document vault and documents on the filing page (DO2–DO7)
+
+**What**
+- **One blueprint, `/api/v1/documents`**, for businesses: upload, list (filters FY, type, filing; paginated),
+  download, soft delete, link and unlink. **No migration**: the `documents` and `compliance_item_documents` tables
+  already had every column.
+- **Download is the only route a CA may use**, and only for a document `ca_can_access_document()` allows (active
+  engagement). Others get 404 (they do not learn it exists). Admins are not allowed on the vault routes at all (they
+  never read contents; the certificate view stays their one exception).
+- **Linking a file to a checklist entry ticks it** (asked and approved), through a new non-committing
+  `compliance_service.tick_checklist_entry()`, so "docs pending → ready" moves by itself. Unlinking keeps the tick.
+- **A filed filing's documents are fixed:** no link, unlink or delete of its files (409 `FILING_LOCKED` /
+  `DOCUMENT_IN_USE`), and its acknowledgement can only go through "Undo mark as filed". A business can still add
+  files while the filing is `with_ca`.
+- **Upload-and-link is one request** (`compliance_item_id` + `checklist_key` on the upload); the link is checked
+  before the file is stored, so a refused link leaves no orphan file.
+- **OCR hook:** `on_document_uploaded(document)`, a no-op called by `add_document()` for every upload (vault,
+  acknowledgement, certificate), is where local OCR (DO8, DO9) plugs in.
+- documents ↔ compliance and documents ↔ marketplace import each other's service modules, as alerts ↔ marketplace.
+
+**Why:** the simplest vault that gives the filing page real files per checklist entry, lets the CA of an active
+engagement open exactly those files, and never lets proof of a filed return disappear.
+
 ## 2026-09-28: Alerts: tray, email settings, reminders, penalty estimator (AL1–AL5)
 
 **What**

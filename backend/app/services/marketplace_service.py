@@ -26,6 +26,13 @@ ca_can_access_document(ca_profile_id, document_id) -> bool  a document of one of
 own_profile_id(user) -> uuid | None                          the logged-in CA's profile id
 active_ca_users_by_filing(filing_ids) -> dict               {filing id: CA user} (alerts' reminders)
 
+For ca_workspace: active_work(ca_profile_id), active_cas_of_business(business_id),
+complete_if_all_filed(engagement_id) (the last filing filed completes the engagement).
+
+Capacity (MA7): `capacity` is the most businesses a CA has ACTIVE engagements with.
+A full CA is hidden from the list, and a request, an acceptance, an accepted quote or
+a pro-bono match that would add a client answers 409 CA_AT_CAPACITY.
+
 Ratings (MA17): rate_engagement(business, id, stars, review) after completion, once;
 rating_summary(ca_profile_id) -> {rating_average, rating_count}; latest_reviews(ca_profile_id).
 
@@ -317,6 +324,7 @@ def list_verified_cas(
     """
     stmt = select(CaProfile).join(CaProfile.user)
     stmt = _only_listed_cas(stmt)
+    stmt = stmt.where(_active_client_count_sql() < CaProfile.capacity)  # MA7: full CAs are hidden
     stmt = stmt.order_by(CaProfile.years_experience.desc(), User.full_name, CaProfile.id)
     if specialization:
         stmt = stmt.where(CaProfile.specializations.contains([specialization]))
@@ -707,6 +715,42 @@ def list_requestable_filings(business, ca_profile_id) -> list[dict]:
     return result
 
 
+# --- Capacity (MA7): `ca_profiles.capacity` is the most ACTIVE clients a CA takes ---------
+
+
+def _active_client_count_sql():
+    """SQL: how many businesses the CaProfile of the outer query has ACTIVE engagements with."""
+    return (
+        select(func.count(func.distinct(Engagement.business_id)))
+        .where(
+            Engagement.ca_profile_id == CaProfile.id,
+            Engagement.status == EngagementStatus.ACTIVE,
+        )
+        .correlate(CaProfile)
+        .scalar_subquery()
+    )
+
+
+def active_client_ids(ca_profile_id) -> set:
+    """The businesses the CA has an ACTIVE engagement with (paid and pro-bono alike)."""
+    stmt = select(Engagement.business_id).where(
+        Engagement.ca_profile_id == ca_profile_id, Engagement.status == EngagementStatus.ACTIVE
+    )
+    return set(db.session.scalars(stmt))
+
+
+def _check_room(ca: CaProfile, business_id) -> None:
+    """409 CA_AT_CAPACITY when working for this business would give the CA more active
+    clients than their capacity. A business that is already an active client always fits."""
+    clients = active_client_ids(ca.id)
+    if business_id not in clients and len(clients) >= ca.capacity:
+        raise ApiError(
+            409,
+            "CA_AT_CAPACITY",
+            "This CA is not taking new clients right now: all their client slots are full.",
+        )
+
+
 def create_request(business, ca_profile_id, items: list[dict]) -> dict:
     """The business asks the CA to do some filings: a new engagement, status `requested`.
 
@@ -717,6 +761,7 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
     that does not fit the business's ITR form).
     """
     ca = _find_listed_ca(ca_profile_id)
+    _check_room(ca, business.id)
     itr_service_code = _itr_service_code(business)
 
     # {filing id: the service chosen for it}
@@ -966,6 +1011,7 @@ def accept_request(user: User, engagement_id) -> dict:
     engagement = _ca_engagement(user, engagement_id)
     _check_status(engagement, EngagementStatus.REQUESTED)
     _check_not_expired(engagement)
+    _check_room(db.session.get(CaProfile, engagement.ca_profile_id), engagement.business_id)
     items = _items_of(engagement)
     for item in items:
         item.agreed_price = item.listed_price
@@ -1052,6 +1098,7 @@ def accept_quote(business, engagement_id) -> dict:
     """The business accepts the CA's quote: the quoted prices are agreed, status `active`."""
     engagement = _business_engagement(business, engagement_id)
     _check_status(engagement, EngagementStatus.QUOTED)
+    _check_room(db.session.get(CaProfile, engagement.ca_profile_id), engagement.business_id)
     items = _items_of(engagement)
     for item in items:
         item.agreed_price = item.quoted_price
@@ -1217,6 +1264,58 @@ def active_ca_users_by_filing(filing_ids) -> dict:
     for filing_id, user in db.session.execute(stmt):
         users[filing_id] = user
     return users
+
+
+# --- Used by the ca_workspace module (CW2 to CW7) -------------------------------------
+
+
+def active_work(ca_profile_id) -> list[tuple]:
+    """(engagement id, business id, filing id) for every filing in the CA's ACTIVE engagements."""
+    stmt = (
+        select(Engagement.id, Engagement.business_id, EngagementItem.compliance_item_id)
+        .join(EngagementItem, EngagementItem.engagement_id == Engagement.id)
+        .where(
+            Engagement.ca_profile_id == ca_profile_id,
+            Engagement.status == EngagementStatus.ACTIVE,
+        )
+    )
+    return [tuple(row) for row in db.session.execute(stmt)]
+
+
+def active_cas_of_business(business_id) -> dict:
+    """{engagement id: the CA's User} for the business's ACTIVE engagements."""
+    stmt = (
+        select(Engagement.id, User)
+        .join(CaProfile, Engagement.ca_profile_id == CaProfile.id)
+        .join(User, CaProfile.user_id == User.id)
+        .where(Engagement.business_id == business_id, Engagement.status == EngagementStatus.ACTIVE)
+    )
+    cas = {}
+    for engagement_id, user in db.session.execute(stmt):
+        cas[engagement_id] = user
+    return cas
+
+
+def complete_if_all_filed(engagement_id) -> bool:
+    """Complete an ACTIVE engagement once every one of its filings is filed (CW5), and tell
+    the business. Returns True if it completed. Does not commit."""
+    engagement = db.session.get(Engagement, engagement_id)
+    if engagement is None or engagement.status != EngagementStatus.ACTIVE:
+        return False
+    filing_ids = [item.compliance_item_id for item in _items_of(engagement)]
+    filings = compliance_service.get_filings_by_ids(filing_ids)
+    for filing in filings.values():
+        if filing.status not in FILED_STATUSES:
+            return False
+    engagement.status = EngagementStatus.COMPLETED
+    engagement.completed_at = utcnow()
+    _notify_business(
+        engagement,
+        "Your CA completed the work",
+        'filed every filing of your request. You can rate the work in "My engagements".',
+    )
+    log.info("Engagement %s completed: every filing is filed", engagement.id)
+    return True
 
 
 # --- Ratings (MA17) --------------------------------------------------------------------
@@ -1504,6 +1603,7 @@ def accept_pro_bono_request(user: User, request_id) -> dict:
         raise ApiError(409, "PRO_BONO_NOT_QUEUED", "This request is no longer in the queue.")
 
     business = onboarding_service.get_business(request.business_id)
+    _check_room(ca, business.id)
     filings = compliance_service.get_filings_by_ids(request.compliance_item_ids, lock=True)
     busy = _busy_filing_ids(request.compliance_item_ids)
     for filing_id in request.compliance_item_ids:
