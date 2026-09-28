@@ -48,6 +48,28 @@ The news monitor works end to end (RE1–RE6, the news part of X2).
   only, scan now, CLI, worker job), frontend `RegulatoryAdminPage.test.jsx`. The network is never used in tests
   (`_download` is faked).
 
+### How a change is extracted (AI first, keywords only as a fallback)
+Order for every new article (`_looks_relevant` → `_extract_change` in `regulatory_service.py`):
+1. **Keyword filter, always first:** the title + description must contain one of our forms **and** a change word,
+   else the article is only stored (no Gemini call, no change). Forms (`FORM_PATTERNS`, any case): `GSTR-1`/`GSTR 1`,
+   `GSTR-3B`, `CMP-08`, `GSTR-4`, `24Q`, `26Q`, `ITR`/`ITRs`/`income tax return(s)`. Change words (`CHANGE_WORDS`):
+   due date, last date, extend, extension, deadline, late fee, waive, waiver, postpone. At most 10 per scan.
+2. **Gemini** reads it and answers JSON. A JSON answer is used as it is (after the checks above): a change, or
+   `relevant: false` = **no change** (the keyword version is *not* used then).
+3. **Keyword version only if Gemini fails:** no key, an error such as 503 "high demand" after 3 tries, a timeout
+   (20 s), or a reply that is not JSON. It is built by fixed rules (`_change_from_keywords`):
+
+   | Field | Rule |
+   |---|---|
+   | summary | the article title, as published |
+   | form_codes | every form from the list above found in the text |
+   | change_type | `due_date_extension` only if the text says "extended" or "extends"; else `other` |
+   | dates | none (a pattern cannot read dates reliably, so nothing is guessed) |
+   | affected_categories | `{"extracted_by": "keywords"}`: everyone with an open filing of those forms |
+
+   The admin page shows it with the badge **"Found by keywords (no AI): read the article"**: open the article
+   before approving, and reject requests, opinions or anything too broad.
+
 ## Tables
 Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/regulatory.py`.
 - `news_sources` (config, seeded), `news_articles` (unique url and content hash), `regulatory_changes` (the
@@ -85,3 +107,6 @@ core-infra (worker, Gemini client), compliance (`business_ids_with_open_filings`
   those forms; read the article and reject it if it is too broad.
 - Approving a due-date extension does not move any due date; the obligation templates stay the source of due dates.
 - TaxGuru titles start with the category ("Income Tax | ..."); they are kept as published.
+- A reply from Gemini that starts like JSON but is broken is treated as "not a change" instead of falling back to
+  the keyword version (rare; possible follow-up).
+- Possible follow-up: on the next scan, ask Gemini again for keyword-only changes that are still pending.
