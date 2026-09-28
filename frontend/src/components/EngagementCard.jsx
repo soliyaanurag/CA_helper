@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDate, formatDateTime } from "@/lib/dates";
+import { expiresInText, formatDate, formatDateTime } from "@/lib/dates";
 import { ENGAGEMENT_STATUS_LABELS, FORM_LABELS, label } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
@@ -24,6 +24,40 @@ function total(items, priceName) {
   return sum;
 }
 
+// The steps shown for each status, e.g. Requested → Active → Completed.
+function stepsFor(status) {
+  if (status === "quoted") return ["requested", "quoted", "active", "completed"];
+  if (["declined", "expired", "cancelled"].includes(status)) return ["requested", status];
+  return ["requested", "active", "completed"];
+}
+
+/** Where the engagement is: ✓ done steps, ● the current one (bold), ○ steps still to come. */
+function Timeline({ status }) {
+  const steps = stepsFor(status);
+  const current = steps.indexOf(status);
+  return (
+    <ol aria-label="Progress" className="flex flex-wrap items-center gap-1 text-xs">
+      {steps.map((step, index) => (
+        <li
+          key={step}
+          aria-current={index === current ? "step" : undefined}
+          className={
+            index === current
+              ? "font-semibold"
+              : index < current
+                ? "text-muted-foreground"
+                : "text-muted-foreground/60"
+          }
+        >
+          {index > 0 && <span aria-hidden="true">→ </span>}
+          {index < current ? "✓ " : index === current ? "● " : "○ "}
+          {label(ENGAGEMENT_STATUS_LABELS, step)}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /**
  * One engagement as a card: who it is with, its status, and each filing with its
  * prices. Used by the business's and the CA's "My engagements" pages. `title` is
@@ -43,7 +77,16 @@ export function EngagementCard({ engagement, title, children }) {
             {label(ENGAGEMENT_STATUS_LABELS, engagement.status)}
           </Badge>
         </CardTitle>
-        <CardDescription>Requested {formatDateTime(engagement.requested_at)}</CardDescription>
+        <CardDescription>
+          Requested {formatDateTime(engagement.requested_at)}
+          {["requested", "quoted"].includes(engagement.status) && engagement.expires_at && (
+            <span className="font-medium text-amber-800">
+              {" "}
+              · {expiresInText(engagement.expires_at)}
+            </span>
+          )}
+        </CardDescription>
+        <Timeline status={engagement.status} />
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <table className="w-full text-left">

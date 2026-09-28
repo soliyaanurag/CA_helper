@@ -2,6 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { PublicLayout } from "@/components/PublicLayout";
 import { RequireRole } from "@/components/RequireRole";
 import { ROLE_HOME } from "@/lib/session";
+import { AdminCaDetailPage } from "@/pages/admin/AdminCaDetailPage";
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { RegulatoryAdminPage } from "@/pages/admin/RegulatoryAdminPage";
@@ -28,6 +29,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { SignupPage } from "@/pages/SignupPage";
+import { TermsPage } from "@/pages/TermsPage";
 import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 
 /**
@@ -88,6 +90,7 @@ export const appRoutes = [
       { index: true, element: <HomePage /> },
       { path: "login", element: <LoginPage /> },
       { path: "signup", element: <SignupPage /> },
+      { path: "terms", element: <TermsPage /> },
       { path: "verify-email", element: <VerifyEmailPage /> },
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
@@ -116,6 +119,7 @@ export const appRoutes = [
   roleArea("admin", [
     { index: true, element: <AdminDashboardPage /> },
     { path: "users", element: <AdminUsersPage /> },
+    { path: "cas/:caId", element: <AdminCaDetailPage /> },
     { path: "regulatory", element: <RegulatoryAdminPage /> },
   ]),
   { path: "*", element: <NotFoundPage /> },

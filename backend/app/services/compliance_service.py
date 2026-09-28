@@ -3,7 +3,8 @@
 financial_year_start(day) -> date                   1 April of the financial year of `day`
 periods_of_year(frequency, fy_start) -> list        the months / quarters / year of one FY
 due_date(template, period_end, quarter, audit)      when one filing is due (CO2)
-create_filings(business_id, profile, today) -> int  add the missing filings of this FY (CO3)
+sync_filings(business_id, profile, today) -> dict  match this FY's filings to the profile (CO3)
+create_filings(business_id, profile, today) -> int  the same for a new business (count added)
 list_filings(business) -> list[ComplianceItem]      one business's filings, soonest first
 get_filings_by_ids(ids, lock) -> dict               filings by id (used by marketplace)
 mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
@@ -22,6 +23,7 @@ from sqlalchemy import or_, select
 
 from app.extensions import db
 from app.models import ComplianceItem, ObligationTemplate, RegulatoryProfile, User
+from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus, FilingPath, Frequency
 
 
@@ -109,16 +111,35 @@ def _applies_to(template: ObligationTemplate, profile: RegulatoryProfile) -> boo
     return True
 
 
-def create_filings(business_id, profile: RegulatoryProfile, today: date) -> int:
-    """Add the filings this business must make in the current financial year. Does not commit.
+# Filings in these states are done; a profile change never removes them.
+DONE_STATUSES = (ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED)
 
-    One filing per applicable form and period. Only periods due today or later are
-    added (we cannot know whether older ones were filed before the business joined).
-    A filing that already exists is skipped, so running this again is safe.
-    Returns how many filings were added.
+
+def _status_for(due: date, today: date) -> ComplianceStatus:
+    """A filing that is not started yet: overdue once its due date has passed."""
+    return ComplianceStatus.OVERDUE if due < today else ComplianceStatus.UPCOMING
+
+
+def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=()) -> dict:
+    """Make the business's filings of the current financial year match its profile.
+    Does not commit.
+
+    - Every applicable form and period gets a filing, from 1 April: periods whose due
+      date has passed start as "overdue" (the business may have filed them before it
+      joined; it can mark them filed).
+    - A soft-deleted filing that applies again is reactivated, not inserted again.
+    - A filing that no longer applies is soft-deleted, unless it is filed, with a CA
+      (status "with_ca") or in `keep_ids` (filings in an open engagement).
+    - A not-started filing whose period or due date changed gets the new one: the audit
+      answer moves the ITR date; switching between monthly and quarterly returns turns
+      "Q1" into "Apr" (both start on 1 April, and only one live filing per form and start
+      date may exist).
+
+    Returns {"added", "restored", "removed", "moved", "kept_with_ca"} counts.
     """
     fy_start = financial_year_start(today)
     fy = fy_label(fy_start)
+    audit = bool(profile.audit_applicable or profile.other_audit_applicable)
     templates = db.session.scalars(
         select(ObligationTemplate).where(
             ObligationTemplate.effective_from <= today,
@@ -126,24 +147,54 @@ def create_filings(business_id, profile: RegulatoryProfile, today: date) -> int:
         )
     ).all()
 
-    added = 0
+    # {(form_code, period_start): (template, label, start, end, due date)} for this FY.
+    wanted = {}
     for template in templates:
-        if not _applies_to(template, profile):
-            continue
-        for label, start, end, quarter in periods_of_year(template.frequency, fy_start):
-            due = due_date(template, end, quarter, profile.audit_applicable)
-            if due < today:
-                continue
-            exists = db.session.scalar(
-                select(ComplianceItem.id).where(
-                    ComplianceItem.business_id == business_id,
-                    ComplianceItem.form_code == template.form_code,
-                    ComplianceItem.period_start == start,
-                    ComplianceItem.deleted_at.is_(None),
-                )
-            )
-            if exists:
-                continue
+        if _applies_to(template, profile):
+            for label, start, end, quarter in periods_of_year(template.frequency, fy_start):
+                due = due_date(template, end, quarter, audit)
+                wanted[(template.form_code, start)] = (template, label, start, end, due)
+
+    this_year = db.session.scalars(
+        select(ComplianceItem)
+        .where(ComplianceItem.business_id == business_id, ComplianceItem.fy == fy)
+        .order_by(ComplianceItem.created_at)
+    ).all()
+    live = {}
+    deleted = {}
+    for item in this_year:
+        key = (item.form_code, item.period_start)
+        if item.deleted_at is None:
+            live[key] = item
+        else:
+            deleted[key] = item  # the newest one wins
+
+    def reshape(item, template, label, end, due):
+        """Give a not-started filing the wanted template, period and due date."""
+        item.template_id = template.id
+        item.period_label = label
+        item.period_end = end
+        item.due_date = due
+        item.status = _status_for(due, today)
+
+    counts = {"added": 0, "restored": 0, "removed": 0, "moved": 0, "kept_with_ca": 0}
+    for key, (template, label, start, end, due) in wanted.items():
+        item = live.get(key)
+        if item is not None:
+            not_started = item.status in (ComplianceStatus.UPCOMING, ComplianceStatus.OVERDUE)
+            if not_started and (item.period_end, item.due_date) != (end, due):
+                reshape(item, template, label, end, due)
+                counts["moved"] += 1
+        elif key in deleted:
+            item = deleted[key]
+            item.is_active = True
+            item.deleted_at = None
+            if item.status in DONE_STATUSES:
+                item.template_id = template.id
+            else:
+                reshape(item, template, label, end, due)
+            counts["restored"] += 1
+        else:
             db.session.add(
                 ComplianceItem(
                     business_id=business_id,
@@ -154,11 +205,29 @@ def create_filings(business_id, profile: RegulatoryProfile, today: date) -> int:
                     period_start=start,
                     period_end=end,
                     due_date=due,
-                    status=ComplianceStatus.UPCOMING,
+                    status=_status_for(due, today),
                 )
             )
-            added = added + 1
-    return added
+            counts["added"] += 1
+
+    for key, item in live.items():
+        if key in wanted or item.status in DONE_STATUSES:
+            continue
+        if item.status == ComplianceStatus.WITH_CA or item.id in keep_ids:
+            counts["kept_with_ca"] += 1
+            continue
+        item.is_active = False
+        item.deleted_at = utcnow()
+        counts["removed"] += 1
+    return counts
+
+
+def create_filings(business_id, profile: RegulatoryProfile, today: date) -> int:
+    """Add the filings of a newly registered business (sync_filings). Does not commit.
+
+    Returns how many filings were added; running it again adds nothing.
+    """
+    return sync_filings(business_id, profile, today)["added"]
 
 
 def list_filings(business) -> list[ComplianceItem]:

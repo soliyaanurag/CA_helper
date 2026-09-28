@@ -22,7 +22,8 @@ FORM = {
     "pan": "abcde1234f",  # lower case on purpose: it is stored in capitals
     "phone": "9876543210",
     "gst_registered": True,
-    "gstin": "27ABCDE1234F1Z5",
+    "gstin": "27ABCDE1234F1Z0",  # synthetic: valid check character, PAN and state code
+    "gst_qrmp": True,  # quarterly returns (QRMP), the business's choice
     "deducts_tds": False,
     "pays_salary_above_limit": False,
 }
@@ -113,7 +114,7 @@ def test_get_returns_the_saved_business(client, owner, auth_headers):
 
     body = client.get(URL, headers=auth_headers(owner)).get_json()
 
-    assert body["business"]["gstin"] == "27ABCDE1234F1Z5"
+    assert body["business"]["gstin"] == "27ABCDE1234F1Z0"
     assert body["profile"]["msme_tier"] == "micro"
 
 

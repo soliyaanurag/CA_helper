@@ -18,6 +18,7 @@ NEW_ACCOUNT = {
     "email": "Asha@Example.com",
     "password": PASSWORD,
     "role": "business",
+    "terms_accepted": True,
 }
 
 
@@ -118,3 +119,18 @@ def test_signup_is_rate_limited_to_5_per_minute(client, database):
     statuses = [signup(client, email=f"user{i}@example.com").status_code for i in range(6)]
 
     assert statuses == [201] * 5 + [429]
+
+
+def test_signup_needs_the_terms_accepted_and_records_when(client, database):
+    refused = signup(client, terms_accepted=False)
+    missing = client.post(
+        SIGNUP_URL, json={k: v for k, v in NEW_ACCOUNT.items() if k != "terms_accepted"}
+    )
+    accepted = signup(client)
+
+    assert refused.status_code == missing.status_code == 422
+    assert refused.get_json()["error"]["details"]["json"]["terms_accepted"] == [
+        "Agree to the Terms and Privacy Policy to sign up."
+    ]
+    assert accepted.status_code == 201
+    assert database.session.scalar(select(User)).terms_accepted_at is not None

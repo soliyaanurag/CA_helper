@@ -4,12 +4,14 @@ get_own_profile(user) -> CaProfile                  the CA's profile (404 before
 save_own_profile(user, **fields) -> CaProfile        create or update it
 list_verified_cas(page, page_size, ...) -> dict      verified CAs, filtered and paginated
 get_verified_ca(profile_id) -> dict                  one verified CA with the services they offer
+save_certificate(user, upload) -> CaProfile          upload the Certificate of Practice (-> pending)
 list_catalog() -> list[dict]                         catalog services with their typical price range
 get_own_menu(user) -> dict                           the services the CA offers, with prices
 save_own_menu(user, items) -> dict                   replace the CA's price menu
 
 Engagements (a business working with a CA on some filings):
 list_requestable_filings(business, ca_id) -> list    the business's filings, with this CA's prices
+open_filing_ids(filing_ids) -> set                   those in an open engagement (for onboarding)
 create_request(business, ca_id, items) -> dict       send a request (status `requested`)
 list_business_engagements(business) -> list          the business's engagements, newest first
 list_ca_engagements(user) -> list                    the CA's engagements, newest first
@@ -28,7 +30,11 @@ with live accounts, worked out each time from `ca_services` (never typed in). It
 shown only once MIN_CAS_FOR_RANGE CAs offer the service; with fewer, one or two
 prices would say little and could reveal a single CA's fee.
 
-Verification: a new profile is `pending` until an admin checks it. If a verified or
+For the admin module: list_cas_for_admin, get_ca_for_admin, certificate_document_id,
+set_verification, count_cas_by_status, count_open_engagements.
+
+Verification: a new profile is `pending` until an admin checks it (the Certificate of
+Practice must be uploaded first). A new certificate sends it back to `pending`. If a verified or
 rejected CA changes the membership or CoP number, it goes back to `pending` (the
 admin must check the new number). A rejected CA's profile goes back to `pending`
 on any save, so fixing it and saving asks for a new check.
@@ -38,16 +44,17 @@ import logging
 from datetime import timedelta
 from statistics import median
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.errors import ApiError
 from app.extensions import db
 from app.models import CaProfile, CaService, CatalogService, Engagement, EngagementItem, User
 from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus
+from app.models.documents import DocumentType
 from app.models.enums import FormCode
-from app.models.marketplace import CaVerificationStatus, EngagementStatus
-from app.services import compliance_service, onboarding_service
+from app.models.marketplace import SERVICE_SPECIALIZATIONS, CaVerificationStatus, EngagementStatus
+from app.services import compliance_service, documents_service, onboarding_service
 from app.utils.email import send_email
 
 log = logging.getLogger(__name__)
@@ -115,9 +122,121 @@ def save_own_profile(user: User, **fields) -> CaProfile:
         profile.verification_status = CaVerificationStatus.PENDING
 
     for name, value in fields.items():
-        setattr(profile, name, value)
+        if value is not None:  # an older form sends no pro-bono slots: keep the saved number
+            setattr(profile, name, value)
     db.session.commit()
     return profile
+
+
+def save_certificate(user: User, upload) -> CaProfile:
+    """Store the CA's Certificate of Practice (encrypted) and link it to their profile.
+
+    A new certificate needs a new admin check: the profile goes back to `pending`
+    (a verified CA leaves the marketplace until then). The old certificate is soft-deleted.
+    404 CA_PROFILE_NOT_FOUND before the first profile save; storage errors pass through.
+    """
+    profile = get_own_profile(user)
+    document = documents_service.add_document(
+        user.id, user.id, upload, DocumentType.CERTIFICATE_OF_PRACTICE
+    )
+    db.session.flush()  # gives document.id
+    if profile.cop_document_id:
+        documents_service.remove_document(profile.cop_document_id)
+    profile.cop_document_id = document.id
+    profile.verification_status = CaVerificationStatus.PENDING
+    db.session.commit()
+    log.info("CA profile %s uploaded a certificate", profile.id)
+    return profile
+
+
+# --- For the admin module: verification and counts (none of these commits) --------------
+
+
+def _admin_row(profile: CaProfile) -> dict:
+    """Everything an admin sees about a CA (their numbers too, for checking)."""
+    return {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "full_name": profile.user.full_name,
+        "email": profile.user.email,
+        "membership_no": profile.membership_no,
+        "cop_number": profile.cop_number,
+        "city": profile.city,
+        "languages": profile.languages,
+        "specializations": profile.specializations,
+        "capacity": profile.capacity,
+        "years_experience": profile.years_experience,
+        "pro_bono_slots_per_month": profile.pro_bono_slots_per_month,
+        "about": profile.about,
+        "verification_status": profile.verification_status,
+        "rejection_reason": profile.rejection_reason,
+        "verified_at": profile.verified_at,
+        "has_certificate": profile.cop_document_id is not None,
+        "updated_at": profile.updated_at,
+    }
+
+
+def list_cas_for_admin(status: CaVerificationStatus | None) -> list[dict]:
+    """CA profiles (optionally of one status), the longest-waiting first."""
+    stmt = select(CaProfile).where(CaProfile.is_active).order_by(CaProfile.updated_at)
+    if status is not None:
+        stmt = stmt.where(CaProfile.verification_status == status)
+    return [_admin_row(profile) for profile in db.session.scalars(stmt)]
+
+
+def _ca_for_admin(profile_id) -> CaProfile:
+    profile = db.session.get(CaProfile, profile_id)
+    if profile is None or not profile.is_active:
+        raise ApiError(404, "CA_NOT_FOUND", "This CA was not found.")
+    return profile
+
+
+def get_ca_for_admin(profile_id) -> dict:
+    return _admin_row(_ca_for_admin(profile_id))
+
+
+def certificate_document_id(profile_id):
+    """The document id of the CA's Certificate of Practice. 404 CERTIFICATE_MISSING."""
+    profile = _ca_for_admin(profile_id)
+    if profile.cop_document_id is None:
+        raise ApiError(404, "CERTIFICATE_MISSING", "This CA has not uploaded a certificate.")
+    return profile.cop_document_id
+
+
+def set_verification(profile_id, admin: User, verified: bool, reason: str | None) -> CaProfile:
+    """An admin verifies or rejects a CA. Verifying needs an uploaded certificate
+    (409 CERTIFICATE_MISSING). Does not commit."""
+    profile = _ca_for_admin(profile_id)
+    if verified:
+        if profile.cop_document_id is None:
+            raise ApiError(
+                409, "CERTIFICATE_MISSING", "Ask the CA to upload their certificate first."
+            )
+        profile.verification_status = CaVerificationStatus.VERIFIED
+        profile.verified_at = utcnow()
+        profile.verified_by_id = admin.id
+        profile.rejection_reason = None
+    else:
+        profile.verification_status = CaVerificationStatus.REJECTED
+        profile.rejection_reason = reason
+        profile.verified_at = None
+        profile.verified_by_id = None
+    return profile
+
+
+def count_cas_by_status() -> dict:
+    """{"pending": n, "verified": n, "rejected": n} over live CA profiles."""
+    counts = {status.value: 0 for status in CaVerificationStatus}
+    for status in db.session.scalars(
+        select(CaProfile.verification_status).where(CaProfile.is_active)
+    ):
+        counts[status.value] += 1
+    return counts
+
+
+def count_open_engagements() -> int:
+    stmt = select(func.count()).select_from(Engagement).where(Engagement.status.in_(OPEN_STATUSES))
+    return db.session.scalar(stmt)
 
 
 def list_verified_cas(
@@ -127,12 +246,19 @@ def list_verified_cas(
     language: str | None = None,
     city: str | None = None,
     service: str | None = None,
+    user: User | None = None,
 ) -> dict:
     """Verified CAs with live accounts, most experienced first.
 
     `specialization` / `language` keep CAs whose list contains that code; `city`
     keeps CAs whose city contains the text (any case); `service` (a catalog code)
     keeps CAs who offer that service, and each item then has their `price`.
+
+    For a `user` with a registered business the list is ranked for it: each item also
+    gets `my_prices` (the CA's price for each of the business's open filing forms) and
+    `same_city` (the CA's city is in the business address); CAs offering more of those
+    forms come first, then same-city CAs, then the usual order. Without a registered
+    business the order and the items are as before (my_prices [], same_city null).
     """
     stmt = select(CaProfile).join(CaProfile.user)
     stmt = _only_listed_cas(stmt)
@@ -150,10 +276,31 @@ def list_verified_cas(
             CatalogService.code == service, CatalogService.is_active, CaService.is_active
         )
 
-    result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
+    business = onboarding_service.business_of_user(user) if user is not None else None
+
+    # (profile, my_prices, same_city) for the rows of this page.
+    if business is None:
+        result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
+        rows = [(profile, [], None) for profile in result.items]
+        total = result.total
+    else:
+        forms = set()
+        for filing in compliance_service.list_filings(business):
+            if filing.status not in FILED_STATUSES:
+                forms.add(filing.form_code)
+        itr_service_code = _itr_service_code(business)
+        address = business.address.lower()
+        rows = []
+        for profile in db.session.scalars(stmt):
+            my_prices = _my_prices(profile, forms, itr_service_code)
+            rows.append((profile, my_prices, profile.city.lower() in address))
+        # sort() is stable: within a tie the usual order (experience, name) stays.
+        rows.sort(key=lambda row: (-len(row[1]), not row[2]))
+        total = len(rows)
+        rows = rows[(page - 1) * page_size : page * page_size]
 
     items = []
-    for profile in result.items:
+    for profile, my_prices, same_city in rows:
         price = None
         if service:
             price = _price_of(profile, service)
@@ -168,9 +315,24 @@ def list_verified_cas(
                 "years_experience": profile.years_experience,
                 "about": profile.about,
                 "price": price,
+                "my_prices": my_prices,
+                "same_city": same_city,
             }
         )
-    return {"items": items, "page": page, "page_size": page_size, "total": result.total}
+    return {"items": items, "page": page, "page_size": page_size, "total": total}
+
+
+def _my_prices(profile: CaProfile, forms: set, itr_service_code: str | None) -> list[dict]:
+    """The CA's lowest price for each of `forms` they offer ({form_code, price})."""
+    best = {}
+    for service, price in _filing_services(profile):
+        if service.form_code not in forms:
+            continue
+        if service.form_code == FormCode.ITR and service.code != itr_service_code:
+            continue
+        if service.form_code not in best or price < best[service.form_code]:
+            best[service.form_code] = price
+    return [{"form_code": form, "price": price} for form, price in best.items()]
 
 
 def _price_of(profile: CaProfile, service_code: str):
@@ -224,6 +386,7 @@ def list_catalog() -> list[dict]:
             "name": service.name,
             "description": service.description,
             "unit": service.unit,
+            "specialization": SERVICE_SPECIALIZATIONS.get(service.code),
             "ca_count": len(service_prices),
             "min_price": None,
             "median_price": None,
@@ -387,6 +550,12 @@ def _busy_filing_ids(filing_ids) -> set:
         )
     )
     return set(db.session.scalars(stmt))
+
+
+def open_filing_ids(filing_ids) -> set:
+    """The filings among `filing_ids` in an open engagement (used by onboarding: a profile
+    edit never removes them)."""
+    return _busy_filing_ids(filing_ids)
 
 
 def _filing_services(ca: CaProfile) -> list:

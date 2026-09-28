@@ -95,6 +95,17 @@ function RequestForm({ caId, filings }) {
     setChosen(next);
   }
 
+  // Tick every filing of a quarter that can be picked (keeping choices already made).
+  function selectAll(group) {
+    const next = { ...chosen };
+    for (const filing of group) {
+      if (filing.blocked_reason === null && !next[filing.id]) {
+        next[filing.id] = filing.options[0].service_id;
+      }
+    }
+    setChosen(next);
+  }
+
   function chooseService(filing, serviceId) {
     setChosen({ ...chosen, [filing.id]: serviceId });
   }
@@ -131,37 +142,67 @@ function RequestForm({ caId, filings }) {
     }
   }
 
+  // Filings this CA has not priced are listed apart, folded away.
+  const notOffered = filings.filter((filing) => filing.options.length === 0);
+  const quarters = groupByQuarter(filings.filter((filing) => filing.options.length > 0));
+
+  function filingRow(filing) {
+    return (
+      <li key={filing.id} className="rounded-lg border p-3 text-sm">
+        <label htmlFor={"filing-" + filing.id} className="flex items-center gap-2 font-medium">
+          <input
+            id={"filing-" + filing.id}
+            type="checkbox"
+            value={filing.id}
+            checked={Boolean(chosen[filing.id])}
+            disabled={filing.blocked_reason !== null}
+            onChange={() => toggle(filing)}
+          />
+          {label(FORM_LABELS, filing.form_code)} {filing.period_label}
+          <span className="font-normal text-muted-foreground">
+            · due {formatDate(filing.due_date)}
+          </span>
+        </label>
+        {filing.blocked_reason ? (
+          <p className="mt-1 text-muted-foreground">{filing.blocked_reason}</p>
+        ) : (
+          <FilingPrice
+            filing={filing}
+            serviceId={chosen[filing.id] || filing.options[0].service_id}
+            onChoose={(serviceId) => chooseService(filing, serviceId)}
+          />
+        )}
+      </li>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <ul className="space-y-2">
-        {filings.map((filing) => (
-          <li key={filing.id} className="rounded-lg border p-3 text-sm">
-            <label htmlFor={"filing-" + filing.id} className="flex items-center gap-2 font-medium">
-              <input
-                id={"filing-" + filing.id}
-                type="checkbox"
-                value={filing.id}
-                checked={Boolean(chosen[filing.id])}
-                disabled={filing.blocked_reason !== null}
-                onChange={() => toggle(filing)}
-              />
-              {label(FORM_LABELS, filing.form_code)} {filing.period_label}
-              <span className="font-normal text-muted-foreground">
-                · due {formatDate(filing.due_date)}
-              </span>
-            </label>
-            {filing.blocked_reason ? (
-              <p className="mt-1 text-muted-foreground">{filing.blocked_reason}</p>
-            ) : (
-              <FilingPrice
-                filing={filing}
-                serviceId={chosen[filing.id] || filing.options[0].service_id}
-                onChoose={(serviceId) => chooseService(filing, serviceId)}
-              />
-            )}
-          </li>
-        ))}
-      </ul>
+      {quarters.map(([quarter, group]) => (
+        <section key={quarter} className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-medium">Due in {quarter}</h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => selectAll(group)}
+              disabled={group.every((filing) => filing.blocked_reason !== null)}
+            >
+              Select all in {quarter.split(" ")[0]}
+            </Button>
+          </div>
+          <ul className="space-y-2">{group.map(filingRow)}</ul>
+        </section>
+      ))}
+      {notOffered.length > 0 && (
+        <details className="rounded-lg border p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Not offered by this CA ({notOffered.length})
+          </summary>
+          <ul className="mt-2 space-y-2">{notOffered.map(filingRow)}</ul>
+        </details>
+      )}
 
       <p className="text-sm font-medium">Total at the listed prices: {formatRupees(total)}</p>
       {error && (
@@ -179,6 +220,27 @@ function RequestForm({ caId, filings }) {
       </div>
     </div>
   );
+}
+
+// The financial-year quarter a date falls in, e.g. "Q3 (Oct–Dec 2026)".
+function quarterOf(isoDate) {
+  const [year, month] = isoDate.split("-").map(Number);
+  if (month >= 4 && month <= 6) return `Q1 (Apr–Jun ${year})`;
+  if (month >= 7 && month <= 9) return `Q2 (Jul–Sep ${year})`;
+  if (month >= 10) return `Q3 (Oct–Dec ${year})`;
+  return `Q4 (Jan–Mar ${year})`;
+}
+
+// [[quarter, filings]] in due-date order (the API sends the filings soonest first).
+function groupByQuarter(filings) {
+  const groups = [];
+  for (const filing of filings) {
+    const quarter = quarterOf(filing.due_date);
+    const last = groups[groups.length - 1];
+    if (last && last[0] === quarter) last[1].push(filing);
+    else groups.push([quarter, [filing]]);
+  }
+  return groups;
 }
 
 // The CA's price for a filing. If the CA offers several services for it (ITR),

@@ -56,9 +56,32 @@ is not built: an unanswered request stays `requested` (its `expires_at` is set, 
   `CaServicesPage.test.jsx`, `MarketplacePage.test.jsx`, `CaDetailPage.test.jsx`, `TypicalFeesPage.test.jsx`,
   `RequestCaPage.test.jsx`, `MyEngagementsPage.test.jsx`, `CaEngagementsPage.test.jsx` (sample data in
   `test/engagementData.js`), `lib/money.test.js`.
-- **Not yet:** MA12 (the expiry job and re-matching email), Certificate of Practice upload + OCR, the admin
-  verify/reject screen, the admin catalog editor, CA capacity limits, pro-bono, ratings (a section on the CA
-  page), the in-app notification tray (engagement news is email only).
+- **Certificate and verification:** `save_certificate(user, upload)` stores the Certificate of Practice as a
+  `certificate_of_practice` document owned by the CA (encrypted, `documents_service`), links it through
+  `cop_document_id` and sends the profile back to `pending` (a verified CA leaves the marketplace until checked
+  again); the old certificate is soft-deleted. The admin module verifies or rejects through
+  `set_verification()`, which needs the certificate (409 `CERTIFICATE_MISSING`). `pro_bono_slots_per_month`
+  is on the profile form ("Free (pro-bono) slots per month"; not sent → the saved number stays). The profile
+  response adds `pro_bono_slots_per_month`, `rejection_reason`, `has_certificate`.
+- **Ranked for the business:** for a business with a registered business, `list_verified_cas()` adds
+  `my_prices` (the CA's price for each of its open filing forms, the ITR one by its ITR form) and `same_city`
+  (the CA's city is in its address), and ranks CAs offering more of its filings first, then same city, then
+  the usual order. There is no language badge: businesses have no language field.
+- **CA pages:** `CaProfilePage` has the certificate upload, the pro-bono field, a warning before saving a new
+  membership or CoP number when verified, the rejection reason, and "Preview: how businesses see you".
+  `CaServicesPage` warns when a priced service's specialization (`specialization` in the catalog, from
+  `SERVICE_SPECIALIZATIONS` in `models/marketplace.py`) is missing, with "Add to specializations".
+  `CaDashboardPage` shows a setup checklist until verified (profile, certificate, prices, verification with the
+  reason). The business pages: "Find a CA" shows "GSTR-3B from ₹600" for the business's filings, a "Same city"
+  badge and greys CAs offering none; the request page groups filings by quarter of their due date with "Select
+  all in Q2" and folds unpriced ones under "Not offered by this CA (n)"; engagement cards show a timeline
+  (Requested → Active → Completed, ✓ ● ○) and "expires in 31 h" while requested or quoted.
+- **Tests (new):** `tests/test_admin_ca_verification.py` (certificate upload, type check, re-verification,
+  pro-bono; admin side), the ranking test in `test_marketplace_engagements.py`; `CaProfilePage.test.jsx`,
+  `CaServicesPage.test.jsx`, `MarketplacePage.test.jsx`, `RequestCaPage.test.jsx`, `MyEngagementsPage.test.jsx`.
+- **Not yet:** MA12 (the expiry job and re-matching email), OCR of the certificate, the admin catalog editor,
+  CA capacity limits, the pro-bono queue, ratings (a section on the CA page), the in-app notification tray
+  (engagement news is email only).
 
 ## Tables
 - `ca_profiles`: one CA's practice profile and verification status (details in `docs/DATA_MODEL.md`). The
@@ -84,9 +107,10 @@ Created by `schema: complete data model`, not used by any service yet (model fil
 |---|---|---|---|
 | GET | `/api/v1/marketplace/ca-profile` | ca | the CA's own profile; 404 `CA_PROFILE_NOT_FOUND` before the first save |
 | PUT | `/api/v1/marketplace/ca-profile` | ca | create or update `{membership_no, cop_number, city, languages[], specializations[], capacity, years_experience, about}` → the profile; 409 `DUPLICATE_MEMBERSHIP_NO` |
-| GET | `/api/v1/marketplace/cas?service=&specialization=&language=&city=&page=&page_size=` | business | `{items, page, page_size, total}`: verified CAs with live accounts, most experienced first; each item `{id, full_name, membership_no, city, languages, specializations, years_experience, about, price}` (no CoP number, no capacity). `service` (a catalog code) keeps CAs who offer it and fills `price`; otherwise `price` is null |
+| POST | `/api/v1/marketplace/ca-profile/certificate` | ca | multipart `file` (PDF, JPG or PNG, up to `MAX_UPLOAD_MB`) → the profile, now `pending`; 400 `FILE_EMPTY`, `FILE_TYPE_NOT_ALLOWED`, `FILE_TOO_LARGE`; 404 `CA_PROFILE_NOT_FOUND` |
+| GET | `/api/v1/marketplace/cas?service=&specialization=&language=&city=&page=&page_size=` | business | `{items, page, page_size, total}`: verified CAs with live accounts, most experienced first (ranked for a registered business, see above); each item `{id, full_name, membership_no, city, languages, specializations, years_experience, about, price, my_prices, same_city}` (no CoP number, no capacity). `service` (a catalog code) keeps CAs who offer it and fills `price`; otherwise `price` is null. `my_prices` is `[]` and `same_city` null before the business registers |
 | GET | `/api/v1/marketplace/cas/<id>` | business | one listed CA: `{id, full_name, membership_no, city, languages, specializations, years_experience, about, services}`; `services` are the catalog services they offer, in catalog order, each a catalog row (with the typical range) plus the CA's `price`. 404 `CA_NOT_FOUND` for a CA who is not verified or whose account is not live (same rule as the list) |
-| GET | `/api/v1/marketplace/services` | any logged-in | active catalog services in order: `{id, code, name, description, unit, ca_count, min_price, median_price, max_price}`; the three prices are null until `MIN_CAS_FOR_RANGE` (3) listed CAs offer the service |
+| GET | `/api/v1/marketplace/services` | any logged-in | active catalog services in order: `{id, code, name, description, unit, specialization, ca_count, min_price, median_price, max_price}`; the three prices are null until `MIN_CAS_FOR_RANGE` (3) listed CAs offer the service |
 | GET | `/api/v1/marketplace/ca-services` | ca | `{items: [{service_id, price}]}`: the CA's current menu (empty without a profile) |
 | PUT | `/api/v1/marketplace/ca-services` | ca | body `{items: [{service_id, price}]}` replaces the menu → the saved menu; price 1 to 10,00,000; 404 `CA_PROFILE_NOT_FOUND`, 400 `UNKNOWN_SERVICE` (not in the active catalog) |
 

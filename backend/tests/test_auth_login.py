@@ -138,3 +138,22 @@ def test_login_is_rate_limited_to_10_per_minute(client, database):
     assert statuses[10] == 429
     response = login(client, "nobody@example.com")
     assert response.get_json()["error"]["code"] == "TOO_MANY_REQUESTS"
+
+
+def test_login_says_whether_the_terms_were_accepted(client, make_user):
+    make_user(email="old@example.com")  # signed up before the consent step
+    make_user(email="new@example.com", terms_accepted_at=datetime.now(UTC))
+
+    old = login(client, "old@example.com").get_json()
+    new = login(client, "new@example.com").get_json()
+
+    assert (old["terms_accepted"], new["terms_accepted"]) == (False, True)
+
+
+def test_accept_terms_records_consent_once(client, make_user, auth_headers, database):
+    user = make_user(email="old@example.com")
+
+    response = client.post("/api/v1/auth/accept-terms", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    assert login(client, "old@example.com").get_json()["terms_accepted"] is True

@@ -61,6 +61,8 @@ class UserSchema(Schema):
 class LoginResponseSchema(Schema):
     access_token = fields.String(required=True)
     user = fields.Nested(UserSchema, required=True)
+    # False for a user who signed up before the consent step: the app asks once.
+    terms_accepted = fields.Boolean(required=True)
 
 
 class SignupSchema(Schema):
@@ -74,6 +76,12 @@ class SignupSchema(Schema):
         by_value=True,
         required=True,
         validate=validate.OneOf([UserRole.BUSINESS, UserRole.CA], error="Choose business or ca."),
+    )
+    # "I agree to the Terms and Privacy Policy" (/terms): required.
+    terms_accepted = fields.Boolean(
+        required=True,
+        load_only=True,
+        validate=validate.Equal(True, error="Agree to the Terms and Privacy Policy to sign up."),
     )
 
 

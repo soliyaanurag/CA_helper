@@ -96,6 +96,7 @@ describe("CA profile page", () => {
       specializations: ["itr", "gstr_3b"],
       capacity: 20,
       years_experience: 5,
+      pro_bono_slots_per_month: 0,
       about: "",
     });
   });
@@ -168,5 +169,76 @@ describe("CA profile page", () => {
     );
     expect(screen.getByRole("checkbox", { name: "Hindi" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "gstr_1" })).not.toBeInTheDocument();
+  });
+
+  it("uploads the Certificate of Practice", async () => {
+    loginAs("ca");
+    const fetchMock = fakeApi({
+      [`GET ${URL}`]: [200, SAVED],
+      [`POST ${URL}/certificate`]: [200, { ...SAVED, has_certificate: true }],
+    });
+    renderApp("/ca/profile");
+    const user = userEvent.setup();
+
+    const file = new File(["%PDF-1.4"], "cop.pdf", { type: "application/pdf" });
+    await user.upload(await screen.findByLabelText("Certificate file"), file);
+    await user.click(screen.getByRole("button", { name: "Upload certificate" }));
+
+    expect(
+      await screen.findByText("Certificate uploaded. An admin will check it."),
+    ).toBeInTheDocument();
+    const [, init] = fetchMock.mock.calls.find(([path]) => path === `${URL}/certificate`);
+    expect(init.body.get("file").name).toBe("cop.pdf");
+  });
+
+  it("warns a verified CA that a new number needs a new check", async () => {
+    loginAs("ca");
+    fakeApi({ [`GET ${URL}`]: [200, { ...SAVED, verification_status: "verified" }] });
+    renderApp("/ca/profile");
+    const user = userEvent.setup();
+
+    const field = await screen.findByLabelText("ICAI membership number");
+    expect(screen.queryByText(/goes back to an admin/)).not.toBeInTheDocument();
+    await user.clear(field);
+    await user.type(field, "654321");
+
+    expect(screen.getByText(/goes back to an admin for verification/)).toBeInTheDocument();
+  });
+
+  it("shows a rejection's reason and a preview of the public profile", async () => {
+    loginAs("ca");
+    fakeApi({
+      [`GET ${URL}`]: [
+        200,
+        { ...SAVED, verification_status: "rejected", rejection_reason: "The CoP number is wrong." },
+      ],
+    });
+    renderApp("/ca/profile");
+
+    expect(await screen.findByText("The CoP number is wrong.")).toBeInTheDocument();
+    expect(screen.getByText("Preview: how businesses see you")).toBeInTheDocument();
+    expect(screen.getByText("Free (pro-bono) slots per month")).toBeInTheDocument();
+  });
+
+  it("shows the setup checklist on the dashboard until verified", async () => {
+    loginAs("ca");
+    fakeApi({
+      "GET /api/v1/ca-workspace/dashboard": [200, { message: "Welcome, Test ca" }],
+      [`GET ${URL}`]: [
+        200,
+        { ...SAVED, verification_status: "rejected", rejection_reason: "Blurry certificate." },
+      ],
+      "GET /api/v1/marketplace/ca-services": [
+        200,
+        { items: [{ service_id: "s1", price: "700.00" }] },
+      ],
+    });
+    renderApp("/ca");
+
+    const checklist = await screen.findByRole("list", { name: "Setup checklist" });
+    expect(checklist).toHaveTextContent("✓ Profile");
+    expect(checklist).toHaveTextContent("✗ Certificate uploaded");
+    expect(checklist).toHaveTextContent("✓ Prices set");
+    expect(checklist).toHaveTextContent("Verification: Rejected (Blurry certificate.)");
   });
 });

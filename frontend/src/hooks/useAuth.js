@@ -6,6 +6,8 @@ import { createContext, useContext } from "react";
  * - login(email, password): calls the login endpoint and returns the user; throws
  *   ApiRequestError (e.g. code INVALID_CREDENTIALS) on failure;
  * - logout(): the Log out button;
+ * - termsAccepted: false for a user who signed up before consent was asked (then
+ *   RequireRole shows the consent step once); acceptTerms() records it;
  * - loggedOutOnPurpose: true after logout() until the next login (the route guard
  *   then does not remember the page for the next login).
  */

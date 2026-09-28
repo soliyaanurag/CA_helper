@@ -14,7 +14,7 @@ it is the reference for every request and response field the frontend uses.
 - Actions that are not plain CRUD use a verb sub-path: `POST /api/v1/compliance/items/{item_id}/mark-filed`.
 - Admin endpoints for a module's configuration: `/api/v1/admin/<module>/...`, in that module's blueprint.
 - Core endpoints: `/api/health`; `/api/v1/auth/signup`, `verify-email`, `verify-email/resend`, `login`,
-  `forgot-password`, `reset-password`, `change-password`, `me` (exist; details in `docs/modules/core-auth.md`);
+  `forgot-password`, `reset-password`, `change-password`, `accept-terms`, `me` (exist; details in `docs/modules/core-auth.md`);
   `/api/v1/notifications/...` (planned).
 - An area's home-page data is served by the module that owns that page, under its own segment:
   `/api/v1/compliance/dashboard` (business), `/api/v1/ca-workspace/dashboard` (CA), `/api/v1/admin/dashboard`.

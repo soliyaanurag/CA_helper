@@ -1,17 +1,25 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link } from "react-router";
 import { z } from "zod";
 
 import { errorMessage } from "@/api/client";
 import { FILINGS_KEY } from "@/api/compliance";
-import { MY_BUSINESS_KEY, registerBusiness, useMyBusiness } from "@/api/onboarding";
+import {
+  MY_BUSINESS_KEY,
+  registerBusiness,
+  updateBusiness,
+  useGstStates,
+  useMyBusiness,
+} from "@/api/onboarding";
 import { FormField } from "@/components/FormField";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { gstinError } from "@/lib/gstin";
 import {
   ENTITY_TYPE_LABELS,
   GST_SCHEME_LABELS,
@@ -23,90 +31,132 @@ import { formatRupees } from "@/lib/money";
 
 /**
  * /business/onboarding: the business profile.
- * Not registered yet → the registration form. Registered → the regulatory profile,
- * with the reason ("why") under every line.
+ * Not registered yet → the registration form. Registered → the regulatory profile (a row
+ * of chips, then every line with its reason), and "Edit details", which opens the same
+ * form filled in; after saving, "What changed" lists the profile lines and filings that
+ * changed.
  */
 export function OnboardingPage() {
   const myBusiness = useMyBusiness();
+  const states = useGstStates();
+  const [editing, setEditing] = useState(false);
+  const [changes, setChanges] = useState(null);
+
+  let content;
+  if (myBusiness.isPending || states.isPending) {
+    content = <p className="text-sm text-muted-foreground">Loading...</p>;
+  } else if (myBusiness.isError || states.isError) {
+    content = (
+      <p role="alert" className="text-sm text-destructive">
+        {errorMessage(myBusiness.error || states.error)}
+      </p>
+    );
+  } else if (myBusiness.data === null) {
+    content = <BusinessForm states={states.data} />;
+  } else if (editing) {
+    content = (
+      <BusinessForm
+        states={states.data}
+        business={myBusiness.data.business}
+        onSaved={(saved) => {
+          setChanges(saved.changes);
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  } else {
+    content = (
+      <>
+        {changes && <WhatChanged changes={changes} />}
+        <ProfileView
+          business={myBusiness.data.business}
+          profile={myBusiness.data.profile}
+          onEdit={() => {
+            setChanges(null);
+            setEditing(true);
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold">Business profile</h1>
-      {myBusiness.isPending && <p className="text-sm text-muted-foreground">Loading...</p>}
-      {myBusiness.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          {errorMessage(myBusiness.error)}
-        </p>
-      )}
-      {myBusiness.isSuccess && myBusiness.data === null && <RegisterForm />}
-      {myBusiness.isSuccess && myBusiness.data !== null && (
-        <ProfileView business={myBusiness.data.business} profile={myBusiness.data.profile} />
-      )}
+      {content}
     </div>
   );
 }
 
 // ----------------------------------------------------------------------------
-// The registration form
+// The registration / edit form
 // ----------------------------------------------------------------------------
 
 const AMOUNT = /^[0-9]+(\.[0-9]{1,2})?$/; // rupees, e.g. 4500000 or 4500000.50
+const GSTIN_FORMAT = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 
 // The same rules as BusinessInputSchema in backend/app/schemas/onboarding.py.
-const registerSchema = z
-  .object({
-    legal_name: z.string().trim().min(1, "Enter the business name.").max(200),
-    entity_type: z.string().min(1, "Choose the type of business."),
-    state: z.string().trim().min(1, "Enter the state.").max(50),
-    address: z.string().trim().min(1, "Enter the address.").max(500),
-    description: z.string().trim().min(1, "Describe what the business does.").max(1000),
-    annual_turnover: z.string().regex(AMOUNT, "Enter an amount in rupees, e.g. 4500000."),
-    investment_amount: z.string().regex(AMOUNT, "Enter an amount in rupees, e.g. 800000."),
-    pan: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, "Enter a valid PAN, e.g. ABCDE1234F."),
-    phone: z.string().regex(/^[6-9][0-9]{9}$/, "Enter a 10-digit mobile number."),
-    gst_registered: z.boolean(),
-    gstin: z.string().trim().toUpperCase(),
-    gst_composition: z.boolean(),
-    deducts_tds: z.boolean(),
-    tan: z.string().trim().toUpperCase(),
-    pays_salary_above_limit: z.boolean(),
-    cin_llpin: z.string().trim().toUpperCase(),
-    udyam_number: z.string().trim().toUpperCase(),
-  })
-  // Fields that are needed only for some businesses.
-  .superRefine((form, ctx) => {
-    if (
-      form.gst_registered &&
-      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(form.gstin)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["gstin"],
-        message: "Enter a valid 15-character GSTIN.",
-      });
-    }
-    if (form.deducts_tds && !/^[A-Z]{4}[0-9]{5}[A-Z]$/.test(form.tan)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["tan"],
-        message: "Enter a valid TAN, e.g. MUMA12345B.",
-      });
-    }
-    if (["llp", "private_limited"].includes(form.entity_type) && !form.cin_llpin) {
-      ctx.addIssue({ code: "custom", path: ["cin_llpin"], message: "Enter the CIN or LLPIN." });
-    }
-    if (form.udyam_number && !/^UDYAM-[A-Z]{2}-[0-9]{2}-[0-9]{7}$/.test(form.udyam_number)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["udyam_number"],
-        message: "Enter it like UDYAM-MH-01-0000001, or leave it empty.",
-      });
-    }
-  });
+// `states` is [{name, code}]: the state must be one of them, and a GSTIN must fit it.
+function makeSchema(states) {
+  const codeOf = Object.fromEntries(states.map((state) => [state.name, state.code]));
+  return (
+    z
+      .object({
+        legal_name: z.string().trim().min(1, "Enter the business name.").max(200),
+        entity_type: z.string().min(1, "Choose the type of business."),
+        state: z.string().refine((name) => name in codeOf, "Choose your state from the list."),
+        address: z.string().trim().min(1, "Enter the address.").max(500),
+        description: z.string().trim().min(1, "Describe what the business does.").max(1000),
+        annual_turnover: z.string().regex(AMOUNT, "Enter an amount in rupees, e.g. 4500000."),
+        investment_amount: z.string().regex(AMOUNT, "Enter an amount in rupees, e.g. 800000."),
+        pan: z
+          .string()
+          .trim()
+          .toUpperCase()
+          .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, "Enter a valid PAN, e.g. ABCDE1234F."),
+        phone: z.string().regex(/^[6-9][0-9]{9}$/, "Enter a 10-digit mobile number."),
+        gst_registered: z.boolean(),
+        gstin: z.string().trim().toUpperCase(),
+        gst_composition: z.boolean(),
+        gst_returns: z.enum(["monthly", "quarterly"]),
+        accounts_audited_other_law: z.boolean(),
+        deducts_tds: z.boolean(),
+        tan: z.string().trim().toUpperCase(),
+        pays_salary_above_limit: z.boolean(),
+        cin_llpin: z.string().trim().toUpperCase(),
+        udyam_number: z.string().trim().toUpperCase(),
+      })
+      // Fields that are needed only for some businesses.
+      .superRefine((form, ctx) => {
+        if (form.gst_registered) {
+          const problem = GSTIN_FORMAT.test(form.gstin)
+            ? gstinError(form.gstin, form.pan, form.state, codeOf[form.state])
+            : "Enter a valid 15-character GSTIN.";
+          if (problem) {
+            ctx.addIssue({ code: "custom", path: ["gstin"], message: problem });
+          }
+        }
+        if (form.deducts_tds && !/^[A-Z]{4}[0-9]{5}[A-Z]$/.test(form.tan)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["tan"],
+            message: "Enter a valid TAN, e.g. MUMA12345B.",
+          });
+        }
+        if (["llp", "private_limited"].includes(form.entity_type) && !form.cin_llpin) {
+          ctx.addIssue({ code: "custom", path: ["cin_llpin"], message: "Enter the CIN or LLPIN." });
+        }
+        if (form.udyam_number && !/^UDYAM-[A-Z]{2}-[0-9]{2}-[0-9]{7}$/.test(form.udyam_number)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["udyam_number"],
+            message: "Enter it like UDYAM-MH-01-0000001, or leave it empty.",
+          });
+        }
+      })
+  );
+}
 
 const EMPTY_FORM = {
   legal_name: "",
@@ -121,6 +171,8 @@ const EMPTY_FORM = {
   gst_registered: false,
   gstin: "",
   gst_composition: false,
+  gst_returns: "monthly",
+  accounts_audited_other_law: false,
   deducts_tds: false,
   tan: "",
   pays_salary_above_limit: false,
@@ -128,41 +180,69 @@ const EMPTY_FORM = {
   udyam_number: "",
 };
 
+// The saved business as form values: only the form's own fields (the API refuses
+// others), amounts as typed, empty codes as "".
+function formValues(business) {
+  const values = {};
+  for (const key of Object.keys(EMPTY_FORM)) {
+    values[key] = business[key] ?? EMPTY_FORM[key];
+  }
+  values.state = business.state_needs_review ? "" : business.state;
+  values.annual_turnover = String(Number(business.annual_turnover));
+  values.investment_amount = String(Number(business.investment_amount));
+  values.gst_returns = business.gst_qrmp ? "quarterly" : "monthly";
+  return values;
+}
+
 const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-function RegisterForm() {
+/** Registers a business (no `business`) or edits the saved one. */
+function BusinessForm({ states, business, onSaved, onCancel }) {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState(null);
+  const schema = useMemo(() => makeSchema(states), [states]);
   const {
     register,
     handleSubmit,
     control,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(registerSchema), defaultValues: EMPTY_FORM });
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: business ? formValues(business) : EMPTY_FORM,
+  });
 
   // Some fields appear only after a tick or a choice.
   const gstRegistered = useWatch({ control, name: "gst_registered" });
+  const composition = useWatch({ control, name: "gst_composition" });
   const deductsTds = useWatch({ control, name: "deducts_tds" });
   const entityType = useWatch({ control, name: "entity_type" });
   const needsCin = entityType === "llp" || entityType === "private_limited";
+  const asksOtherAudit = entityType === "partnership" || entityType === "llp";
 
   async function onSubmit(values) {
     setServerError(null);
+    const { gst_returns, ...rest } = values;
     // Send empty codes as null, and only the ones that apply.
     const form = {
-      ...values,
+      ...rest,
       gstin: values.gst_registered ? values.gstin : null,
       gst_composition: values.gst_registered && values.gst_composition,
+      gst_qrmp: values.gst_registered && !values.gst_composition && gst_returns === "quarterly",
+      accounts_audited_other_law: asksOtherAudit && values.accounts_audited_other_law,
       tan: values.deducts_tds ? values.tan : null,
       pays_salary_above_limit: values.deducts_tds && values.pays_salary_above_limit,
       cin_llpin: needsCin ? values.cin_llpin : null,
       udyam_number: values.udyam_number || null,
     };
     try {
-      const saved = await registerBusiness(form);
-      queryClient.setQueryData(MY_BUSINESS_KEY, saved); // shows the profile at once
-      queryClient.invalidateQueries({ queryKey: FILINGS_KEY }); // new filings were created
+      const saved = business ? await updateBusiness(form) : await registerBusiness(form);
+      queryClient.setQueryData(MY_BUSINESS_KEY, {
+        business: saved.business,
+        profile: saved.profile,
+      });
+      queryClient.invalidateQueries({ queryKey: FILINGS_KEY }); // the filings may have changed
+      onSaved?.(saved);
     } catch (error) {
       setServerError(errorMessage(error));
     }
@@ -171,7 +251,7 @@ function RegisterForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Register your business</CardTitle>
+        <CardTitle>{business ? "Edit your business details" : "Register your business"}</CardTitle>
         <CardDescription>
           We use these details to work out which filings apply to you and when they are due. PAN,
           GSTIN, TAN and phone are stored encrypted.
@@ -200,7 +280,23 @@ function RegisterForm() {
                 <p className="text-sm text-destructive">{errors.entity_type.message}</p>
               )}
             </div>
-            <FormField id="state" label="State" error={errors.state} {...register("state")} />
+            <div className="space-y-2">
+              <Label htmlFor="state">State</Label>
+              <select id="state" className={SELECT_CLASS} {...register("state")}>
+                <option value="">Choose...</option>
+                {states.map((state) => (
+                  <option key={state.code} value={state.name}>
+                    {state.name}
+                  </option>
+                ))}
+              </select>
+              {errors.state && <p className="text-sm text-destructive">{errors.state.message}</p>}
+              {business?.state_needs_review && !errors.state && (
+                <p className="text-xs text-muted-foreground">
+                  You typed "{business.state}" before this list existed: please choose it again.
+                </p>
+              )}
+            </div>
             <FormField
               id="phone"
               label="Mobile number"
@@ -246,6 +342,22 @@ function RegisterForm() {
             {...register("description")}
           />
 
+          {asksOtherAudit && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Audit</legend>
+              <Checkbox
+                id="accounts_audited_other_law"
+                text="Our accounts are audited under another law (for example the LLP Act or our partnership deed)"
+                {...register("accounts_audited_other_law")}
+              />
+              <p className="text-xs text-muted-foreground">
+                LLPs above certain limits, and firms whose deed requires it, have their accounts
+                audited every year. Ask your CA if you are not sure. An audit moves the income tax
+                return's due date.
+              </p>
+            </fieldset>
+          )}
+
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">GST</legend>
             <Checkbox id="gst_registered" text="GST registered" {...register("gst_registered")} />
@@ -257,6 +369,29 @@ function RegisterForm() {
                   text="I chose the composition scheme"
                   {...register("gst_composition")}
                 />
+                {!composition && (
+                  <div className="space-y-1">
+                    <p className="text-sm">How do you file GST returns?</p>
+                    <div className="flex gap-4">
+                      <Radio
+                        id="gst_monthly"
+                        value="monthly"
+                        text="Monthly"
+                        {...register("gst_returns")}
+                      />
+                      <Radio
+                        id="gst_quarterly"
+                        value="quarterly"
+                        text="Quarterly (QRMP)"
+                        {...register("gst_returns")}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Quarterly returns (QRMP) are allowed up to a turnover limit; above it, returns
+                      are monthly and your profile will say so.
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </fieldset>
@@ -281,9 +416,16 @@ function RegisterForm() {
               {serverError}
             </p>
           )}
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Register business"}
-          </Button>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : business ? "Save changes" : "Register business"}
+            </Button>
+            {onCancel && (
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </form>
       </CardContent>
     </Card>
@@ -299,6 +441,15 @@ function Checkbox({ id, text, ...inputProps }) {
   );
 }
 
+function Radio({ id, text, ...inputProps }) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <input id={id} type="radio" {...inputProps} />
+      {text}
+    </label>
+  );
+}
+
 // ----------------------------------------------------------------------------
 // The regulatory profile
 // ----------------------------------------------------------------------------
@@ -307,18 +458,34 @@ function yesNo(value) {
   return value ? "Yes" : "No";
 }
 
-function ProfileView({ business, profile }) {
-  // One row per profile line: [title, value, key of its "why" in profile.explanations].
-  const rows = [
-    ["MSME tier", label(MSME_TIER_LABELS, profile.msme_tier), "msme_tier"],
-    ["GST scheme", label(GST_SCHEME_LABELS, profile.gst_scheme), "gst_scheme"],
-    ["Income tax return form", label(ITR_FORM_LABELS, profile.itr_form), "itr_form"],
-    ["Presumptive scheme", yesNo(profile.presumptive_eligible), "presumptive_eligible"],
-    ["Tax audit", yesNo(profile.audit_applicable), "audit_applicable"],
-    ["TDS return 24Q (salaries)", yesNo(profile.files_24q), "files_24q"],
-    ["TDS return 26Q (other payments)", yesNo(profile.files_26q), "files_26q"],
-  ];
+// Every profile line: [code in the profile, title, how to show its value].
+const LINES = [
+  ["msme_tier", "MSME tier", (value) => label(MSME_TIER_LABELS, value)],
+  ["gst_scheme", "GST scheme", (value) => label(GST_SCHEME_LABELS, value)],
+  ["itr_form", "Income tax return form", (value) => label(ITR_FORM_LABELS, value)],
+  ["presumptive_eligible", "Presumptive scheme", yesNo],
+  ["audit_applicable", "Tax audit (s.44AB)", yesNo],
+  ["other_audit_applicable", "Accounts audited under another law", yesNo],
+  ["files_24q", "TDS return 24Q (salaries)", yesNo],
+  ["files_26q", "TDS return 26Q (other payments)", yesNo],
+];
 
+// The short summary at the top of the profile, e.g. Micro · QRMP · ITR-4 · 26Q.
+function summaryChips(profile) {
+  const chips = [label(MSME_TIER_LABELS, profile.msme_tier)];
+  if (profile.gst_scheme === "regular_qrmp") chips.push("QRMP");
+  else if (profile.gst_scheme === "regular_monthly") chips.push("GST monthly");
+  else if (profile.gst_scheme === "composition") chips.push("Composition");
+  else chips.push("No GST");
+  chips.push(label(ITR_FORM_LABELS, profile.itr_form));
+  if (profile.presumptive_eligible) chips.push("Presumptive");
+  if (profile.audit_applicable || profile.other_audit_applicable) chips.push("Audit");
+  if (profile.files_24q) chips.push("24Q");
+  if (profile.files_26q) chips.push("26Q");
+  return chips;
+}
+
+function ProfileView({ business, profile, onEdit }) {
   return (
     <>
       <Card>
@@ -328,9 +495,26 @@ function ProfileView({ business, profile }) {
             {label(ENTITY_TYPE_LABELS, business.entity_type)} · {business.state} · turnover{" "}
             {formatRupees(business.annual_turnover)}
           </CardDescription>
+          <ul className="flex flex-wrap gap-2 pt-1" aria-label="Profile summary">
+            {summaryChips(profile).map((chip) => (
+              <li key={chip}>
+                <Badge variant="secondary">{chip}</Badge>
+              </li>
+            ))}
+          </ul>
+          <div className="pt-2">
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              Edit details
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
+      {business.state_needs_review && (
+        <p role="alert" className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+          Your state "{business.state}" is not in our list. Choose it again with Edit details.
+        </p>
+      )}
       {profile.gst_registration_suggested && (
         <p role="alert" className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
           {profile.explanations.gst_scheme}
@@ -343,20 +527,20 @@ function ProfileView({ business, profile }) {
       <Card>
         <CardHeader>
           <CardTitle>Your regulatory profile</CardTitle>
-          <CardDescription>What applies to your business, and why.</CardDescription>
+          <CardDescription>What applies to your business. Open a line to see why.</CardDescription>
         </CardHeader>
         <CardContent>
-          <dl className="divide-y">
-            {rows.map(([title, value, key]) => (
-              <div key={key} className="grid gap-1 py-3 sm:grid-cols-3">
-                <dt className="text-sm font-medium">{title}</dt>
-                <dd className="sm:col-span-2">
-                  <p className="text-sm font-semibold">{value}</p>
-                  <p className="text-sm text-muted-foreground">{profile.explanations[key]}</p>
-                </dd>
-              </div>
+          <div className="divide-y">
+            {LINES.map(([key, title, show]) => (
+              <details key={key} className="py-3">
+                <summary className="flex cursor-pointer justify-between gap-4 text-sm">
+                  <span className="font-medium">{title}</span>
+                  <span className="font-semibold">{show(profile[key])}</span>
+                </summary>
+                <p className="pt-1 text-sm text-muted-foreground">{profile.explanations[key]}</p>
+              </details>
             ))}
-          </dl>
+          </div>
         </CardContent>
       </Card>
 
@@ -372,5 +556,56 @@ function ProfileView({ business, profile }) {
         relying on it.
       </p>
     </>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// After an edit: what changed
+// ----------------------------------------------------------------------------
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function WhatChanged({ changes }) {
+  const filings = changes.filings;
+  const filingLines = [];
+  if (filings.added) filingLines.push(`${plural(filings.added, "filing")} added`);
+  if (filings.restored) filingLines.push(`${plural(filings.restored, "filing")} back again`);
+  if (filings.removed) filingLines.push(`${plural(filings.removed, "filing")} no longer needed`);
+  if (filings.moved)
+    filingLines.push(`${plural(filings.moved, "filing")} with a new period or due date`);
+  if (filings.kept_with_ca) {
+    filingLines.push(
+      `${plural(filings.kept_with_ca, "filing")} kept although no longer needed, because a CA has it`,
+    );
+  }
+
+  return (
+    <Card role="status">
+      <CardHeader>
+        <CardTitle>Saved. What changed</CardTitle>
+        {changes.profile.length === 0 && filingLines.length === 0 && (
+          <CardDescription>Nothing in your profile or filings changed.</CardDescription>
+        )}
+      </CardHeader>
+      {(changes.profile.length > 0 || filingLines.length > 0) && (
+        <CardContent>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {changes.profile.map((change) => {
+              const [, title, show] = LINES.find(([key]) => key === change.line);
+              return (
+                <li key={change.line}>
+                  {title}: {show(change.old)} → {show(change.new)}
+                </li>
+              );
+            })}
+            {filingLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </CardContent>
+      )}
+    </Card>
   );
 }

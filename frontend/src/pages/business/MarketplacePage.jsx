@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   CA_LANGUAGE_LABELS,
   CA_SPECIALIZATION_LABELS,
+  FORM_LABELS,
   label,
   SERVICE_UNIT_LABELS,
 } from "@/lib/labels";
@@ -19,7 +20,10 @@ const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /**
- * /business/marketplace ("Find a CA"): verified CAs, most experienced first.
+ * /business/marketplace ("Find a CA"): verified CAs. For a registered business the API
+ * ranks them: CAs offering its own filings first (each card shows their prices for
+ * them), then CAs in its city; CAs offering none of its filings are greyed and come last.
+ * Otherwise most experienced first.
  * The filters live in the URL (?service=gstr_3b&language=hindi&city=pune&page=2),
  * so another page can link here with a filter already applied. With a service
  * chosen, the page shows its typical fee and each CA's price for it.
@@ -186,13 +190,23 @@ function CaCard({ ca, service, search }) {
     }
   }
 
+  // same_city is null before the business registers: then nothing is ranked or greyed.
+  const ranked = ca.same_city !== null && ca.same_city !== undefined;
+  const offersNone = ranked && ca.my_prices.length === 0;
+
   return (
     <Link to={detailLink} state={{ search }} className="block h-full">
-      <Card className="h-full cursor-pointer transition hover:shadow-md hover:ring-2 hover:ring-primary/40">
+      <Card
+        className={
+          "h-full cursor-pointer transition hover:shadow-md hover:ring-2 hover:ring-primary/40" +
+          (offersNone ? " opacity-60" : "")
+        }
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <h2>{ca.full_name}</h2>
             <Badge className="bg-green-100 text-green-700">Verified</Badge>
+            {ca.same_city && <Badge className="bg-sky-100 text-sky-900">Same city</Badge>}
           </CardTitle>
           <CardDescription>
             {ca.city} · {ca.years_experience} {ca.years_experience === 1 ? "year" : "years"} of
@@ -200,6 +214,17 @@ function CaCard({ ca, service, search }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {ranked && ca.my_prices.length > 0 && (
+            <p aria-label="Prices for your filings" className="font-medium">
+              {ca.my_prices
+                .map(
+                  (item) =>
+                    `${label(FORM_LABELS, item.form_code)} from ${formatRupees(item.price)}`,
+                )
+                .join(" · ")}
+            </p>
+          )}
+          {offersNone && <p className="text-muted-foreground">Offers none of your filings.</p>}
           <div className="flex flex-wrap gap-1">
             {ca.specializations.map((code) => (
               <Badge key={code} variant="outline">

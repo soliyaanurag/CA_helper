@@ -12,7 +12,13 @@ function post(path, body) {
 
 /** POST /api/v1/auth/signup {full_name, email, password, role} -> the new (unverified) user */
 export function signup({ full_name, email, password, role }) {
-  return post("/api/v1/auth/signup", { full_name, email, password, role });
+  // Signing up is only possible after ticking "I agree to the Terms and Privacy Policy".
+  return post("/api/v1/auth/signup", { full_name, email, password, role, terms_accepted: true });
+}
+
+/** POST /api/v1/auth/accept-terms: consent from a user who signed up before it was asked */
+export function acceptTerms() {
+  return post("/api/v1/auth/accept-terms");
 }
 
 /** POST /api/v1/auth/verify-email: the 6-digit code emailed at signup */

@@ -30,8 +30,15 @@ const signupSchema = z
     role: z.enum(SIGNUP_ROLES, { error: "Choose how you will use CA Helper." }),
     password: newPasswordSchema,
     confirm_password: z.string(),
+    terms_accepted: z.boolean(),
   })
-  .refine(passwordsMatch, PASSWORDS_MATCH_ERROR);
+  .refine(passwordsMatch, PASSWORDS_MATCH_ERROR)
+  // A check on the whole form (not z.literal on the field), so it is shown together with
+  // the other errors.
+  .refine((form) => form.terms_accepted, {
+    message: "Agree to the Terms and Privacy Policy to sign up.",
+    path: ["terms_accepted"],
+  });
 
 /** /signup: create a business or CA account, then verify the email with the emailed code. */
 export function SignupPage() {
@@ -46,7 +53,10 @@ export function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(signupSchema),
-    defaultValues: { role: SIGNUP_ROLES.includes(askedRole) ? askedRole : "business" },
+    defaultValues: {
+      role: SIGNUP_ROLES.includes(askedRole) ? askedRole : "business",
+      terms_accepted: false,
+    },
   });
 
   if (user) return <Navigate to={ROLE_HOME[user.role]} replace />;
@@ -109,6 +119,24 @@ export function SignupPage() {
           error={errors.confirm_password}
           {...register("confirm_password")}
         />
+        <div className="space-y-1">
+          <label htmlFor="terms_accepted" className="flex items-center gap-2 text-sm">
+            <input id="terms_accepted" type="checkbox" {...register("terms_accepted")} />
+            <span>
+              I agree to the{" "}
+              <Link
+                to="/terms"
+                target="_blank"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Terms and Privacy Policy
+              </Link>
+            </span>
+          </label>
+          {errors.terms_accepted && (
+            <p className="text-sm text-destructive">{errors.terms_accepted.message}</p>
+          )}
+        </div>
         {serverError && (
           <p role="alert" className="text-sm text-destructive">
             {serverError}

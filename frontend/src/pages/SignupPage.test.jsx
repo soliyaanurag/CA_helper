@@ -13,6 +13,7 @@ async function fillForm({ role = "Business", password = "Sunrise-2026", confirm 
   await user.click(screen.getByLabelText(role));
   await user.type(screen.getByLabelText("Password"), password);
   await user.type(screen.getByLabelText("Confirm password"), confirm);
+  await user.click(screen.getByLabelText(/I agree to the/));
   await user.click(screen.getByRole("button", { name: "Create account" }));
 }
 
@@ -48,6 +49,7 @@ describe("signup page", () => {
       email: "asha@example.com",
       password: "Sunrise-2026",
       role: "ca",
+      terms_accepted: true,
     });
   });
 
@@ -65,5 +67,22 @@ describe("signup page", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "An account with this email already exists.",
     );
+  });
+
+  it("needs the terms accepted before signing up", async () => {
+    const fetchMock = fakeApi({});
+    renderApp("/signup");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Create account" }));
+
+    expect(
+      await screen.findByText("Agree to the Terms and Privacy Policy to sign up."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Terms and Privacy Policy" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

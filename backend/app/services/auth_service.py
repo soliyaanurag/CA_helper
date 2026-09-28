@@ -7,6 +7,8 @@ authenticate(email, password) -> User                 login (refused until the e
 request_password_reset(email)                         emails a reset code (at most one a minute)
 reset_password(email, code, new_password)             sets a new password with that code
 change_password(user, current_password, new_password) for a logged-in user
+accept_terms(user)                                    records consent (for accounts from before it)
+list_users(role, search, page, page_size) / count_users_by_role()   for the admin screens
 issue_access_token(user) -> str                       JWT for a logged-in user
 get_active_user(user_id) -> User | None               used by the JWT user loader
 normalize_email(email) -> str
@@ -128,17 +130,22 @@ def _use_code(user: User | None, purpose: OtpPurpose, code: str) -> None:
 # --- Signup and email verification ------------------------------------------------
 
 
-def signup(full_name: str, email: str, password: str, role: UserRole) -> User:
+def signup(full_name: str, email: str, password: str, role: UserRole, terms_accepted: bool) -> User:
     """Create an unverified business or CA account and email it a verification code.
 
     409 EMAIL_TAKEN if the email already has an account. Admins are never created
-    here (the request schema allows only business and ca).
+    here (the request schema allows only business and ca). `terms_accepted` is always
+    True (the schema requires it); it records when the user agreed to the terms.
     """
     email = normalize_email(email)
     if db.session.scalar(select(User.id).where(User.email == email)):
         raise ApiError(409, "EMAIL_TAKEN", "An account with this email already exists.")
     user = User(
-        email=email, password_hash=hash_password(password), full_name=full_name.strip(), role=role
+        email=email,
+        password_hash=hash_password(password),
+        full_name=full_name.strip(),
+        role=role,
+        terms_accepted_at=utcnow() if terms_accepted else None,
     )
     db.session.add(user)
     code = _add_code(user, OtpPurpose.VERIFY_EMAIL)
@@ -291,3 +298,35 @@ def change_password(user: User, current_password: str, new_password: str) -> Non
     db.session.commit()
     _email_password_changed(user)
     log.info("User %s changed their password", user.id)
+
+
+def accept_terms(user: User) -> None:
+    """Record that a user who signed up before the consent step agreed to the terms."""
+    if user.terms_accepted_at is None:
+        user.terms_accepted_at = utcnow()
+    db.session.commit()
+    log.info("User %s accepted the terms", user.id)
+
+
+# --- For the admin module ---------------------------------------------------------------
+
+
+def list_users(role: UserRole | None, search: str | None, page: int, page_size: int) -> dict:
+    """Live accounts, newest first, optionally of one role and matching `search` (in the
+    name or email). Paginated: {items, page, page_size, total}."""
+    stmt = select(User).where(User.deleted_at.is_(None)).order_by(User.created_at.desc())
+    if role is not None:
+        stmt = stmt.where(User.role == role)
+    if search:
+        pattern = f"%{search.strip()}%"
+        stmt = stmt.where(User.full_name.ilike(pattern) | User.email.ilike(pattern))
+    result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
+    return {"items": result.items, "page": page, "page_size": page_size, "total": result.total}
+
+
+def count_users_by_role() -> dict:
+    """{"business": n, "ca": n, "admin": n} over live accounts."""
+    counts = {role.value: 0 for role in UserRole}
+    for role in db.session.scalars(select(User.role).where(User.deleted_at.is_(None))):
+        counts[role.value] += 1
+    return counts

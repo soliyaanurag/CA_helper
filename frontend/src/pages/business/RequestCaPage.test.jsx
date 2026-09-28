@@ -175,4 +175,27 @@ describe("Request this CA page", () => {
       "/business/onboarding",
     );
   });
+
+  it("groups filings by quarter, selects a quarter at once, and folds away unpriced ones", async () => {
+    loginAs("business");
+    const later = filing({ id: "f4", period_label: "Sep 2026", due_date: "2026-10-20" });
+    fakeApi({
+      [`GET ${CA_URL}`]: [200, CA],
+      [`GET ${FILINGS_URL}`]: [200, [...FILINGS, later]],
+    });
+    renderApp(`/business/marketplace/${CA_ID}/request`);
+    const user = userEvent.setup();
+
+    expect(
+      await screen.findByRole("heading", { name: "Due in Q2 (Jul–Sep 2026)" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Due in Q3 (Oct–Dec 2026)" })).toBeInTheDocument();
+    expect(screen.getByText("Not offered by this CA (1)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Select all in Q3" }));
+
+    expect(screen.getByLabelText(/ITR\) FY 2025-26/)).toBeChecked();
+    expect(screen.getByLabelText(/GSTR-3B Sep 2026/)).toBeChecked();
+    expect(screen.getByLabelText(/GSTR-3B Aug 2026/)).not.toBeChecked();
+  });
 });

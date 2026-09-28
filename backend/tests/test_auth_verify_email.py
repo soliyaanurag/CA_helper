@@ -20,7 +20,13 @@ def signed_up(client, database, mailbox):
     """Sign up; returns the emailed verification code."""
     client.post(
         "/api/v1/auth/signup",
-        json={"full_name": "Asha Rao", "email": EMAIL, "password": PASSWORD, "role": "ca"},
+        json={
+            "full_name": "Asha Rao",
+            "email": EMAIL,
+            "password": PASSWORD,
+            "role": "ca",
+            "terms_accepted": True,
+        },
     )
     return emailed_code(mailbox[-1])
 

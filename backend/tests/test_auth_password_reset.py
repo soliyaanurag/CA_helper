@@ -103,7 +103,13 @@ def test_the_new_password_must_follow_the_rule(client, owner, mailbox):
 def test_a_verification_code_cannot_reset_a_password(client, database, mailbox):
     client.post(
         "/api/v1/auth/signup",
-        json={"full_name": "Asha", "email": EMAIL, "password": "Sunrise-2026", "role": "business"},
+        json={
+            "full_name": "Asha",
+            "email": EMAIL,
+            "password": "Sunrise-2026",
+            "role": "business",
+            "terms_accepted": True,
+        },
     )
 
     response = reset(client, emailed_code(mailbox[0]))

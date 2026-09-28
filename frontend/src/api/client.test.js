@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeApi } from "@/test/utils";
 
-import { ApiRequestError, apiFetch, errorMessage, REQUEST_TIMEOUT_MS, setAuth } from "./client";
+import {
+  ApiRequestError,
+  apiDownload,
+  apiFetch,
+  errorMessage,
+  REQUEST_TIMEOUT_MS,
+  setAuth,
+} from "./client";
 
 afterEach(() => setAuth(null, () => {}));
 
@@ -89,5 +96,40 @@ describe("errorMessage", () => {
 
   it("explains network failures", () => {
     expect(errorMessage(new TypeError("Failed to fetch"))).toMatch(/Cannot reach the server/);
+  });
+});
+
+describe("file uploads and downloads", () => {
+  it("sends a FormData body as it is, without a JSON content type", async () => {
+    const fetchMock = fakeApi({ "POST /api/v1/x": [200, {}] });
+    const form = new FormData();
+    form.append("file", new Blob(["%PDF-"]), "cop.pdf");
+
+    await apiFetch("/api/v1/x", { method: "POST", body: form });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBe(form);
+    expect(init.headers["Content-Type"]).toBeUndefined();
+  });
+
+  it("downloads a file with the token, and throws the API's error", async () => {
+    setAuth("my-token", () => {});
+    const fetchMock = vi.fn(async (path) =>
+      path === "/ok"
+        ? new Response("file bytes", { status: 200 })
+        : new Response(
+            JSON.stringify({ error: { code: "CERTIFICATE_MISSING", message: "No file." } }),
+            {
+              status: 404,
+            },
+          ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blob = await apiDownload("/ok");
+
+    expect(await blob.text()).toBe("file bytes");
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer my-token");
+    await expect(apiDownload("/missing")).rejects.toMatchObject({ code: "CERTIFICATE_MISSING" });
   });
 });
