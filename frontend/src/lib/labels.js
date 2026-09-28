@@ -131,6 +131,21 @@ export const ENGAGEMENT_STATUS_LABELS = {
   cancelled: "Cancelled",
 };
 
+/** What kind of file a document is (documents.doc_type). */
+export const DOCUMENT_TYPE_LABELS = {
+  gst_certificate: "GST registration certificate",
+  pan_card: "PAN card",
+  sales_register: "Sales register",
+  purchase_register: "Purchase register",
+  bank_statement: "Bank statement",
+  invoice: "Invoice",
+  salary_register: "Salary register",
+  tds_challan: "TDS challan",
+  acknowledgement: "Filing acknowledgement",
+  certificate_of_practice: "Certificate of Practice (CA)",
+  other: "Other",
+};
+
 /** What a tray notification is about (notifications.type). */
 export const NOTIFICATION_TYPE_LABELS = {
   deadline_reminder: "Deadline reminder",

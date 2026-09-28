@@ -14,15 +14,25 @@ import {
   useAcknowledgementFile,
   useFiling,
 } from "@/api/compliance";
+import {
+  DOCUMENTS_KEY,
+  UPLOAD_TYPES,
+  downloadDocument,
+  linkDocument,
+  unlinkDocument,
+  uploadDocument,
+  useDocuments,
+} from "@/api/documents";
 import { useMyEngagements } from "@/api/marketplace";
 import { FormField } from "@/components/FormField";
 import { Markdown } from "@/components/Markdown";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { daysLeftText, daysUntil, formatDate, formatDateTime } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { DOCUMENT_TYPE_LABELS, FORM_LABELS, label } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
 // Statuses in which the business itself can still act on the filing.
@@ -30,6 +40,8 @@ const OPEN_FOR_BUSINESS = ["upcoming", "docs_pending", "ready", "overdue"];
 const FILED = ["filed", "filed_verified"];
 // Engagement statuses in which a CA request or CA work is still going on.
 const OPEN_ENGAGEMENTS = ["requested", "quoted", "active"];
+const SELECT_CLASS =
+  "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /**
  * /business/compliance/:itemId: one filing. The business chooses how to file it
@@ -372,9 +384,12 @@ function Filed({ page, onUpdated }) {
 
 function Checklist({ page, onUpdated }) {
   const item = page.filing;
+  const queryClient = useQueryClient();
   const [error, setError] = useState(null);
   const [busyKey, setBusyKey] = useState(null);
   const locked = FILED.includes(item.status);
+  const documents = useDocuments({ compliance_item_id: item.id, page_size: 100 });
+  const linked = linksByKey(documents.data, item.id);
 
   async function toggle(entry) {
     setError(null);
@@ -388,6 +403,14 @@ function Checklist({ page, onUpdated }) {
     }
   }
 
+  // A file was added or removed: the documents, and maybe a tick and the status, changed.
+  function refresh() {
+    queryClient.invalidateQueries({ queryKey: DOCUMENTS_KEY });
+    queryClient.invalidateQueries({ queryKey: filingKey(item.id) });
+    queryClient.invalidateQueries({ queryKey: FILINGS_KEY });
+    queryClient.invalidateQueries({ queryKey: ["compliance", "dashboard"] });
+  }
+
   const required = page.checklist.filter((entry) => entry.required);
   const requiredTicked = required.filter((entry) => entry.ticked);
 
@@ -396,28 +419,55 @@ function Checklist({ page, onUpdated }) {
       <CardHeader>
         <CardTitle>Documents to have ready</CardTitle>
         <CardDescription>
-          Tick what you have. {requiredTicked.length} of {required.length} required documents ready.
+          Tick what you have, or add the file: it is ticked for you, and a CA working on this filing
+          can open it. {requiredTicked.length} of {required.length} required documents ready.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {page.checklist.map((entry) => (
-          <label key={entry.key} className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={entry.ticked}
-              disabled={locked || busyKey !== null}
-              onChange={() => toggle(entry)}
+          <div key={entry.key} className="space-y-1">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={entry.ticked}
+                disabled={locked || busyKey !== null}
+                onChange={() => toggle(entry)}
+              />
+              <span>
+                {entry.label}
+                {!entry.required && <span className="text-muted-foreground"> (if it applies)</span>}
+                {entry.help && (
+                  <span className="block text-xs text-muted-foreground">{entry.help}</span>
+                )}
+              </span>
+            </label>
+            <EntryDocuments
+              item={item}
+              entryKey={entry.key}
+              entryLabel={entry.label}
+              links={linked[entry.key] ?? []}
+              locked={locked}
+              onChanged={refresh}
             />
-            <span>
-              {entry.label}
-              {!entry.required && <span className="text-muted-foreground"> (if it applies)</span>}
-              {entry.help && (
-                <span className="block text-xs text-muted-foreground">{entry.help}</span>
-              )}
-            </span>
-          </label>
+          </div>
         ))}
+        <div className="space-y-1 border-t pt-3">
+          <p className="text-sm font-medium">Other documents for this filing</p>
+          <EntryDocuments
+            item={item}
+            entryKey="general"
+            entryLabel="this filing"
+            links={linked.general ?? []}
+            locked={locked}
+            onChanged={refresh}
+          />
+        </div>
+        {documents.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage(documents.error)}
+          </p>
+        )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -425,6 +475,209 @@ function Checklist({ page, onUpdated }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// {checklist key: [{ link, document }]}: the files linked to this filing, per entry.
+function linksByKey(documents, itemId) {
+  const byKey = {};
+  for (const document of documents?.items ?? []) {
+    for (const link of document.links) {
+      if (link.compliance_item_id !== itemId) continue;
+      byKey[link.checklist_key] ??= [];
+      byKey[link.checklist_key].push({ link, document });
+    }
+  }
+  return byKey;
+}
+
+// The files linked to one checklist entry (or "general"), and "Add a file" for more.
+function EntryDocuments({ item, entryKey, entryLabel, links, locked, onChanged }) {
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(action) {
+    setError(null);
+    setBusy(true);
+    try {
+      await action();
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function remove(link) {
+    run(async () => {
+      await unlinkDocument(link.id);
+      onChanged();
+    });
+  }
+
+  return (
+    <div className="ml-6 space-y-1 text-sm">
+      {links.map(({ link, document }) => (
+        <div key={link.id} className="flex flex-wrap items-center gap-x-2">
+          <span className="break-all">{document.original_filename}</span>
+          <Button
+            variant="link"
+            size="sm"
+            disabled={busy}
+            aria-label={"Open " + document.original_filename}
+            onClick={() => run(() => downloadDocument(document))}
+          >
+            Open
+          </Button>
+          {!locked && (
+            <Button
+              variant="link"
+              size="sm"
+              disabled={busy}
+              aria-label={"Remove " + document.original_filename}
+              onClick={() => remove(link)}
+            >
+              Remove
+            </Button>
+          )}
+        </div>
+      ))}
+      {!locked && !adding && (
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={"Add a file for " + entryLabel}
+          onClick={() => setAdding(true)}
+        >
+          Add a file
+        </Button>
+      )}
+      {adding && (
+        <AddDocument
+          item={item}
+          entryKey={entryKey}
+          links={links}
+          onAdded={() => {
+            setAdding(false);
+            onChanged();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Upload a new file for the entry, or link one that is already in the vault.
+function AddDocument({ item, entryKey, links, onAdded, onCancel }) {
+  const vault = useDocuments({ page_size: 100 });
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const alreadyLinked = new Set(links.map(({ document }) => document.id));
+  const choices = (vault.data?.items ?? []).filter((document) => !alreadyLinked.has(document.id));
+
+  async function run(action) {
+    setError(null);
+    setBusy(true);
+    try {
+      await action();
+      onAdded();
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onUpload(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const file = event.currentTarget.elements.file.files[0];
+    if (!file) {
+      setError("Choose a file to upload.");
+      return;
+    }
+    run(() =>
+      uploadDocument(file, {
+        doc_type: form.get("doc_type"),
+        compliance_item_id: item.id,
+        checklist_key: entryKey,
+      }),
+    );
+  }
+
+  function onLink(event) {
+    event.preventDefault();
+    const documentId = new FormData(event.currentTarget).get("document_id");
+    if (!documentId) {
+      setError("Choose a file from your vault.");
+      return;
+    }
+    run(() => linkDocument(documentId, item.id, entryKey));
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border p-3">
+      <form className="flex flex-wrap items-end gap-2" onSubmit={onUpload}>
+        <div className="space-y-1">
+          <Label htmlFor={"file-" + entryKey}>Upload a new file</Label>
+          <Input id={"file-" + entryKey} name="file" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={"type-" + entryKey}>Type</Label>
+          <select
+            id={"type-" + entryKey}
+            name="doc_type"
+            defaultValue="other"
+            className={SELECT_CLASS}
+          >
+            {UPLOAD_TYPES.map((code) => (
+              <option key={code} value={code}>
+                {DOCUMENT_TYPE_LABELS[code]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" size="sm" disabled={busy}>
+          Upload
+        </Button>
+      </form>
+      <form className="flex flex-wrap items-end gap-2" onSubmit={onLink}>
+        <div className="space-y-1">
+          <Label htmlFor={"existing-" + entryKey}>Or link one from your vault</Label>
+          <select
+            id={"existing-" + entryKey}
+            name="document_id"
+            defaultValue=""
+            className={SELECT_CLASS}
+          >
+            <option value="">{vault.isPending ? "Loading..." : "Choose a file"}</option>
+            {choices.map((document) => (
+              <option key={document.id} value={document.id}>
+                {document.original_filename} ({label(DOCUMENT_TYPE_LABELS, document.doc_type)})
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" size="sm" disabled={busy}>
+          Link
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </form>
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

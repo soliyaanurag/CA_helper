@@ -6,6 +6,8 @@ import { engagement } from "@/test/engagementData";
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
 
 const ITEM = "/api/v1/compliance/items/f1";
+const FILING_DOCUMENTS = "/api/v1/documents?compliance_item_id=f1&page_size=100";
+const VAULT = "/api/v1/documents?page_size=100";
 
 // "Today" is 28 Sep 2026.
 beforeEach(() => vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 8, 28) }));
@@ -53,11 +55,40 @@ function page({ filing = {}, ...fields } = {}) {
   };
 }
 
+// A GET /documents answer with these documents.
+function documents(...items) {
+  return { items, page: 1, page_size: 100, total: items.length };
+}
+
+// A vault document; `links` are [checklist key] of filing f1.
+function vaultFile(id, name, keys = []) {
+  return {
+    id,
+    doc_type: "invoice",
+    original_filename: name,
+    mime_type: "application/pdf",
+    size_bytes: 2048,
+    fy: "2026-27",
+    period_label: "Q2 2026-27",
+    ocr_status: "none",
+    created_at: "2026-09-20T10:00:00Z",
+    links: keys.map((key) => ({
+      id: "link-" + id + "-" + key,
+      compliance_item_id: "f1",
+      form_code: "gstr_3b",
+      period_label: "Q2 2026-27",
+      checklist_key: key,
+    })),
+    acknowledgement_of: [],
+  };
+}
+
 function open(answers = {}) {
   loginAs("business");
   const fetchMock = fakeApi({
     [`GET ${ITEM}`]: [200, page()],
     "GET /api/v1/marketplace/my-engagements": [200, []],
+    [`GET ${FILING_DOCUMENTS}`]: [200, documents()],
     ...answers,
   });
   renderApp("/business/compliance/f1");
@@ -122,7 +153,7 @@ describe("filing page", () => {
     const fetchMock = open({ [`POST ${ITEM}/checklist`]: [200, ticked] });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByLabelText(/Purchase invoices/));
+    await user.click(await screen.findByRole("checkbox", { name: /Purchase invoices/ }));
 
     expect(
       await screen.findByText("1 of 2 required documents ready.", { exact: false }),
@@ -226,5 +257,117 @@ describe("late fees on the filing page", () => {
     expect(fetchMock.mock.calls.some(([url]) => url.startsWith("/api/v1/alerts/penalties"))).toBe(
       false,
     );
+  });
+});
+
+describe("filing page documents", () => {
+  it("shows the files linked to each entry and to the filing", async () => {
+    open({
+      [`GET ${FILING_DOCUMENTS}`]: [
+        200,
+        documents(
+          vaultFile("d1", "invoices-q2.pdf", ["purchase_invoices"]),
+          vaultFile("d2", "notes.pdf", ["general"]),
+        ),
+      ],
+    });
+
+    expect(await screen.findByText("invoices-q2.pdf")).toBeInTheDocument();
+    expect(screen.getByText("notes.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove invoices-q2.pdf" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add a file for GSTR-2B statement" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a file for this filing" })).toBeInTheDocument();
+  });
+
+  it("keeps the files of a filed filing fixed", async () => {
+    open({
+      [`GET ${ITEM}`]: [
+        200,
+        page({ filing: { status: "filed", filed_at: "2026-09-20T10:00:00Z" } }),
+      ],
+      [`GET ${FILING_DOCUMENTS}`]: [
+        200,
+        documents(vaultFile("d1", "invoices-q2.pdf", ["purchase_invoices"])),
+      ],
+    });
+
+    expect(await screen.findByRole("button", { name: "Open invoices-q2.pdf" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add a file/ })).not.toBeInTheDocument();
+  });
+
+  it("uploads a file for a checklist entry", async () => {
+    const fetchMock = open({
+      [`GET ${VAULT}`]: [200, documents()],
+      "POST /api/v1/documents": [201, vaultFile("d3", "2b.pdf", ["gstr_2b"])],
+    });
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add a file for GSTR-2B statement" }),
+    );
+    await user.upload(
+      screen.getByLabelText("Upload a new file"),
+      new File(["%PDF-1.4"], "2b.pdf", { type: "application/pdf" }),
+    );
+    await user.selectOptions(screen.getByLabelText("Type"), "invoice");
+    await user.click(screen.getByRole("button", { name: "Upload" }));
+
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Upload a new file")).not.toBeInTheDocument(),
+    );
+    const sent = sentBody(fetchMock, "/api/v1/documents");
+    expect(sent.get("file").name).toBe("2b.pdf");
+    expect(sent.get("doc_type")).toBe("invoice");
+    expect(sent.get("compliance_item_id")).toBe("f1");
+    expect(sent.get("checklist_key")).toBe("gstr_2b");
+  });
+
+  it("links a file from the vault", async () => {
+    const fetchMock = open({
+      [`GET ${VAULT}`]: [200, documents(vaultFile("d4", "bank.pdf"))],
+      "POST /api/v1/documents/d4/links": [200, vaultFile("d4", "bank.pdf", ["general"])],
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Add a file for this filing" }));
+    await user.selectOptions(
+      await screen.findByLabelText("Or link one from your vault"),
+      "bank.pdf (Invoice)",
+    );
+    await user.click(screen.getByRole("button", { name: "Link" }));
+
+    await waitFor(() =>
+      expect(JSON.parse(sentBody(fetchMock, "/api/v1/documents/d4/links"))).toEqual({
+        compliance_item_id: "f1",
+        checklist_key: "general",
+      }),
+    );
+  });
+
+  it("removes a linked file and shows why it failed", async () => {
+    const fetchMock = open({
+      [`GET ${FILING_DOCUMENTS}`]: [
+        200,
+        documents(vaultFile("d1", "invoices-q2.pdf", ["purchase_invoices"])),
+      ],
+      "DELETE /api/v1/documents/links/link-d1-purchase_invoices": [
+        409,
+        { error: { code: "FILING_LOCKED", message: "This filing is filed." } },
+      ],
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Remove invoices-q2.pdf" }));
+
+    expect(await screen.findByText("This filing is filed.")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          url === "/api/v1/documents/links/link-d1-purchase_invoices" && init.method === "DELETE",
+      ),
+    ).toBe(true);
   });
 });
