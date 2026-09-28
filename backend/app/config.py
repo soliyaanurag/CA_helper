@@ -49,6 +49,11 @@ class BaseConfig:
     # True: nothing is sent; messages are kept in app.utils.email.outbox (tests).
     MAIL_SUPPRESS_SEND = False
 
+    # --- Gemini (app/utils/gemini_client.py). No key: AI features use their fallback ---
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or None
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+    GEMINI_TIMEOUT_SECONDS = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "20"))
+
     # --- Rate limiting (Flask-Limiter): counters kept in memory, per process ---
     RATELIMIT_STORAGE_URI = "memory://"
     RATELIMIT_HEADERS_ENABLED = True
@@ -101,6 +106,8 @@ class TestingConfig(BaseConfig):
     MAIL_SUPPRESS_SEND = True
     # Fixed here so a developer's .env cannot change test behaviour.
     LOG_LEVEL = "INFO"
+    # Tests never call the real Gemini: without a key the client refuses (tests fake it).
+    GEMINI_API_KEY = None
 
 
 _CONFIGS = {

@@ -4,6 +4,30 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Gemini client and NIC code suggestion (ON9, ON10, ON11)
+
+**What**
+- **`google-genai` (pinned 2.25.0)** is the Gemini library; the model, key and timeout come from `.env`
+  (`GEMINI_MODEL`, default `gemini-flash-latest`, an alias Google keeps pointing at the current Flash model; `GEMINI_API_KEY`; `GEMINI_TIMEOUT_SECONDS`). Tests never have a key.
+- **One wrapper, `app/utils/gemini_client.py`:** `ask_gemini()` always runs `scrub_pii()` first (GSTIN, PAN, email,
+  Aadhaar-like numbers, phone → `[GSTIN]`, ...), logs only the kinds it removed, and raises 503
+  `GEMINI_UNAVAILABLE` without a key or when the call fails. Every feature must work without Gemini (fallback).
+- **The NIC list** is the Ministry of MSME's PMEGP file (NIC-2008), converted once to
+  `content/reference/nic_2008.csv` and loaded by `make seed` (`seed_nic_codes`). Only the **5-digit sub-classes**
+  (1,165 codes): that is what Udyam and GST registration ask for, and headings would make vague suggestions. The PDF
+  had lost the leading zero of divisions 01–09; it is put back. Wording is kept as published.
+- **Suggestion = keyword shortlist + Gemini pick:** the 15 codes whose description best matches the words of the
+  business description (a word found in few codes counts more; common words ignored), then Gemini picks the best 3
+  **from that shortlist only**, with a reason. Invented or repeated codes are dropped and keyword matches fill the
+  gap. Only the scrubbed description and the shortlist are sent (never the name, PAN, GSTIN, ...). The user
+  confirms one code; nothing is saved before that. No embeddings: word matching is explainable in one sentence.
+- `POST /onboarding/nic-suggestions` is limited to 10 per minute (Gemini quota).
+
+**Why:** rule 1 (no PII to Gemini) is only safe if there is exactly one place that calls it; rule "never invent"
+applies to NIC codes too, so Gemini may only choose, not create. The form asks users to leave names and contact
+details out of the description, because names cannot be found by a pattern.
+
+
 ## 2026-09-28: Suspension, audit log, admin filing numbers, peer insights, demo data (AD4, AD5, AD8, CO13, X1)
 
 **What**

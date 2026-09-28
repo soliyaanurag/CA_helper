@@ -4,6 +4,9 @@
     GET  /api/v1/onboarding/business   business only   the business with its regulatory profile
     PUT  /api/v1/onboarding/business   business only   edit it (profile recomputed, filings synced)
     GET  /api/v1/onboarding/states     business only   states / UTs with their GST codes
+    POST /api/v1/onboarding/nic-suggestions  business only   up to 3 suggested NIC codes
+    GET  /api/v1/onboarding/nic-codes?q=     business only   search the NIC list
+    PUT  /api/v1/onboarding/business/nic-code  business only  save the confirmed NIC code
 
 Each route only checks who is calling, reads the input, calls one function in
 app/services/onboarding_service.py and returns its result as JSON.
@@ -12,12 +15,17 @@ app/services/onboarding_service.py and returns its result as JSON.
 from flask_smorest import Blueprint
 
 from app.errors import ErrorSchema
+from app.extensions import limiter
 from app.models.enums import UserRole
 from app.schemas.onboarding import (
     BusinessInputSchema,
     GstStateSchema,
     MyBusinessSchema,
     MyBusinessUpdateSchema,
+    NicCodeInputSchema,
+    NicCodeSchema,
+    NicSearchQuerySchema,
+    NicSuggestionSchema,
 )
 from app.services import onboarding_service
 from app.utils.decorators import current_business, current_user, roles_required
@@ -54,6 +62,38 @@ def get_my_business():
 @blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND (register first)")
 def update_my_business(data):
     return onboarding_service.update_business(current_business(), data)
+
+
+# Suggest up to 3 NIC activity codes for the business's description (nothing is saved).
+# Limited per minute because each call can use the Gemini quota.
+@blp.route("/onboarding/nic-suggestions", methods=["POST"])
+@limiter.limit("10 per minute")
+@roles_required(UserRole.BUSINESS)
+@blp.response(200, NicSuggestionSchema)
+@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND (register first)")
+@blp.alt_response(429, schema=ErrorSchema, description="TOO_MANY_REQUESTS (rate limit per IP)")
+def suggest_nic_codes():
+    return onboarding_service.suggest_nic_codes(current_business())
+
+
+# Search the official NIC list by code or words, for choosing a code by hand.
+@blp.route("/onboarding/nic-codes", methods=["GET"])
+@roles_required(UserRole.BUSINESS)
+@blp.arguments(NicSearchQuerySchema, location="query")
+@blp.response(200, NicCodeSchema(many=True))
+def search_nic_codes(args):
+    return onboarding_service.search_nic_codes(args["q"])
+
+
+# Save the NIC code the user confirmed.
+@blp.route("/onboarding/business/nic-code", methods=["PUT"])
+@roles_required(UserRole.BUSINESS)
+@blp.arguments(NicCodeInputSchema)
+@blp.response(200, NicCodeSchema)
+@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND (register first)")
+@blp.alt_response(422, schema=ErrorSchema, description="UNKNOWN_NIC_CODE (not in the list)")
+def set_nic_code(data):
+    return onboarding_service.set_nic_code(current_business(), data["code"])
 
 
 # The states and union territories for the form's dropdown.

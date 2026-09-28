@@ -10,7 +10,8 @@ Code: `backend/app/__init__.py`, `config.py`, `extensions.py`, `errors.py`, `see
 - **pgvector:** the `pgvector` package gives the `vector(768)` column type (`kb_chunks`); the extension is created by the migration and the test fixtures.
 - **File storage:** `app/utils/storage.py` (encrypted uploads: type by first bytes, size limit, `UPLOAD_DIR` and `MAX_UPLOAD_MB` in `.env`, Flask's `MAX_CONTENT_LENGTH` one MB above it). The test fixture `upload_dir` points uploads at a temporary folder.
 - **Reference and format helpers:** `app/utils/gstin.py` (the GST state list from `content/reference/gst_states.json`, GSTIN checks), `app/utils/money.py` (`format_inr()`, the Indian number format for texts).
-- **Not built yet** (planned files, listed in `app/utils/__init__.py`): `utils/gemini_client.py`, `utils/ocr.py`. Their packages (google-genai, pytesseract, PyMuPDF, ...) and `.env` variables are added with them.
+- **Gemini (ON11):** `app/utils/gemini_client.py` is the only way to call Gemini (`google-genai`): `scrub_pii(text) -> (clean, found)` replaces GSTIN, PAN, email, Aadhaar-like numbers and phone numbers with `[GSTIN]`-style placeholders; `gemini_available()`; `ask_gemini(prompt, want_json=False) -> str` scrubs first, logs only the kinds removed (never the prompt or reply), and raises 503 `GEMINI_UNAVAILABLE` without `GEMINI_API_KEY` or when the call fails or times out (`GEMINI_TIMEOUT_SECONDS`). `GEMINI_MODEL` picks the model. Tests: `tests/test_gemini_client.py` (the real call, `_send_to_gemini`, is replaced by a fake; `TestingConfig` has no key).
+- **Not built yet** (planned, listed in `app/utils/__init__.py`): `utils/ocr.py`. Its packages (pytesseract, PyMuPDF) are added with it.
 - **Tests:** backend tests in `backend/tests/`: app factory and error format (including the 500 body), `/api/v1` prefix (checked on the real app's URL rules), health, seed command, worker (jobs run in the app context), base model/mixins/enums and per-test cleanup (`test_db_foundations.py`, with the test-only model in `tests/_models.py`), email (`test_email.py`: template, outbox, SMTP hand-off, failure logged without the address). Shared fixtures in `backend/tests/conftest.py` create the test database and its tables once per session and delete every row after each test (reverse foreign-key order); the autouse `mailbox` fixture empties the email outbox before each test.
 - **Dev environment:** conda env `ca-helper` (Python 3.12, Node 22, pip packages from `backend/requirements*.txt`) + `make setup`; `docker-compose.yml` with `db` (Postgres 16 + pgvector image, healthcheck) and `mailpit`, started by `make infra`; Makefile (all Python and npm commands via `conda run`; `make help` lists the targets); team workflow targets `make doctor`, `feature`, `sync`, `check`, `pr`, `merge` in `scripts/workflow.sh` (README "Team workflow"); CI with a backend job (ruff, migrations, pytest with Postgres, OpenAPI spec builds) and a frontend job (lint, format, tests, build).
 
@@ -32,7 +33,8 @@ None. (The `notifications` tray table belongs to alerts.) The `vector` Postgres 
 - `app.utils.email.send_email(to, subject, template, **context) -> bool` (exists): add the body as `backend/app/templates/email/<template>.txt`; call it after the commit, since a failed send never raises
 - `app.utils.encryption.EncryptedString` (exists): `mapped_column(EncryptedString())` for PAN, GSTIN, TAN, phone; also `encrypt()` / `decrypt()`
 - `app.models.enums.only_codes(column, codes)` (exists): CHECK for an array column of codes
-- Planned: `storage.save_file()/load_file()`; `notify()`; `gemini_client.generate()/embed()`; OCR helpers
+- `app.utils.gemini_client.ask_gemini(prompt, want_json=False)`, `gemini_available()`, `scrub_pii(text)` (exist): catch `ApiError` (503) and fall back
+- Planned: `gemini_client.embed()` (assistant); OCR helpers
 
 ## Depends on
 Nothing (this is the base layer).
@@ -44,7 +46,7 @@ Nothing (this is the base layer).
 - Each public service function commits once at its end; routes never touch `db.session`
 - A module's blueprint sets no `url_prefix` and is listed in `BLUEPRINTS`; its models are imported in `models/__init__.py`; its seed function is listed in `SEEDS`; its jobs are added in `worker.py`
 - Jobs run inside the Flask app context; cron times are Asia/Kolkata; give every job a unique `id` like `alerts.due_reminders`
-- Every Gemini call goes through `app/utils/gemini_client.py` (rule 1)
+- Every Gemini call goes through `app/utils/gemini_client.py` (rule 1); every AI feature must still work (fall back) when it raises 503 `GEMINI_UNAVAILABLE`
 
 ## Known issues
 - Rate-limit counters live in memory (`memory://`), per process: they reset when the API restarts. Fine for a single dev server.

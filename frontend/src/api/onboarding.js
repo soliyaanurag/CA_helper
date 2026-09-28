@@ -39,6 +39,28 @@ export function updateBusiness(form) {
   return apiFetch("/api/v1/onboarding/business", { method: "PUT", body: form });
 }
 
+// Up to 3 suggested NIC activity codes for the business's description (nothing is saved):
+// { picks: [{code, description, reason, source: "ai" | "keywords"}], shortlist, ai_used }.
+export function suggestNicCodes() {
+  return apiFetch("/api/v1/onboarding/nic-suggestions", { method: "POST" });
+}
+
+// Searches the official NIC list by code or words (for choosing a code by hand).
+// Only runs once at least 2 characters are typed.
+export function useNicSearch(query) {
+  const text = query.trim();
+  return useQuery({
+    queryKey: ["onboarding", "nic-codes", text],
+    queryFn: () => apiFetch("/api/v1/onboarding/nic-codes?q=" + encodeURIComponent(text)),
+    enabled: text.length >= 2,
+  });
+}
+
+// Saves the NIC code the user confirmed. Returns { code, description }.
+export function saveNicCode(code) {
+  return apiFetch("/api/v1/onboarding/business/nic-code", { method: "PUT", body: { code } });
+}
+
 // The states and union territories with their GST codes, for the form's dropdown.
 export function useGstStates() {
   return useQuery({

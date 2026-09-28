@@ -8,7 +8,7 @@
     money.py         format_inr(): amounts in the Indian number format for texts
     jwt_handlers.py  JWT user loading and token error responses
     passwords.py     argon2 hash_password / verify_password
+    gemini_client.py ask_gemini(): the only way to call Gemini; removes PII first
 
-Planned (docs/modules/core-infra.md): gemini_client.py (the only way to call
-Gemini, scrubs PII), ocr.py (local Tesseract).
+Planned (docs/modules/core-infra.md): ocr.py (local Tesseract).
 """

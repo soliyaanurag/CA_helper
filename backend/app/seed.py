@@ -14,12 +14,14 @@ sample CAs get prices so some typical price ranges show up. The legal rule
 thresholds and the obligation templates of the 7 forms are seeded too, all marked
 TODO_VERIFY until someone checks them (docs/TODO_VERIFY.md). The penalty rules of the 7
 forms are seeded with every amount empty (NULL, TODO_VERIFY): no amount is confirmed yet.
+The official NIC activity codes are loaded from content/reference/nic_2008.csv.
 
 Every seed function
 must be safe to re-run (it skips rows that already exist) and must not commit:
 run_all_seeds() commits once at the end. Add a new table's seed function to SEEDS.
 """
 
+import csv
 import logging
 import os
 import secrets
@@ -30,11 +32,13 @@ import click
 from flask import Flask
 from sqlalchemy import select
 
+from app.config import REPO_ROOT
 from app.extensions import db
 from app.models import (
     CaProfile,
     CaService,
     CatalogService,
+    NicCode,
     ObligationTemplate,
     PenaltyRule,
     RuleThreshold,
@@ -606,6 +610,28 @@ def seed_penalty_rules() -> None:
             )
 
 
+# The official NIC activity codes (ON9): reference data, never typed by hand.
+NIC_FILE = REPO_ROOT / "content" / "reference" / "nic_2008.csv"
+
+
+def seed_nic_codes() -> None:
+    """Add the NIC codes from content/reference/nic_2008.csv that are not in the table yet."""
+    if not NIC_FILE.exists():
+        log.warning("Skipping NIC codes: %s is missing", NIC_FILE)
+        return
+
+    existing = set(db.session.scalars(select(NicCode.code)))
+    with open(NIC_FILE, encoding="utf-8") as handle:
+        lines = []
+        for line in handle:
+            if not line.startswith("#"):  # the source notes at the top
+                lines.append(line)
+    for row in csv.DictReader(lines):
+        if row["code"] not in existing:
+            db.session.add(NicCode(code=row["code"], description=row["description"]))
+            existing.add(row["code"])
+
+
 # (name, function) in dependency order: users first, other data may refer to them.
 SEEDS = [
     ("demo users", seed_demo_users),
@@ -615,6 +641,7 @@ SEEDS = [
     ("rule thresholds", seed_rule_thresholds),
     ("obligation templates", seed_obligation_templates),
     ("penalty rules", seed_penalty_rules),
+    ("NIC codes", seed_nic_codes),
 ]
 
 

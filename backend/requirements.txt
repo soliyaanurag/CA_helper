@@ -31,3 +31,6 @@ PyYAML==6.0.3
 
 # --- Background jobs (worker process only) ---
 APScheduler==3.11.3
+
+# --- AI (Gemini; every call goes through app/utils/gemini_client.py) ---
+google-genai==2.25.0

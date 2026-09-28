@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { gstinError } from "@/lib/gstin";
+import { NicCodeCard } from "@/pages/business/NicCodeCard";
 import {
   ENTITY_TYPE_LABELS,
   GST_SCHEME_LABELS,
@@ -72,6 +73,7 @@ export function OnboardingPage() {
         <ProfileView
           business={myBusiness.data.business}
           profile={myBusiness.data.profile}
+          nicCode={myBusiness.data.nic_code}
           onEdit={() => {
             setChanges(null);
             setEditing(true);
@@ -240,6 +242,7 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
       queryClient.setQueryData(MY_BUSINESS_KEY, {
         business: saved.business,
         profile: saved.profile,
+        nic_code: saved.nic_code,
       });
       queryClient.invalidateQueries({ queryKey: FILINGS_KEY }); // the filings may have changed
       onSaved?.(saved);
@@ -338,6 +341,7 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
           <FormField
             id="description"
             label="What does the business do?"
+            hint="In your own words, e.g. 'We bake biscuits and cakes'. It is used to suggest your activity code, so leave out names, phone numbers and emails."
             error={errors.description}
             {...register("description")}
           />
@@ -485,7 +489,7 @@ function summaryChips(profile) {
   return chips;
 }
 
-function ProfileView({ business, profile, onEdit }) {
+function ProfileView({ business, profile, nicCode, onEdit }) {
   return (
     <>
       <Card>
@@ -543,6 +547,8 @@ function ProfileView({ business, profile, onEdit }) {
           </div>
         </CardContent>
       </Card>
+
+      <NicCodeCard nicCode={nicCode} />
 
       <p className="text-sm">
         Your filings are in the{" "}
