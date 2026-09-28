@@ -174,7 +174,10 @@ def _add_missing_specializations(user_id, specializations: list) -> None:
     seeded before a specialization was added in step with SAMPLE_CAS.
     """
     profile = db.session.scalar(select(CaProfile).where(CaProfile.user_id == user_id))
-    missing = [code for code in specializations if code not in profile.specializations]
+    missing = []
+    for code in specializations:
+        if code not in profile.specializations:
+            missing.append(code)
     if missing:
         profile.specializations = profile.specializations + missing
 

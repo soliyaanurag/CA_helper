@@ -99,7 +99,11 @@ export function CaProfilePage() {
 }
 
 function StatusCard({ profile }) {
-  const status = profile?.verification_status;
+  // No profile yet (null) -> no status.
+  let status = null;
+  if (profile) {
+    status = profile.verification_status;
+  }
   return (
     <Card>
       <CardHeader>
@@ -173,7 +177,7 @@ function CertificateCard({ profile }) {
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               className="w-auto"
-              onChange={(event) => setFile(event.target.files[0] ?? null)}
+              onChange={(event) => setFile(firstFile(event.target.files))}
             />
             <Button type="submit" disabled={!file || sending}>
               {sending ? "Uploading..." : "Upload certificate"}
@@ -202,7 +206,7 @@ function PreviewCard({ profile }) {
     <Card>
       <CardHeader>
         <CardDescription>Preview: how businesses see you</CardDescription>
-        <CardTitle>{user?.full_name}</CardTitle>
+        <CardTitle>{user ? user.full_name : ""}</CardTitle>
         <CardDescription>
           {profile.city} · {profile.years_experience}{" "}
           {profile.years_experience === 1 ? "year" : "years"} of experience · ICAI no.{" "}
@@ -249,9 +253,14 @@ function CaProfileForm({ profile }) {
   });
   // A verified CA changing a number is told before saving that it needs a new check.
   const typed = useWatch({ control, name: IDENTITY_FIELDS });
-  const needsNewCheck =
-    profile?.verification_status === "verified" &&
-    IDENTITY_FIELDS.some((name, index) => typed[index] !== profile[name]);
+  let needsNewCheck = false;
+  if (profile && profile.verification_status === "verified") {
+    for (let index = 0; index < IDENTITY_FIELDS.length; index++) {
+      if (typed[index] !== profile[IDENTITY_FIELDS[index]]) {
+        needsNewCheck = true;
+      }
+    }
+  }
 
   async function onSubmit(values) {
     setServerError(null);
@@ -402,7 +411,15 @@ function startingValues(profile) {
     specializations: profile.specializations,
     capacity: profile.capacity,
     years_experience: profile.years_experience,
-    pro_bono_slots_per_month: profile.pro_bono_slots_per_month ?? 0,
+    pro_bono_slots_per_month: profile.pro_bono_slots_per_month || 0,
     about: profile.about,
   };
+}
+
+// The file the CA picked in a file input, or null if they picked none.
+function firstFile(files) {
+  if (files.length === 0) {
+    return null;
+  }
+  return files[0];
 }

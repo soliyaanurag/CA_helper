@@ -116,8 +116,8 @@ def save_own_profile(user: User, **fields) -> CaProfile:
         profile = CaProfile(user_id=user.id, verification_status=CaVerificationStatus.PENDING)
         db.session.add(profile)
         log.info("CA profile created for user %s", user.id)
-    elif profile.verification_status == CaVerificationStatus.REJECTED or any(
-        getattr(profile, name) != fields[name] for name in IDENTITY_FIELDS
+    elif profile.verification_status == CaVerificationStatus.REJECTED or _identity_changed(
+        profile, fields
     ):
         profile.verification_status = CaVerificationStatus.PENDING
 
@@ -126,6 +126,15 @@ def save_own_profile(user: User, **fields) -> CaProfile:
             setattr(profile, name, value)
     db.session.commit()
     return profile
+
+
+def _identity_changed(profile: CaProfile, fields: dict) -> bool:
+    """True if the membership or CoP number in `fields` differs from the saved one."""
+    changed = False
+    for name in IDENTITY_FIELDS:
+        if getattr(profile, name) != fields[name]:
+            changed = True
+    return changed
 
 
 def save_certificate(user: User, upload) -> CaProfile:
@@ -181,7 +190,10 @@ def list_cas_for_admin(status: CaVerificationStatus | None) -> list[dict]:
     stmt = select(CaProfile).where(CaProfile.is_active).order_by(CaProfile.updated_at)
     if status is not None:
         stmt = stmt.where(CaProfile.verification_status == status)
-    return [_admin_row(profile) for profile in db.session.scalars(stmt)]
+    rows = []
+    for profile in db.session.scalars(stmt):
+        rows.append(_admin_row(profile))
+    return rows
 
 
 def _ca_for_admin(profile_id) -> CaProfile:
@@ -226,7 +238,7 @@ def set_verification(profile_id, admin: User, verified: bool, reason: str | None
 
 def count_cas_by_status() -> dict:
     """{"pending": n, "verified": n, "rejected": n} over live CA profiles."""
-    counts = {status.value: 0 for status in CaVerificationStatus}
+    counts = {"pending": 0, "verified": 0, "rejected": 0}
     for status in db.session.scalars(
         select(CaProfile.verification_status).where(CaProfile.is_active)
     ):
@@ -276,12 +288,16 @@ def list_verified_cas(
             CatalogService.code == service, CatalogService.is_active, CaService.is_active
         )
 
-    business = onboarding_service.business_of_user(user) if user is not None else None
+    business = None
+    if user is not None:
+        business = onboarding_service.business_of_user(user)
 
-    # (profile, my_prices, same_city) for the rows of this page.
+    # One row per CA on this page: {"profile", "my_prices", "same_city"}.
+    rows = []
     if business is None:
         result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
-        rows = [(profile, [], None) for profile in result.items]
+        for profile in result.items:
+            rows.append({"profile": profile, "my_prices": [], "same_city": None})
         total = result.total
     else:
         forms = set()
@@ -290,17 +306,26 @@ def list_verified_cas(
                 forms.add(filing.form_code)
         itr_service_code = _itr_service_code(business)
         address = business.address.lower()
-        rows = []
         for profile in db.session.scalars(stmt):
-            my_prices = _my_prices(profile, forms, itr_service_code)
-            rows.append((profile, my_prices, profile.city.lower() in address))
-        # sort() is stable: within a tie the usual order (experience, name) stays.
-        rows.sort(key=lambda row: (-len(row[1]), not row[2]))
+            rows.append(
+                {
+                    "profile": profile,
+                    "my_prices": _my_prices(profile, forms, itr_service_code),
+                    "same_city": profile.city.lower() in address,
+                }
+            )
+        # sort() keeps the usual order (experience, name) between CAs that rank the same.
+        rows.sort(key=_ranking_key)
         total = len(rows)
-        rows = rows[(page - 1) * page_size : page * page_size]
+        # Keep only this page, e.g. page 2 with page_size 20 is rows 20 to 39.
+        start = (page - 1) * page_size
+        rows = rows[start : start + page_size]
 
     items = []
-    for profile, my_prices, same_city in rows:
+    for row in rows:
+        profile = row["profile"]
+        my_prices = row["my_prices"]
+        same_city = row["same_city"]
         price = None
         if service:
             price = _price_of(profile, service)
@@ -332,7 +357,19 @@ def _my_prices(profile: CaProfile, forms: set, itr_service_code: str | None) -> 
             continue
         if service.form_code not in best or price < best[service.form_code]:
             best[service.form_code] = price
-    return [{"form_code": form, "price": price} for form, price in best.items()]
+    result = []
+    for form, price in best.items():
+        result.append({"form_code": form, "price": price})
+    return result
+
+
+def _ranking_key(row: dict):
+    """Sort order for a business: CAs offering more of its filings first, then same-city CAs.
+
+    Python sorts small values first, so the count is negated (-3 comes before -1) and
+    `not same_city` is False (= 0) for a same-city CA.
+    """
+    return (-len(row["my_prices"]), not row["same_city"])
 
 
 def _price_of(profile: CaProfile, service_code: str):

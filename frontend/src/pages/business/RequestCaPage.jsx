@@ -143,8 +143,16 @@ function RequestForm({ caId, filings }) {
   }
 
   // Filings this CA has not priced are listed apart, folded away.
-  const notOffered = filings.filter((filing) => filing.options.length === 0);
-  const quarters = groupByQuarter(filings.filter((filing) => filing.options.length > 0));
+  const offered = [];
+  const notOffered = [];
+  for (const filing of filings) {
+    if (filing.options.length > 0) {
+      offered.push(filing);
+    } else {
+      notOffered.push(filing);
+    }
+  }
+  const quarters = groupByQuarter(offered);
 
   function filingRow(filing) {
     return (
@@ -178,21 +186,21 @@ function RequestForm({ caId, filings }) {
 
   return (
     <div className="space-y-4">
-      {quarters.map(([quarter, group]) => (
-        <section key={quarter} className="space-y-2">
+      {quarters.map((group) => (
+        <section key={group.quarter} className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-medium">Due in {quarter}</h2>
+            <h2 className="font-medium">Due in {group.quarter}</h2>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => selectAll(group)}
-              disabled={group.every((filing) => filing.blocked_reason !== null)}
+              onClick={() => selectAll(group.filings)}
+              disabled={allBlocked(group.filings)}
             >
-              Select all in {quarter.split(" ")[0]}
+              Select all in {group.quarter.split(" ")[0]}
             </Button>
           </div>
-          <ul className="space-y-2">{group.map(filingRow)}</ul>
+          <ul className="space-y-2">{group.filings.map(filingRow)}</ul>
         </section>
       ))}
       {notOffered.length > 0 && (
@@ -224,23 +232,45 @@ function RequestForm({ caId, filings }) {
 
 // The financial-year quarter a date falls in, e.g. "Q3 (Oct–Dec 2026)".
 function quarterOf(isoDate) {
-  const [year, month] = isoDate.split("-").map(Number);
-  if (month >= 4 && month <= 6) return `Q1 (Apr–Jun ${year})`;
-  if (month >= 7 && month <= 9) return `Q2 (Jul–Sep ${year})`;
-  if (month >= 10) return `Q3 (Oct–Dec ${year})`;
-  return `Q4 (Jan–Mar ${year})`;
+  const parts = isoDate.split("-"); // "2026-09-20" -> ["2026", "09", "20"]
+  const year = parts[0];
+  const month = Number(parts[1]);
+  if (month >= 4 && month <= 6) {
+    return "Q1 (Apr–Jun " + year + ")";
+  }
+  if (month >= 7 && month <= 9) {
+    return "Q2 (Jul–Sep " + year + ")";
+  }
+  if (month >= 10) {
+    return "Q3 (Oct–Dec " + year + ")";
+  }
+  return "Q4 (Jan–Mar " + year + ")";
 }
 
-// [[quarter, filings]] in due-date order (the API sends the filings soonest first).
+// Groups filings by the quarter of their due date: [{ quarter: "Q2 (Jul–Sep 2026)",
+// filings: [...] }, ...] in due-date order (the API sends the filings soonest first).
 function groupByQuarter(filings) {
   const groups = [];
   for (const filing of filings) {
     const quarter = quarterOf(filing.due_date);
     const last = groups[groups.length - 1];
-    if (last && last[0] === quarter) last[1].push(filing);
-    else groups.push([quarter, [filing]]);
+    if (last && last.quarter === quarter) {
+      last.filings.push(filing);
+    } else {
+      groups.push({ quarter: quarter, filings: [filing] });
+    }
   }
   return groups;
+}
+
+// True when no filing of the group can be picked (all are blocked).
+function allBlocked(filings) {
+  for (const filing of filings) {
+    if (filing.blocked_reason === null) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // The CA's price for a filing. If the CA offers several services for it (ITR),

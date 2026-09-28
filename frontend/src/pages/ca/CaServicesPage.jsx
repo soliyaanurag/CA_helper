@@ -135,7 +135,10 @@ function PriceMenu({ services, menu, profile, verified }) {
       const count = wrongNames.length === 1 ? "1 price" : wrongNames.length + " prices";
       setErrorSummary("Fix " + count + ": " + wrongNames.join(", ") + ".");
       // Move to the first wrong price, which may be out of view.
-      document.getElementById(priceId(Object.keys(newErrors)[0]))?.focus();
+      const firstWrong = document.getElementById(priceId(Object.keys(newErrors)[0]));
+      if (firstWrong) {
+        firstWrong.focus();
+      }
       return;
     }
 
@@ -221,7 +224,7 @@ function SpecializationWarning({ services, rows, profile }) {
         cop_number: profile.cop_number,
         city: profile.city,
         languages: profile.languages,
-        specializations: [...profile.specializations, ...missing],
+        specializations: profile.specializations.concat(missing),
         capacity: profile.capacity,
         years_experience: profile.years_experience,
         about: profile.about,

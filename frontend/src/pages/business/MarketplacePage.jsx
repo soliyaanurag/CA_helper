@@ -31,11 +31,11 @@ const SELECT_CLASS =
 export function MarketplacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = {
-    specialization: searchParams.get("specialization") ?? "",
-    language: searchParams.get("language") ?? "",
-    city: searchParams.get("city") ?? "",
-    service: searchParams.get("service") ?? "",
-    page: Number(searchParams.get("page") ?? 1),
+    specialization: urlValue(searchParams, "specialization"),
+    language: urlValue(searchParams, "language"),
+    city: urlValue(searchParams, "city"),
+    service: urlValue(searchParams, "service"),
+    page: Number(urlValue(searchParams, "page") || 1),
   };
   const cas = useVerifiedCas(filters);
   const services = useServices();
@@ -43,23 +43,36 @@ export function MarketplacePage() {
   // The catalog service picked in the "Service" filter, if any.
   let chosenService = null;
   if (services.isSuccess && filters.service) {
-    chosenService = services.data.find((service) => service.code === filters.service) || null;
+    for (const service of services.data) {
+      if (service.code === filters.service) {
+        chosenService = service;
+      }
+    }
   }
 
   /** Show `changes` (a new filter goes back to page 1); empty values leave the URL. */
   function show(changes) {
     const next = { ...filters, page: 1, ...changes };
-    setSearchParams(
-      Object.fromEntries(
-        Object.entries(next).filter(([name, v]) => v && !(name === "page" && v === 1)),
-      ),
-    );
+    const params = {};
+    for (const name in next) {
+      const value = next[name];
+      // Leave out empty filters, and page 1 (the default).
+      if (value && !(name === "page" && value === 1)) {
+        params[name] = value;
+      }
+    }
+    setSearchParams(params);
   }
 
   function onSearch(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    show(Object.fromEntries(form));
+    show({
+      service: form.get("service"),
+      specialization: form.get("specialization"),
+      language: form.get("language"),
+      city: form.get("city"),
+    });
   }
 
   return (
@@ -265,4 +278,13 @@ function Pager({ data, onPage }) {
       </Button>
     </div>
   );
+}
+
+// One filter from the URL (?city=pune), or "" when it is not there.
+function urlValue(searchParams, name) {
+  const value = searchParams.get(name);
+  if (value === null) {
+    return "";
+  }
+  return value;
 }
