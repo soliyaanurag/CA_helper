@@ -118,3 +118,26 @@ class MarkFiledFileSchema(Schema):
     """The optional acknowledgement file (PDF, JPG or PNG)."""
 
     file = fields.Raw(load_default=None, metadata={"type": "string", "format": "binary"})
+
+
+class PeerPathSchema(Schema):
+    count = fields.Integer(required=True, metadata={"description": "Filed filings on this path"})
+    share_pct = fields.Integer(allow_none=True, metadata={"description": "Of all filed, %"})
+    on_time_pct = fields.Integer(allow_none=True, metadata={"description": "Filed on time, %"})
+
+
+class PeerInsightsSchema(Schema):
+    """GET /compliance/items/<id>/peer-insights (CO13)."""
+
+    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    scope = fields.String(
+        required=True,
+        metadata={"description": '"segment" (same entity type and MSME tier), "overall" or "none"'},
+    )
+    entity_type = fields.String(required=True)
+    msme_tier = fields.String(allow_none=True)
+    min_businesses = fields.Integer(required=True)
+    business_count = fields.Integer(required=True)
+    filing_count = fields.Integer(required=True)
+    self = fields.Nested(PeerPathSchema, allow_none=True, required=True)
+    ca = fields.Nested(PeerPathSchema, allow_none=True, required=True)

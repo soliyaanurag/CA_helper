@@ -200,7 +200,9 @@ Access checks (MA14), the ONLY way to decide what a CA may see of a business (CL
   unless active access. Access ends when the engagement ends (completed, declined, expired, cancelled).
 
 Also used by other modules: `active_work(ca_profile_id) -> [(engagement id, business id, filing id)]`,
-`active_cas_of_business(business_id) -> {engagement id: CA User}`, `complete_if_all_filed(engagement_id) -> bool`
+`active_cas_of_business(business_id) -> {engagement id: CA User}`, `cancel_open_requests_of_ca(user) -> int` (admin:
+a suspended CA's requested and quoted engagements are cancelled, each business gets a tray entry and an email;
+active ones stay), `ca_names(profile_ids)` (admin audit log), `complete_if_all_filed(engagement_id) -> bool`
 (no commit) and `active_client_ids(ca_profile_id)` (ca_workspace), `open_filing_ids(filing_ids)` (onboarding), the admin helpers (admin),
 `active_ca_users_by_filing(filing_ids) -> {filing id: User}` (the CA of an active engagement on each filing; alerts
 reminders).

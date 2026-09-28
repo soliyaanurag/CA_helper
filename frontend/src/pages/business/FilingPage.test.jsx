@@ -447,3 +447,47 @@ describe("documents the CA asked for", () => {
     expect(screen.queryByText("Your CA asked for documents")).not.toBeInTheDocument();
   });
 });
+
+describe("how similar businesses file it", () => {
+  const PEERS = "/api/v1/compliance/items/f1/peer-insights";
+  const figures = {
+    form_code: "gstr_3b",
+    scope: "segment",
+    entity_type: "proprietorship",
+    msme_tier: "micro",
+    min_businesses: 10,
+    business_count: 10,
+    filing_count: 40,
+    self: { count: 24, share_pct: 60, on_time_pct: 88 },
+    ca: { count: 16, share_pct: 40, on_time_pct: 100 },
+  };
+
+  it("shows the segment's figures", async () => {
+    open({ [`GET ${PEERS}`]: [200, figures] });
+
+    const card = (await screen.findByText("How similar businesses file it")).closest(
+      "[data-slot=card]",
+    );
+    expect(card).toHaveTextContent(
+      "Among 10 micro businesses like yours (proprietorship) that filed GSTR-3B:",
+    );
+    expect(card).toHaveTextContent("Filed it themselves60%88% of them on time");
+    expect(card).toHaveTextContent("Filed it through a CA40%100% of them on time");
+  });
+
+  it("falls back to every business, or says there are too few", async () => {
+    open({ [`GET ${PEERS}`]: [200, { ...figures, scope: "overall", business_count: 12 }] });
+    expect(
+      await screen.findByText("Among all 12 businesses on CA Helper that filed GSTR-3B:"),
+    ).toBeInTheDocument();
+  });
+
+  it("says when too few businesses filed it", async () => {
+    open({
+      [`GET ${PEERS}`]: [200, { ...figures, scope: "none", self: null, ca: null }],
+    });
+    expect(
+      await screen.findByText(/Not enough businesses have filed GSTR-3B here yet/),
+    ).toBeInTheDocument();
+  });
+});

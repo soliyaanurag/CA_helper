@@ -4,6 +4,29 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-28: Suspension, audit log, admin filing numbers, peer insights, demo data (AD4, AD5, AD8, CO13, X1)
+
+**What**
+- **Suspension is `users.is_active = false`** (no new column): login answers 403 `ACCOUNT_INACTIVE` with "This
+  account is suspended…", and a token still held stops working at once. A suspended CA disappears from the
+  marketplace (only live accounts are listed); their `requested` / `quoted` engagements are cancelled and each
+  business is told (tray + email). **Active engagements stay** (the business keeps its filings' history; deciding
+  what happens next is an admin's call). An admin cannot suspend themselves. Reactivating does not restore
+  cancelled requests. Both actions go to the audit log with the (optional) reason.
+- **Overdue rate** (admin dashboard) = of the filings whose due date has passed, the share not filed on time
+  (still unfiled, or `filed_at` after the due date in Indian time).
+- **Peer insights** compare the **filed** filings of the same form: self vs through a CA (`filing_path`) and each
+  path's on-time rate. Segment = same entity type + MSME tier, shown only with ≥ 10 businesses that filed the form
+  (`MIN_PEER_BUSINESSES`, the rule in SCOPE.md), else the same figures over every business, else nothing.
+- **Demo data is a separate command, `flask seed-demo` (`make seed-demo`)**, in `backend/app/demo_seed.py`, not
+  part of `make seed` / `make sync`, so nobody's database fills with demo data unasked. It runs once (it checks
+  for the first demo business's email), all fictional, 14 businesses of which 10 are micro proprietorships so the
+  peer-insights segment shows. It gives `business@demo.local` a business only if it has none, and sets the demo
+  CA's pro-bono pledge to 2 when it is 0 (so the pro-bono flow can be shown). README "Demo script" says which
+  account shows which flow.
+
+**Why:** the smallest changes that make the admin side and the demo complete, without new tables or columns.
+
 ## 2026-09-28: CA workspace (CW2–CW7) and CA capacity (MA7)
 
 **What**

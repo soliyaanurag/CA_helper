@@ -10,7 +10,7 @@ Signup with email OTP verification, login (refused until the email is verified),
   - `services/auth_service.py`:
     - `signup()` creates a business or CA account with `email_verified_at` empty and emails a verification code.
     - `verify_email()` and `resend_verification_code()` handle that code.
-    - `authenticate()` always checks an argon2 hash, even for an unknown email, so timing doesn't reveal which emails exist. It rejects inactive or deleted users, then unverified emails, and rehashes outdated hashes.
+    - `authenticate()` always checks an argon2 hash, even for an unknown email, so timing doesn't reveal which emails exist. It rejects inactive or deleted users ("This account is suspended…": admins suspend accounts, AD4), then unverified emails, and rehashes outdated hashes.
     - `request_password_reset()` and `reset_password()` handle the reset code; a successful reset also verifies the email.
     - `change_password()` needs the current password.
     - Also `issue_access_token()` (token contents), `get_active_user()` and `normalize_email()`.

@@ -631,3 +631,11 @@ def register_commands(app: Flask) -> None:
     def seed_command() -> None:
         """Insert development seed data. Safe to re-run."""
         click.echo(f"Seeded: {', '.join(run_all_seeds())}")
+
+    @app.cli.command("seed-demo")
+    def seed_demo_command() -> None:
+        """Insert the fictional demo data (app/demo_seed.py) after the normal seed. Runs once."""
+        from app.demo_seed import seed_demo_data  # demo_seed imports this module
+
+        click.echo(f"Seeded: {', '.join(run_all_seeds())}")
+        click.echo(seed_demo_data())

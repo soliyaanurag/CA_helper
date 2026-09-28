@@ -91,3 +91,15 @@ export function useAcknowledgementFile(itemId, enabled) {
     enabled,
   });
 }
+
+/**
+ * GET /api/v1/compliance/items/<id>/peer-insights: how similar businesses file this form.
+ * { scope: "segment" | "overall" | "none", entity_type, msme_tier, min_businesses,
+ *   business_count, filing_count, self: { count, share_pct, on_time_pct }, ca: {...} }
+ */
+export function usePeerInsights(itemId) {
+  return useQuery({
+    queryKey: [...filingKey(itemId), "peers"],
+    queryFn: () => apiFetch("/api/v1/compliance/items/" + itemId + "/peer-insights"),
+  });
+}

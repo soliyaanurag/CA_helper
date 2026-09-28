@@ -2,6 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { PublicLayout } from "@/components/PublicLayout";
 import { RequireRole } from "@/components/RequireRole";
 import { ROLE_HOME } from "@/lib/session";
+import { AdminAuditLogPage } from "@/pages/admin/AdminAuditLogPage";
 import { AdminCaDetailPage } from "@/pages/admin/AdminCaDetailPage";
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
@@ -71,6 +72,7 @@ export const NAV = {
     { label: "Dashboard", path: "/admin" },
     { label: "Users & CAs", path: "/admin/users" },
     { label: "Regulatory news", path: "/admin/regulatory" },
+    { label: "Audit log", path: "/admin/audit" },
   ],
 };
 
@@ -137,6 +139,7 @@ export const appRoutes = [
     { path: "users", element: <AdminUsersPage /> },
     { path: "cas/:caId", element: <AdminCaDetailPage /> },
     { path: "regulatory", element: <RegulatoryAdminPage /> },
+    { path: "audit", element: <AdminAuditLogPage /> },
   ]),
   { path: "*", element: <NotFoundPage /> },
 ];

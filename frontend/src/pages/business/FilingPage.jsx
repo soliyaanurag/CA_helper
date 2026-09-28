@@ -14,6 +14,7 @@ import {
   unmarkFiled,
   useAcknowledgementFile,
   useFiling,
+  usePeerInsights,
 } from "@/api/compliance";
 import {
   DOCUMENTS_KEY,
@@ -33,7 +34,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { daysLeftText, daysUntil, formatDate, formatDateTime } from "@/lib/dates";
-import { DOCUMENT_TYPE_LABELS, FORM_LABELS, label } from "@/lib/labels";
+import {
+  DOCUMENT_TYPE_LABELS,
+  ENTITY_TYPE_LABELS,
+  FORM_LABELS,
+  MSME_TIER_LABELS,
+  label,
+} from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
 // Statuses in which the business itself can still act on the filing.
@@ -78,6 +85,7 @@ export function FilingPage() {
           {!FILED.includes(filing.data.filing.status) &&
             daysUntil(filing.data.filing.due_date) < 0 && <Penalty item={filing.data.filing} />}
           <HowToFile page={filing.data} onUpdated={showUpdated} />
+          <PeerInsights item={filing.data.filing} />
           <CaRequests page={filing.data} />
           <Checklist page={filing.data} onUpdated={showUpdated} />
           <Guide page={filing.data} />
@@ -679,6 +687,55 @@ function AddDocument({ item, entryKey, links, onAdded, onCancel }) {
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+// --- How similar businesses file it (CO13) ----------------------------------------------
+
+function PeerInsights({ item }) {
+  const peers = usePeerInsights(item.id);
+  if (!peers.isSuccess) return null;
+  const data = peers.data;
+  const form = label(FORM_LABELS, item.form_code);
+
+  let who = `all ${data.business_count} businesses on CA Helper that filed ${form}`;
+  if (data.scope === "segment") {
+    const tier = label(MSME_TIER_LABELS, data.msme_tier).toLowerCase();
+    const type = label(ENTITY_TYPE_LABELS, data.entity_type).toLowerCase();
+    who = `${data.business_count} ${tier} businesses like yours (${type}) that filed ${form}`;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>How similar businesses file it</CardTitle>
+        <CardDescription>
+          {data.scope === "none"
+            ? `Not enough businesses have filed ${form} here yet to compare (at least ${data.min_businesses} are needed).`
+            : `Among ${who}:`}
+        </CardDescription>
+      </CardHeader>
+      {data.scope !== "none" && (
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+          <PeerPath title="Filed it themselves" figures={data.self} />
+          <PeerPath title="Filed it through a CA" figures={data.ca} />
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function PeerPath({ title, figures }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <p className="text-muted-foreground">{title}</p>
+      <p className="text-2xl font-semibold tabular-nums">{figures.share_pct ?? 0}%</p>
+      <p>
+        {figures.on_time_pct === null
+          ? "No filings yet"
+          : `${figures.on_time_pct}% of them on time`}
+      </p>
     </div>
   );
 }

@@ -17,7 +17,7 @@ FLASK := $(BACKEND) flask --app app
 # npm from the conda env (Node 22), running inside frontend/.
 NPM := $(PY) --cwd frontend npm
 
-.PHONY: help setup env-update infra infra-down migrate migration seed test lint format \
+.PHONY: help setup env-update infra infra-down migrate migration seed seed-demo test lint format \
 	dev-backend dev-worker dev-frontend doctor feature sync check pr merge
 
 help: ## List all targets
@@ -51,6 +51,9 @@ migration: .env ## Create a migration: make migration name="onboarding: add busi
 
 seed: .env ## Insert development seed data (safe to re-run)
 	$(FLASK) seed
+
+seed-demo: .env ## Add the fictional demo data (14 businesses, engagements, files; once)
+	$(FLASK) seed-demo
 
 test: ## Run all tests: pytest (needs `make infra`), then Vitest
 	$(BACKEND) pytest
