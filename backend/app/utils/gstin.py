@@ -5,7 +5,7 @@
     gstin_error(gstin, pan, state)  None if the GSTIN is fine, else what is wrong
 
 The state list is reference data in content/reference/gst_states.json (with its
-source note; TODO_VERIFY until confirmed, docs/TODO_VERIFY.md). A GSTIN is
+source note: checked against the GST e-invoice portal's state codes). A GSTIN is
 <state code 2><PAN 10><entity 1>Z<check character 1>; the check character comes
 from the other 14 with the mod-36 algorithm below.
 """

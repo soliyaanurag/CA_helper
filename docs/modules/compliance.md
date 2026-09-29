@@ -51,7 +51,7 @@ admin's filing numbers (AD5) are below. `filed_verified` is set from the acknowl
   - `mark_overdue_filings(today)` (CO11): live filings in `upcoming`, `docs_pending` or `ready` whose due date is
     before today become `overdue` (a filing due today is not late yet; `with_ca`, filed and removed filings are
     untouched; commits once, returns the count).
-  - `seed.py`: `seed_obligation_templates()` adds 9 templates for the 7 forms, **all `TODO_VERIFY`**.
+  - `seed.py`: `seed_obligation_templates()` adds 9 templates for the 7 forms, each with its official source (checked on 29 Sep 2026; GSTR-4's date is still `TODO_VERIFY`); re-running it updates rows seeded earlier.
 - **How filings are made (`sync_filings`):** for each template in force whose `applicability` matches the profile,
   one filing per period of the **current financial year, from 1 April**; a period whose due date has passed starts
   as `overdue` (the business may have filed it before joining; it can mark it filed), the rest `upcoming`. On a
@@ -64,9 +64,10 @@ admin's filing numbers (AD5) are below. `filed_verified` is set from the acknowl
   (ITR).
 - **Worker:** `backend/worker.py` runs `mark_overdue_filings` every hour (id `compliance.mark_overdue`;
   `make dev-worker`).
-- **Content:** `content/forms/<FORM>/` has a **first draft** (`status: DRAFT`) of the explanation, the self-filing
-  steps and the document checklist of each of the 7 forms (no amounts, rates or due dates). Someone must review
-  them against the official sources and set `status: DONE`.
+- **Content:** `content/forms/<FORM>/` has the explanation, the self-filing
+  steps and the document checklist of each of the 7 forms (no amounts, rates or due dates), reviewed on 29 Sep 2026
+  against the official GST portal FAQs and incometax.gov.in pages linked at the bottom of each page (`status: DONE`).
+  The TDS pages name the new-Act forms (Form 138 / 140) and the ITR pages the tax year.
 - **Frontend:**
   - `pages/business/FilingPage.jsx` at `/business/compliance/:itemId`: header (form, period, status badge, due
     date and days left); "How will you file it?" (buttons for `self` / `ca`; with `ca`, a link to the marketplace
@@ -153,11 +154,13 @@ onboarding (the regulatory profile, passed in by `register_business()`), core-au
 - Period labels: `"Apr 2026"` (monthly), `"Q1 2026-27"` (quarterly), `"FY 2026-27"` (yearly)
 
 ## Known issues
-- **Every due-date rule is `TODO_VERIFY`** (`docs/TODO_VERIFY.md`); GSTR-3B QRMP uses the 22nd for every state (some states have the 24th).
+- A corrected due-date rule (`make seed`) reaches filings created earlier only when `sync_filings` runs for that
+  business again (after a profile edit). After the V1 change (ITR 31 August, GSTR-4 30 June), existing test
+  or demo businesses keep the old dates until then; new registrations get the new ones.
+- GSTR-3B under QRMP uses the 22nd for every state; some states have the 24th (a decision, `docs/TODO_VERIFY.md` "Simplifications"). GSTR-4's 30 June is still `TODO_VERIFY`.
 - Only the current financial year is created; nothing creates next year's filings yet (a worker job, X2/ON14).
 - The yearly ITR filing is the current year's (FY 2026-27, due in 2027); last year's return is not added.
 - A late `with_ca` filing keeps `with_ca` (not `overdue`); `SCOPE.md` says overdue is reachable from any pre-filed state. See `DECISIONS.md` (2026-09-28).
-- **The form content is a first draft** (`status: DRAFT`), not checked against the official sources yet.
 - Verification (DO8) trusts what the acknowledgement's text shows; a forged PDF with the right words would pass. It only reads the first 3 pages and English text.
 - A CA cannot open a filing page yet, and cannot mark a filing filed (CW3, CW5); a `with_ca` filing can only be finished by the CA.
-- The penalty figures are "pending" until the `penalty_rules` amounts are verified (alerts, `docs/TODO_VERIFY.md`).
+- Some penalty values are still proposals (`TODO_VERIFY`), so those estimates say "rules pending verification" (alerts).

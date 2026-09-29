@@ -1,8 +1,8 @@
 """Penalty rules and the estimator (AL4, AL5).
 
-The seeded rules have every amount empty (nothing is confirmed yet), so the estimate is
-"pending". The arithmetic is tested with made-up amounts written into the test database
-only: they are NOT legal values.
+The seeded rules hold the values checked on 29 Sep 2026 (app/seed.py, docs/TODO_VERIFY.md).
+The arithmetic tests start from rules with every amount empty (`rules`) and write made-up
+amounts into the test database only: they are NOT legal values.
 
 The `business_with_filings` QRMP business: GSTR-1 for Q1 2026-27 was due on 13 Jul 2026,
 GSTR-3B for Q1 on 22 Jul 2026, GSTR-1 for Q2 on 13 Oct 2026.
@@ -18,18 +18,28 @@ from app.models.base import today_in_india
 from app.models.compliance import ComplianceStatus
 from app.models.enums import UserRole
 from app.models.onboarding import EntityType
-from app.seed import PENALTY_RULES, seed_penalty_rules
+from app.seed import PENALTY_COLUMNS, PENALTY_RULES, seed_penalty_rules
 from app.services import alerts_service
 
 BASE = "/api/v1/alerts"
 
 
 @pytest.fixture()
-def rules(database):
+def seeded(database):
     """The seeded penalty rules, as {form code: PenaltyRule}."""
     seed_penalty_rules()
     database.session.commit()
     return {rule.form_code: rule for rule in database.session.query(PenaltyRule)}
+
+
+@pytest.fixture()
+def rules(seeded, database):
+    """The seeded rules with every amount emptied, for the made-up amounts of the tests."""
+    for rule in seeded.values():
+        for column in PENALTY_COLUMNS:
+            setattr(rule, column, None)
+    database.session.commit()
+    return seeded
 
 
 def filing(database, form_code, period_label) -> ComplianceItem:
@@ -47,20 +57,55 @@ def estimate(business, item, tax_due=None, today=date(2026, 7, 23)):
 # --- AL4: the seeded rules ----------------------------------------------------------------
 
 
-def test_every_form_has_a_rule_with_no_amount_until_verified(rules, database):
-    assert set(rules) == {form for form, _ in PENALTY_RULES}
-    assert len(rules) == 7
-    for rule in rules.values():
-        assert rule.source_reference.startswith("TODO_VERIFY")
-        assert rule.late_fee_per_day is None
-        assert rule.max_late_fee is None
-        assert rule.flat_late_fee is None
-        assert rule.annual_interest_rate is None
-        assert rule.nil_return_late_fee_per_day is None
+def test_every_form_has_a_rule_with_its_seeded_values(seeded, database):
+    assert set(seeded) == {form for form, _, _ in PENALTY_RULES}
+    assert len(seeded) == 7
+    for form, amounts, source in PENALTY_RULES:
+        rule = seeded[form]
+        assert rule.source_reference == source
+        for column in PENALTY_COLUMNS:
+            expected = amounts.get(column)
+            assert getattr(rule, column) == (Decimal(expected) if expected else None)
+    # The TDS late fee is confirmed; the GST interest rate is not yet.
+    assert "TODO_VERIFY" not in seeded["tds_24q"].source_reference
+    assert "TODO_VERIFY" in seeded["gstr_3b"].source_reference
 
     seed_penalty_rules()  # running the seed again adds nothing
     database.session.commit()
     assert database.session.query(PenaltyRule).count() == 7
+
+
+def test_the_seed_updates_a_rule_seeded_earlier(seeded, database):
+    old = seeded["gstr_3b"]
+    old.late_fee_per_day = None  # as the first seed left it
+    old.source_reference = "TODO_VERIFY: old text"
+    database.session.commit()
+
+    seed_penalty_rules()
+    database.session.commit()
+
+    assert old.late_fee_per_day == Decimal("50")
+    assert old.source_reference.startswith("CBIC Circular 26/26/2017-GST")
+
+
+def test_the_seeded_gst_rules_give_an_estimate(business_with_filings, seeded, database):
+    # GSTR-1 Q1 was due on 13 Jul: 10 days × ₹50, under the ₹2,000 cap; no interest.
+    result = estimate(business_with_filings, filing(database, "gstr_1", "Q1 2026-27"))
+    assert (result["status"], result["late_fee"], result["total"]) == (
+        "estimated",
+        Decimal("500.00"),
+        Decimal("500.00"),
+    )
+    assert result["label"] == "Estimate (rules pending verification)"
+    long_late = estimate(
+        business_with_filings, filing(database, "gstr_1", "Q1 2026-27"), today=date(2026, 12, 1)
+    )
+    assert long_late["late_fee"] == Decimal("2000.00")
+
+
+def test_cmp08_has_no_late_fee(seeded):
+    assert seeded["cmp_08"].late_fee_per_day == Decimal("0")
+    assert seeded["cmp_08"].max_late_fee == Decimal("0")
 
 
 # --- AL5: the estimate --------------------------------------------------------------------

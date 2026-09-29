@@ -4,6 +4,34 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-29: Legal values checked against official sources (V1, CO6)
+
+**What**
+- Every seeded threshold, due-date rule, penalty rule and GST state code was checked against official pages (GST
+  portal FAQs, CBIC circulars and notifications, incometax.gov.in FAQs and form manuals, TRACES, the Udyam portal,
+  the GST e-invoice portal). Each row's `source_reference` now names its source; `docs/TODO_VERIFY.md` lists the
+  verified values with links, what is still open and the simplifications. A teammate re-reads the links once.
+- **Corrected:** the ITR is due on **31 August** without a tax audit (31 July only applies to returns without
+  business income) and GSTR-4 on **30 June** after the year (from FY 2024-25; that notification could not be opened,
+  so it keeps `TODO_VERIFY`).
+- **Values whose official text could not be opened** (the GSTR-1 / GSTR-4 daily fees, GST interest 18%, ITR interest)
+  are filled in as proposals and keep `TODO_VERIFY`, so their estimates say "rules pending verification" (asked and
+  approved).
+- **GSTR-3B under QRMP stays on the 22nd for every state**, although some states have the 24th (asked and
+  approved): the date shown is never late, and no state logic is needed.
+- **Caps that depend on turnover or income store the small-business value** (turnover up to ₹1.5 crore; ITR ₹5,000);
+  the TDS fee's cap (the TDS of the statement) is not stored (asked and approved).
+- `seed_rule_thresholds`, `seed_obligation_templates` and `seed_penalty_rules` now **update** rows seeded earlier
+  (`_upsert()` in `seed.py`), so a corrected value reaches every database with `make seed` / `make sync`.
+- **The Income-tax Act, 2025** (from 1 April 2026) keeps these thresholds, due dates and fees; the guides mention
+  its names (Form 138 / 140 for 24Q / 26Q, tax year). The app keeps the old form codes.
+- **Content (CO6):** the 21 files in `content/forms/` were reviewed against the official pages and set to
+  `status: DONE`. Fixed: CMP-08 has no late fee; unsupported claims removed; each page links its official FAQ.
+
+**Why:** the rule "never invent a legal value" needs a named source per value; updating seeded rows keeps every
+teammate's database in step with the reviewed values.
+
+
 ## 2026-09-29: Local OCR (B2: ON12, ON13, DO8, DO9, CO10 filed–verified)
 
 **What**

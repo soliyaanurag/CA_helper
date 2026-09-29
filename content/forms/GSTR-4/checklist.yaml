@@ -1,5 +1,5 @@
 # Document checklist for GSTR-4.
-# Status: DRAFT (review, then set status: DONE).
+# Status: DONE (reviewed on 29 Sep 2026 against the official pages in explanation.md).
 #
 # Used by: the checklist on the filing page (and OCR document-type checks later).
 # Each item:
@@ -8,7 +8,7 @@
 #   required  true if a CA normally cannot file without it
 #   help      optional one-line hint
 form: GSTR-4
-status: DRAFT
+status: DONE
 items:
   - key: cmp08_statements
     label: "All CMP-08 statements of the year"
