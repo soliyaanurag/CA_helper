@@ -76,3 +76,61 @@ def test_a_failed_call_is_unavailable(app, monkeypatch):
         ask_gemini("hello")
 
     assert error.value.status == 503
+
+
+def test_a_quota_error_is_logged_with_the_model_and_googles_reason(app, monkeypatch, caplog):
+    from google.genai import errors
+
+    def over_quota(prompt, want_json):
+        body = {
+            "error": {
+                "code": 429,
+                "message": "You exceeded your current quota.",
+                "status": "RESOURCE_EXHAUSTED",
+            }
+        }
+        raise errors.ClientError(429, body)
+
+    monkeypatch.setitem(app.config, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setitem(app.config, "GEMINI_MODEL", "gemini-test-flash")
+    monkeypatch.setattr(gemini_client, "_send_to_gemini", over_quota)
+
+    with app.app_context(), caplog.at_level(logging.ERROR), pytest.raises(ApiError):
+        ask_gemini("PAN ABCDE1234F")
+
+    assert "model gemini-test-flash" in caplog.text
+    assert "429 RESOURCE_EXHAUSTED: You exceeded your current quota." in caplog.text
+    assert "ABCDE1234F" not in caplog.text
+
+
+def test_an_error_without_a_code_is_logged_by_its_name(app, monkeypatch, caplog):
+    def too_slow(prompt, want_json):
+        raise TimeoutError("took too long")
+
+    monkeypatch.setitem(app.config, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(gemini_client, "_send_to_gemini", too_slow)
+
+    with app.app_context(), caplog.at_level(logging.ERROR), pytest.raises(ApiError):
+        ask_gemini("hello")
+
+    assert "TimeoutError" in caplog.text
+
+
+def test_only_busy_503_answers_are_retried_not_429(app, monkeypatch):
+    from google import genai
+
+    made = {}
+
+    def fake_client(**settings):
+        made.update(settings)
+        return "client"
+
+    monkeypatch.setitem(app.config, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(genai, "Client", fake_client)
+
+    with app.app_context():
+        gemini_client._client()
+
+    retry = made["http_options"].retry_options
+    assert retry.http_status_codes == [503]
+    assert retry.attempts == 3

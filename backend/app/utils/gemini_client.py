@@ -51,24 +51,49 @@ def gemini_available() -> bool:
     return bool(current_app.config.get("GEMINI_API_KEY"))
 
 
-def _send_to_gemini(prompt: str, want_json: bool) -> str:
-    """Send an already-scrubbed prompt to Gemini and return the reply text.
+def _client():
+    """A Gemini client with our timeout and retry rule.
 
-    Kept separate so tests can replace it; nothing else may call it.
+    Only 503 ("this model is currently experiencing high demand") is retried, twice.
+    A 429 means our quota is used up: retrying at once would only use up more of it.
     """
     # Imported here so the app starts (and tests run) without loading the Gemini library.
     from google import genai
     from google.genai import types
 
     config = current_app.config
-    client = genai.Client(
+    return genai.Client(
         api_key=config["GEMINI_API_KEY"],
         http_options=types.HttpOptions(
             timeout=config["GEMINI_TIMEOUT_SECONDS"] * 1000,
-            # Gemini sometimes answers 503 "high demand" or 429 for a moment: try twice more.
-            retry_options=types.HttpRetryOptions(attempts=3, http_status_codes=[429, 503]),
+            retry_options=types.HttpRetryOptions(attempts=3, http_status_codes=[503]),
         ),
     )
+
+
+def _failure_reason(error: Exception) -> str:
+    """Why a Gemini call failed, for the log, e.g. "429 RESOURCE_EXHAUSTED: You exceeded
+    your current quota". Google's message never contains our prompt."""
+    code = getattr(error, "code", None)
+    status = getattr(error, "status", None)
+    message = getattr(error, "message", None)
+    if code is None and status is None:
+        return type(error).__name__  # e.g. a timeout or no network
+    reason = f"{code} {status}"
+    if message:
+        reason += ": " + str(message)[:200]
+    return reason
+
+
+def _send_to_gemini(prompt: str, want_json: bool) -> str:
+    """Send an already-scrubbed prompt to Gemini and return the reply text.
+
+    Kept separate so tests can replace it; nothing else may call it.
+    """
+    from google.genai import types
+
+    config = current_app.config
+    client = _client()
     # We only ask for text; the library's automatic function calling stays off.
     settings = types.GenerateContentConfig(
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
@@ -97,7 +122,11 @@ def ask_gemini(prompt: str, want_json: bool = False) -> str:
     try:
         return _send_to_gemini(clean_prompt, want_json)
     except Exception as error:  # any library, network or quota error
-        log.error("Gemini call failed: %s", type(error).__name__)
+        log.error(
+            "Gemini call failed (model %s): %s",
+            current_app.config["GEMINI_MODEL"],
+            _failure_reason(error),
+        )
         raise ApiError(
             503, "GEMINI_UNAVAILABLE", "AI suggestions are not available right now."
         ) from error
@@ -114,17 +143,10 @@ def _send_embeddings(texts: list[str], for_question: bool) -> list[list[float]]:
 
     Kept separate so tests can replace it; nothing else may call it.
     """
-    from google import genai
     from google.genai import types
 
     config = current_app.config
-    client = genai.Client(
-        api_key=config["GEMINI_API_KEY"],
-        http_options=types.HttpOptions(
-            timeout=config["GEMINI_TIMEOUT_SECONDS"] * 1000,
-            retry_options=types.HttpRetryOptions(attempts=3, http_status_codes=[429, 503]),
-        ),
-    )
+    client = _client()
     # A question and the texts that answer it are embedded slightly differently.
     task = "RETRIEVAL_QUERY" if for_question else "RETRIEVAL_DOCUMENT"
     response = client.models.embed_content(
@@ -156,7 +178,11 @@ def embed_texts(texts: list[str], for_question: bool = False) -> list[list[float
         for start in range(0, len(clean_texts), EMBED_BATCH):
             vectors.extend(_send_embeddings(clean_texts[start : start + EMBED_BATCH], for_question))
     except Exception as error:  # any library, network or quota error
-        log.error("Gemini embedding failed: %s", type(error).__name__)
+        log.error(
+            "Gemini embedding failed (model %s): %s",
+            current_app.config["GEMINI_EMBED_MODEL"],
+            _failure_reason(error),
+        )
         raise ApiError(
             503, "GEMINI_UNAVAILABLE", "AI suggestions are not available right now."
         ) from error
