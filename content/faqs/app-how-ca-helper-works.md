@@ -1,12 +1,13 @@
 ---
 title: How CA Helper works, and when to consult a CA
-source:
-publisher: "CA Helper (this project)"
+source: /terms
+publisher: "CA Helper: Terms and Privacy Policy (the app's /terms page)"
 retrieved: 2026-09-30
 status: DRAFT
 area: app
 sources:
   - CA Helper product documentation (this project)
+  - CA Helper Terms and Privacy Policy - /terms
 ---
 
 <!-- Plain-language summary written from the sources above, NOT copied word for word (unlike
