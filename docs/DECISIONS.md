@@ -4,6 +4,35 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-30: 2026 legal update: Form 138 / 140 names, ITR date by form, filings resynced
+
+From the "findings that affect the app" in `docs/KB_VERIFICATION_NOTES.md`.
+
+**What**
+- **TDS returns keep their codes but show their new names** from tax year 2026-27: "Form 138 (earlier 24Q)" and
+  "Form 140 (earlier 26Q)" (Income-tax Act, 2025; Form 138 / 140 user manuals). A display name is not a legal
+  value (no threshold, rate or due date), so it is a small table in code, `RENAMED_FORMS` (backend
+  `compliance_service` and frontend `lib/labels.js`, the same entries), keyed by the first financial year. The
+  frontend reads the year from the filing's period label ("Q2 2026-27"). Codes, folders, rules and old periods
+  stay 24Q / 26Q.
+- **ITR due date by form:** without an audit, individuals and HUFs with business or professional income (ITR-3,
+  ITR-4: every individual and proprietor in the app) stay on 31 August; **ITR-5 (firms, LLPs) is set to 31 July,
+  `TODO_VERIFY`**: sources disagree (31 July or 31 August), and the earlier date is never late (the same choice as
+  GSTR-3B's 22nd). Any audit: 31 October. 31 July for returns without business income (ITR-1 / ITR-2) is recorded
+  in the source but no profile of the app has one. Stored as `by_itr_form` in the ITR template's `due_date_rule`
+  (one template per form, frequency and start date is allowed).
+- **GSTR-4** was already 30 June (V1); it keeps `TODO_VERIFY` until Notification 12/2024-CT is read.
+- **Corrected rules reach existing filings:** `flask seed` (so `make seed` and `make sync`) ends with
+  `resync_all_filings()`, which runs `sync_filings` for every business with its saved profile: not-started filings
+  get the new dates; filed, "With CA" and requested filings keep theirs. `sync_filings` also moves a filing to the
+  template now in force.
+- **Guides and labels** name the new sections next to the old ones (44AB → 63, 44AD/44ADA → 58, TDS 192 → 392,
+  193–194T → 393); the profile page says "Tax audit (s.44AB; s.63 from tax year 2026-27)".
+
+**Why:** the smallest change that shows users the forms they will actually see on the portal, gives firms and LLPs
+a date that is never late until the rule is confirmed, and makes a corrected rule reach every database with the
+command teammates already run.
+
 ## 2026-09-29: Matching score and evaluations (B5: MA8, X3)
 
 **What**

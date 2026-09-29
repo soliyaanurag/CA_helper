@@ -23,6 +23,7 @@ Seeded rows are effective from 1 April 2025. When the law changes, add a row wit
 
 | Key / row | Proposed value (in use) | Where to confirm | Why it is open |
 |---|---|---|---|
+| `obligation_templates` ITR due date for ITR-5 (firms, LLPs) without an audit | 31 July after the FY (`by_itr_form`; ITR-3 / ITR-4 stay 31 August) | e-filing portal (the due date it shows for ITR-5, AY 2027-28), Finance Act 2026 amendment of s.139(1) / s.263 | Sources disagree (31 July vs 31 August; `docs/KB_VERIFICATION_NOTES.md`). The earlier date is used, so the date shown is never late. |
 | `obligation_templates` GSTR-4 due date | 30 June after the FY (was 30 April) | CGST Rules rule 62 as amended by Notification 12/2024-CT (10.07.2024), 53rd GST Council | The notification could not be opened; the GST portal FAQ ([faq_GSTR4annual](https://tutorial.gst.gov.in/userguide/returns/faq_GSTR4annual.htm) Q5) still says "30th of the month succeeding the financial year" (= 30 April). Every other report says 30 June from FY 2024-25. |
 | `penalty_rules` GSTR-1 daily fee | ₹50 a day, nil ₹20 | Notification 4/2018-CT | No longer hosted on cbic-gst.gov.in. The same amounts are confirmed for GSTR-3B (Circular 26/26/2017-GST). |
 | `penalty_rules` GSTR-4 daily fee | ₹50 a day, nil ₹20 | Notification 73/2017-CT | No longer hosted. |
@@ -50,7 +51,7 @@ Seeded rows are effective from 1 April 2025. When the law changes, add a row wit
 - **The Income-tax Act, 2025 applies from 1 April 2026** (tax year 2026-27, the filings the app creates now). Its
   thresholds, due dates and fees are the same as the 1961 Act's for everything above (incometax.gov.in FAQs); the
   TDS returns are called Form 138 (was 24Q) and Form 140 (was 26Q) and new ITR forms come under the Income-tax
-  Rules, 2026. The app keeps the old names.
+  Rules, 2026. The app keeps the old codes and shows the new names for tax year 2026-27 onwards (`RENAMED_FORMS`).
 
 ## Verified values
 
