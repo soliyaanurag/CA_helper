@@ -244,6 +244,21 @@ function CaCard({ ca, service, search }) {
             </p>
           )}
           {offersNone && <p className="text-muted-foreground">Offers none of your filings.</p>}
+          {ranked && ca.match_reasons.length > 0 && (
+            <div aria-label="Why this CA">
+              <p className="font-medium">
+                Why this CA <span className="text-muted-foreground">(match {ca.match_score})</span>
+              </p>
+              <ul className="list-disc pl-5">
+                {ca.match_reasons.map((reason) => (
+                  <li key={reason.reason}>
+                    {reason.reason}{" "}
+                    <span className="text-muted-foreground">(+{reason.points})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex flex-wrap gap-1">
             {ca.specializations.map((code) => (
               <Badge key={code} variant="outline">
