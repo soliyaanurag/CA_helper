@@ -1,5 +1,6 @@
 """Encrypted file storage for uploads (CLAUDE.md rule 4: files are encrypted at rest).
 
+    check_file(data, "application/pdf")        the type and size checks only
     key = save_file(data, "application/pdf")   checks type and size, encrypts, writes
     data = open_file(key)                      reads and decrypts
     delete_file(key)                           removes the file (only when its save failed:
@@ -40,8 +41,8 @@ def _path(key: str) -> Path:
     return _folder() / key
 
 
-def save_file(data: bytes, mime_type: str) -> str:
-    """Encrypt and store an uploaded file; returns its storage key.
+def check_file(data: bytes, mime_type: str) -> None:
+    """The checks every upload passes, also for files that are only read, never stored.
 
     400 FILE_EMPTY, 400 FILE_TYPE_NOT_ALLOWED (not a real PDF/JPG/PNG),
     400 FILE_TOO_LARGE (over MAX_UPLOAD_MB).
@@ -54,6 +55,11 @@ def save_file(data: bytes, mime_type: str) -> str:
         raise ApiError(400, "FILE_TYPE_NOT_ALLOWED", "Upload a PDF, JPG or PNG file.")
     if len(data) > max_mb * 1024 * 1024:
         raise ApiError(400, "FILE_TOO_LARGE", f"The file is larger than {max_mb} MB.")
+
+
+def save_file(data: bytes, mime_type: str) -> str:
+    """Encrypt and store an uploaded file; returns its storage key. Errors: check_file()."""
+    check_file(data, mime_type)
     key = uuid.uuid4().hex
     folder = _folder()
     folder.mkdir(parents=True, exist_ok=True)

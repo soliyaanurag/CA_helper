@@ -246,3 +246,23 @@ class NicCodeInputSchema(Schema):
 class GstStateSchema(Schema):
     name = fields.String(required=True)
     code = fields.String(required=True)  # the first two digits of a GSTIN from this state
+
+
+class RegistrationUploadSchema(Schema):
+    """POST /onboarding/autofill (multipart/form-data): a GST certificate or PAN card."""
+
+    file = fields.Raw(required=True, metadata={"type": "string", "format": "binary"})
+
+
+class RegistrationFieldsSchema(Schema):
+    pan = fields.String()
+    gstin = fields.String()
+    legal_name = fields.String()
+    state = fields.String()
+    entity_type = fields.Enum(EntityType, by_value=True)
+
+
+class AutofillSchema(Schema):
+    """What the document showed; only the fields that were found."""
+
+    found = fields.Nested(RegistrationFieldsSchema, required=True)

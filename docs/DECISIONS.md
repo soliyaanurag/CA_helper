@@ -4,6 +4,28 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-29: Local OCR (B2: ON12, ON13, DO8, DO9, CO10 filed–verified)
+
+**What**
+- **Tools (asked and approved):** `PyMuPDF==1.28.2` (pip) reads PDF text and turns scanned pages into pictures;
+  the **`tesseract` program** comes from conda-forge (`tesseract=5` in `environment.yml`; CI: `apt-get install
+  tesseract-ocr`). `CLAUDE.md`'s conda rule now allows python, nodejs, pip **and tesseract** (a program, not a
+  Python library). We call `tesseract stdin stdout` with `subprocess`, so no `pytesseract` and no Pillow.
+- **OCR runs in the upload request**, in `documents_service.on_document_uploaded(document, data)` (the hook now gets
+  the bytes), and never makes an upload fail. First 3 pages only, English.
+- **Only non-personal facts are stored** in `documents.ocr_fields` (number, date, forms, periods, type guess), never
+  the text, PAN, GSTIN or names (rule 4). Auto-fill (ON13) reads the file in memory and stores nothing.
+- **Filed–verified rule (DO8):** the acknowledgement must name the form, show the period, carry a number (the same as
+  a typed ARN) and a filing date on or after the period's end. Verified → `filed_verified` + `verified_at`; an empty
+  ARN is filled from the file. Not verified → stays `filed` and the page lists what did not match. The same check
+  runs when the CA marks a filing filed (CW5).
+- **Document-type check (DO9)** compares a keyword guess with the type chosen at upload, not with the checklist
+  entry (checklist keys have no document type); the vault shows "Looks like: ...".
+- `storage.check_file()` split out of `save_file()` (shared code), so a file can be checked without being stored.
+
+**Why:** proof of filing is one of the platform's three promises (track, guide, verify); doing it locally keeps
+documents on our server (rule 2), and a rule anyone can read keeps "verified" explainable.
+
 ## 2026-09-29: Gemini: retry only 503, and log the model and Google's reason
 
 **What**

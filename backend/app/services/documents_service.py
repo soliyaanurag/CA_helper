@@ -2,7 +2,8 @@
 
 Used by other modules (no commit):
 add_document(owner_id, uploaded_by_id, upload, doc_type) -> Document   store a file
-on_document_uploaded(document)                                         hook for OCR (a no-op)
+on_document_uploaded(document, data)                                   local OCR (ON12, DO8, DO9)
+verify_acknowledgement(document, filing) -> dict                       proves the filing? (DO8)
 read_document(document_id) -> (Document, bytes)                        its metadata and contents
 remove_document(document_id)                                           soft delete
 document_ids_for_filings(filing_ids) -> set                            documents linked to filings
@@ -32,17 +33,18 @@ other while it is being imported.
 
 import hashlib
 import logging
+from datetime import date
 
 from sqlalchemy import or_, select
 
 from app.errors import ApiError
 from app.extensions import db
 from app.models import ComplianceItemDocument, Document, User
-from app.models.base import utcnow
-from app.models.documents import DocumentType
+from app.models.base import today_in_india, utcnow
+from app.models.documents import DocumentType, OcrStatus
 from app.models.enums import UserRole
 from app.services import compliance_service, marketplace_service
-from app.utils import storage
+from app.utils import document_text, ocr, storage
 
 log = logging.getLogger(__name__)
 
@@ -72,16 +74,114 @@ def add_document(owner_id, uploaded_by_id, upload, doc_type: DocumentType) -> Do
     db.session.add(document)
     db.session.flush()  # gives document.id
     log.info("Stored a %s document (%d bytes)", doc_type, len(data))
-    on_document_uploaded(document)
+    on_document_uploaded(document, data)
     return document
 
 
-def on_document_uploaded(document: Document) -> None:
-    """Called for every new document, right after its row is added. Does not commit.
+def on_document_uploaded(document: Document, data: bytes) -> None:
+    """Read every new file locally and keep what it shows (ON12, DO8, DO9). Does not commit.
 
-    A no-op for now: this is where local OCR (DO8, DO9) will read the file and fill
-    `ocr_status` and `ocr_fields`. It must never send the file anywhere (rule 2).
+    `ocr_fields` gets only non-personal facts (acknowledgement number, filing date, forms,
+    periods, a type guess; app/utils/document_text.py). The text itself and any PAN,
+    GSTIN or name are never stored, and the file never leaves the server (rules 2, 4).
+    OCR never makes an upload fail: an unreadable file is saved with ocr_status "failed".
     """
+    try:
+        text = ocr.extract_text(data, document.mime_type)
+    except ocr.OcrError as error:
+        document.ocr_status = OcrStatus.FAILED
+        document.ocr_fields = {"error": str(error)}
+        return
+    except Exception:  # an unexpected library error must not lose the upload
+        log.exception("OCR failed for document %s", document.id)
+        document.ocr_status = OcrStatus.FAILED
+        document.ocr_fields = {"error": "The file could not be read."}
+        return
+    document.ocr_fields = document_text.read_proof_fields(text, today_in_india())
+    document.ocr_status = OcrStatus.PROCESSED
+
+
+def type_warning(document: Document) -> DocumentType | None:
+    """DO9: the type the file looks like when it differs from the type it was uploaded as
+    (e.g. "bank_statement" for a file uploaded as an invoice), else None."""
+    guess = (document.ocr_fields or {}).get("type_guess")
+    if guess is None or guess == document.doc_type or document.doc_type == DocumentType.OTHER:
+        return None
+    return DocumentType(guess)
+
+
+def _quarter_months(filing) -> list[tuple[int, int]]:
+    """(year, month) of every month of the filing's period, e.g. Jul, Aug, Sep 2026."""
+    months = []
+    year, month = filing.period_start.year, filing.period_start.month
+    while (year, month) <= (filing.period_end.year, filing.period_end.month):
+        months.append((year, month))
+        month = month + 1
+        if month > 12:
+            month = 1
+            year = year + 1
+    return months
+
+
+def _period_shown(fields: dict, filing) -> bool:
+    """Does the acknowledgement show the filing's period?
+
+    A month: "September" with the financial year, or "092026". A quarter: the financial
+    year with "Q2" or one of its months. A year: the financial year; an ITR may show the
+    assessment year instead (the year after, "2027-28" for FY 2026-27).
+    """
+    years = fields.get("financial_years", [])
+    fy_start = int(filing.fy[:4])
+    assessment_year = f"{fy_start + 1}-{str(fy_start + 2)[2:]}"
+    months = _quarter_months(filing)
+    if len(months) == 12:  # a whole financial year
+        return filing.fy in years or (filing.form_code == "itr" and assessment_year in years)
+    for year, month in months:
+        if f"{year}-{month:02d}" in fields.get("months_with_year", []):
+            return True
+    if filing.fy not in years:
+        return False
+    if len(months) == 1:
+        return months[0][1] in fields.get("months", [])
+    quarter = int(filing.period_label[1]) if filing.period_label.startswith("Q") else None
+    named_month = any(month in fields.get("months", []) for _, month in months)
+    return quarter in fields.get("quarters", []) or named_month
+
+
+def verify_acknowledgement(document: Document, filing) -> dict:
+    """Does this acknowledgement prove this filing? (DO8)
+
+    It must name the form, show the period, have an acknowledgement / ARN number (the
+    same as the one typed, if any) and a filing date on or after the period's end.
+    Returns {verified, problems (what did not match, for the page), acknowledgement_no,
+    filing_date}.
+    """
+    fields = document.ocr_fields or {}
+    found = {
+        "acknowledgement_no": fields.get("acknowledgement_no"),
+        "filing_date": fields.get("filing_date"),
+    }
+    if document.ocr_status != OcrStatus.PROCESSED:
+        reason = fields.get("error") or "The file has not been read yet."
+        return {"verified": False, "problems": [reason], **found}
+
+    problems = []
+    form_name = compliance_service.FORM_FOLDERS[filing.form_code]
+    if filing.form_code not in fields.get("form_codes", []):
+        problems.append(f"It does not name the form {form_name}.")
+    if not _period_shown(fields, filing):
+        problems.append(f"It does not show the period {filing.period_label}.")
+    number = found["acknowledgement_no"]
+    typed = (filing.acknowledgement_no or "").replace(" ", "").upper()
+    if number is None:
+        problems.append("No acknowledgement or ARN number was found.")
+    elif typed and typed != number:
+        problems.append(f"Its number ({number}) is not the one typed ({typed}).")
+    if found["filing_date"] is None:
+        problems.append("No filing date was found.")
+    elif date.fromisoformat(found["filing_date"]) < filing.period_end:
+        problems.append("Its date is before the end of the period.")
+    return {"verified": not problems, "problems": problems, **found}
 
 
 def read_document(document_id) -> tuple[Document, bytes]:
@@ -211,6 +311,7 @@ def _describe(documents) -> list[dict]:
             "fy": document.fy,
             "period_label": document.period_label,
             "ocr_status": document.ocr_status,
+            "type_warning": type_warning(document),
             "created_at": document.created_at,
             "links": [],
             "acknowledgement_of": [],

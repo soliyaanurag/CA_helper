@@ -456,7 +456,7 @@ The same seven codes start `ca_profiles.specializations`, so "CAs for this form"
 | `ready` | Ready | |
 | `with_ca` | With CA | set from marketplace engagements |
 | `filed` | Filed | |
-| `filed_verified` | Filed–verified | acknowledgement verified (OCR) |
+| `filed_verified` | Filed–verified | set when the uploaded acknowledgement shows the form, period, number and date (OCR, DO8) |
 | `overdue` | Overdue | set by the hourly worker job from `upcoming`, `docs_pending` or `ready` once the due date has passed; a `with_ca` filing stays `with_ca` |
 
 Lifecycle: `upcoming → docs_pending → ready → with_ca → filed → filed_verified`, plus `overdue` from the states
@@ -480,7 +480,10 @@ before `with_ca` (the CA handles a late `with_ca` filing; pages show how late it
 | `certificate_of_practice` | Certificate of Practice (CA) |
 | `other` | Other |
 
-**`documents.ocr_status`** (`OcrStatus`): `none` Not processed · `processed` Processed · `failed` Failed
+**`documents.ocr_status`** (`OcrStatus`): `none` Not processed · `processed` Processed · `failed` Failed.
+`documents.ocr_fields` (JSONB) holds only non-personal facts found by OCR: `acknowledgement_no`, `filing_date`,
+`form_codes`, `months`, `months_with_year`, `financial_years`, `quarters`, `type_guess`; or `{"error": "..."}` when
+`failed`. Never the text, PAN, GSTIN or names (rule 4).
 
 **`notifications.type`, `notification_settings.type`** (alerts; `NotificationType` in `backend/app/models/alerts.py`)
 

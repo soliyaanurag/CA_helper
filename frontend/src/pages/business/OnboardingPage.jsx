@@ -9,6 +9,7 @@ import { errorMessage } from "@/api/client";
 import { FILINGS_KEY } from "@/api/compliance";
 import {
   MY_BUSINESS_KEY,
+  readRegistrationDocument,
   registerBusiness,
   updateBusiness,
   useGstStates,
@@ -208,6 +209,7 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
@@ -261,6 +263,7 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!business && <FillFromDocument setValue={setValue} />}
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField
@@ -433,6 +436,86 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+// The form fields ON13 can fill, with the names people see.
+const FILLABLE = {
+  legal_name: "business name",
+  entity_type: "type of business",
+  state: "state",
+  pan: "PAN",
+  gstin: "GSTIN",
+};
+
+/**
+ * ON13: "Fill in from a document". The server reads a GST certificate or PAN card with
+ * OCR (locally; the file is not stored) and the found values go into the form. The user
+ * checks them before registering.
+ */
+function FillFromDocument({ setValue }) {
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    setMessage(null);
+    setError(null);
+    setBusy(true);
+    try {
+      const { found } = await readRegistrationDocument(file);
+      const filled = [];
+      for (const [field, name] of Object.entries(FILLABLE)) {
+        if (found[field]) {
+          setValue(field, found[field], { shouldValidate: true });
+          filled.push(name);
+        }
+      }
+      if (found.gstin) setValue("gst_registered", true);
+      setMessage(
+        filled.length
+          ? `Filled in: ${filled.join(", ")}. Check them before you register.`
+          : "We could not find any details in this file. Please type them in.",
+      );
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+      event.target.value = ""; // the same file can be chosen again
+    }
+  }
+
+  return (
+    <div className="mb-6 space-y-2 rounded-lg border border-dashed p-4">
+      <Label htmlFor="autofill_file">
+        Fill in from your GST certificate or PAN card (optional)
+      </Label>
+      <input
+        id="autofill_file"
+        type="file"
+        accept="application/pdf,image/jpeg,image/png"
+        className="block text-sm"
+        disabled={busy}
+        onChange={onFile}
+      />
+      <p className="text-xs text-muted-foreground">
+        {busy
+          ? "Reading the file..."
+          : "The file is read on our server and not kept. Nothing is saved until you register."}
+      </p>
+      {message && (
+        <p role="status" className="text-sm">
+          {message}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

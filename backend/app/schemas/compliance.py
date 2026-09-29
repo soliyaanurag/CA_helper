@@ -72,9 +72,25 @@ class FilingDetailItemSchema(ComplianceItemSchema):
     acknowledgement_no = fields.String(allow_none=True)
 
 
+class VerificationSchema(Schema):
+    """What the acknowledgement file shows, read locally with OCR (DO8)."""
+
+    verified = fields.Boolean(required=True)
+    problems = fields.List(
+        fields.String(), required=True, metadata={"description": "What did not match"}
+    )
+    acknowledgement_no = fields.String(
+        allow_none=True, metadata={"description": "The number found"}
+    )
+    filing_date = fields.String(
+        allow_none=True, metadata={"description": "The date found, YYYY-MM-DD"}
+    )
+
+
 class AcknowledgementSchema(Schema):
     filename = fields.String(required=True)
     uploaded_at = fields.DateTime(required=True)
+    verification = fields.Nested(VerificationSchema, required=True)
 
 
 class FilingDetailSchema(Schema):

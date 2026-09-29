@@ -29,6 +29,11 @@ cryptography==50.0.1
 # Reads content/forms/<FORM>/checklist.yaml (compliance form content, CO6).
 PyYAML==6.0.3
 
+# --- OCR (local only, CLAUDE.md rule 2) ---
+# Reads the text of PDFs and turns PDF pages into images for Tesseract (app/utils/ocr.py).
+# The `tesseract` program itself comes from conda (environment.yml).
+PyMuPDF==1.28.2
+
 # --- Background jobs (worker process only) ---
 APScheduler==3.11.3
 

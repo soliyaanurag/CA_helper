@@ -460,6 +460,8 @@ def get_filing(business, item_id) -> dict:
         acknowledgement = {
             "filename": document.original_filename,
             "uploaded_at": document.created_at,
+            # Why it is (not) verified, read from the file (DO8).
+            "verification": documents_service.verify_acknowledgement(document, filing),
         }
     return {
         "filing": filing,
@@ -537,8 +539,14 @@ def mark_filed(business, user: User, item_id, acknowledgement_no=None, upload=No
 
 def _record_filed(filing, owner_id, uploader: User, path, acknowledgement_no, upload) -> None:
     """Status "filed" with the optional ARN and acknowledgement file (owned by the business
-    owner, uploaded by `uploader`). Does not commit."""
-    if upload is not None:
+    owner, uploaded by `uploader`). Does not commit.
+
+    With a file, the acknowledgement is read locally (documents_service, OCR) and, when it
+    shows this form, period, a number and a filing date, the filing becomes
+    "filed_verified" (CO10, DO8). An ARN found in the file fills an empty ARN.
+    """
+    document = None
+    if upload is not None:  # stored first: a refused file changes nothing
         document = documents_service.add_document(
             owner_id, uploader.id, upload, DocumentType.ACKNOWLEDGEMENT
         )
@@ -549,6 +557,13 @@ def _record_filed(filing, owner_id, uploader: User, path, acknowledgement_no, up
     filing.filing_path = path
     filing.filed_at = utcnow()
     filing.acknowledgement_no = acknowledgement_no or None
+    if document is None:
+        return
+    result = documents_service.verify_acknowledgement(document, filing)
+    if result["verified"]:
+        filing.status = ComplianceStatus.FILED_VERIFIED
+        filing.verified_at = utcnow()
+        filing.acknowledgement_no = filing.acknowledgement_no or result["acknowledgement_no"]
 
 
 def unmark_filed(business, item_id) -> dict:
@@ -557,13 +572,14 @@ def unmark_filed(business, item_id) -> dict:
     409 NOT_SELF_FILED otherwise.
     """
     filing = _own_filing(business, item_id)
-    if filing.status != ComplianceStatus.FILED or filing.filing_path != FilingPath.SELF:
+    if filing.status not in DONE_STATUSES or filing.filing_path != FilingPath.SELF:
         raise ApiError(409, "NOT_SELF_FILED", "Only a filing you marked as filed can be undone.")
     if filing.acknowledgement_document_id is not None:
         documents_service.remove_document(filing.acknowledgement_document_id)
     filing.acknowledgement_document_id = None
     filing.acknowledgement_no = None
     filing.filed_at = None
+    filing.verified_at = None
     filing.status = ComplianceStatus.UPCOMING
     _refresh_status(filing, today_in_india())
     db.session.commit()

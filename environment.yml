@@ -1,7 +1,8 @@
 # Shared conda environment for CA Helper. Every member uses exactly this file.
 #
 # Rules (see CLAUDE.md → "Conda rules"):
-#   - conda installs ONLY python, nodejs and pip (from conda-forge).
+#   - conda installs ONLY python, nodejs, pip and tesseract (from conda-forge);
+#     tesseract is the OCR program, not a Python library.
 #   - ALL Python packages come from pip via backend/requirements*.txt,
 #     the same files CI uses.
 #   - nodejs (with npm) runs the frontend tooling; every npm command runs through
@@ -17,6 +18,8 @@ channels:
 dependencies:
   - python=3.12
   - nodejs=22
+  # The Tesseract OCR program (app/utils/ocr.py reads photos and scans with it, locally).
+  - tesseract=5
   - pip
   - pip:
       - -r backend/requirements-dev.txt

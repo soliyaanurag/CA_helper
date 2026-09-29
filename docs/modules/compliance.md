@@ -9,7 +9,7 @@ The whole business side of a filing works: templates, due dates and filing creat
 filed with the acknowledgement (CO9), the status lifecycle up to `filed` (CO10), the hourly overdue job (CO11) and
 the dashboard numbers (CO12). The penalty estimate on the filing page and the dashboard comes from the alerts
 module (AL5; its own endpoints, shown by `FilingPage` and `BusinessDashboardPage`). Peer insights (CO13) and the
-admin's filing numbers (AD5) are below. Not yet: `filed_verified` from OCR (DO8; the demo seed sets it by hand).
+admin's filing numbers (AD5) are below. `filed_verified` is set from the acknowledgement (DO8, OCR; see below).
 - **Peer insights (CO13):** `peer_insights(business, item_id)`: over the **filed** filings of the same form, the
   share filed by the business itself vs through a CA (`filing_path`) and each path's on-time rate (`filed_on_time`:
   the Indian date of `filed_at` ≤ `due_date`). The segment is the same entity type and MSME tier
@@ -90,6 +90,14 @@ admin's filing numbers (AD5) are below. Not yet: `filed_verified` from OCR (DO8;
   unregistered), `test_compliance_overdue.py`, `test_compliance_due_dates.py`, `test_compliance_items.py`;
   frontend `FilingPage.test.jsx`, `CompliancePage.test.jsx`, `BusinessDashboardPage.test.jsx`.
 
+- **Filed–verified (CO10, DO8):** `_record_filed()` (used by `mark_filed` and the CA's `mark_filed_by_ca`) stores the
+  acknowledgement first, then asks `documents_service.verify_acknowledgement(document, filing)`; when the file shows
+  this form, the period, a number (the same as the typed ARN, if any) and a filing date on or after the period's
+  end, the filing becomes `filed_verified` with `verified_at`, and an empty ARN is filled from the file. Otherwise it
+  stays `filed`. `get_filing()` returns `acknowledgement.verification` = `{verified, problems, acknowledgement_no,
+  filing_date}`; the filing page shows "Filed and verified" or the list of problems. "Undo" also works for a
+  verified self-filed filing (clears `verified_at`).
+
 ## Tables
 Created by migration `schema: complete data model`. Columns, constraints and status values: `docs/DATA_MODEL.md`. Model file: `backend/app/models/compliance.py`.
 - `obligation_templates` (config): form code, frequency, applicability and due-date rule (JSONB), `source_reference`, `effective_from/to`. Seeded (9 rows).
@@ -150,6 +158,6 @@ onboarding (the regulatory profile, passed in by `register_business()`), core-au
 - The yearly ITR filing is the current year's (FY 2026-27, due in 2027); last year's return is not added.
 - A late `with_ca` filing keeps `with_ca` (not `overdue`); `SCOPE.md` says overdue is reachable from any pre-filed state. See `DECISIONS.md` (2026-09-28).
 - **The form content is a first draft** (`status: DRAFT`), not checked against the official sources yet.
-- `filed_verified` is never set yet: it needs the acknowledgement OCR (DO8).
+- Verification (DO8) trusts what the acknowledgement's text shows; a forged PDF with the right words would pass. It only reads the first 3 pages and English text.
 - A CA cannot open a filing page yet, and cannot mark a filing filed (CW3, CW5); a `with_ca` filing can only be finished by the CA.
 - The penalty figures are "pending" until the `penalty_rules` amounts are verified (alerts, `docs/TODO_VERIFY.md`).

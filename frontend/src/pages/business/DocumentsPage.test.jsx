@@ -213,3 +213,11 @@ describe("document vault", () => {
     expect(await screen.findByText("No documents here yet.")).toBeInTheDocument();
   });
 });
+
+describe("document type check (DO9)", () => {
+  it("warns when a file looks like another type", async () => {
+    open({ [`GET ${LIST}`]: [200, documents([{ ...SALES, type_warning: "bank_statement" }])] });
+
+    expect(await screen.findByText("Looks like: Bank statement")).toBeInTheDocument();
+  });
+});
