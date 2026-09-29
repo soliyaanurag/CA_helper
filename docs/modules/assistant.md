@@ -7,14 +7,14 @@ own content and official FAQs with citations, category-level profile awareness a
 ## What exists now
 AS1–AS5 work (B3).
 - **Knowledge base (AS1):** `assistant_service.ingest_knowledge()` (`flask assistant ingest` / `make assistant-ingest`)
-  reads `content/forms/<FORM>/explanation.md` + `instructions.md` (our guides, still DRAFT) and `content/faqs/*.md`
+  reads `content/forms/<FORM>/explanation.md` + `instructions.md` (our guides, reviewed against official pages) and `content/faqs/*.md`
   (official FAQ pages copied word for word, with their source URL: nil GSTR-3B, nil GSTR-1, IFF under QRMP and
   GSTR-2B from the GST portal user manual; returns for business / profession income from incometax.gov.in). Pages are
   cut into chunks of whole sections, at most `MAX_CHUNK` = 1500 characters (long sections at blank lines); writers'
   `<!-- -->` notes and front matter are removed. Each chunk is embedded as "title + text" with
   `gemini_client.embed_texts` (768 numbers). Only new or changed chunks are embedded; chunks whose text is gone are
   deleted (kb_chunks is reference data). Needs `GEMINI_API_KEY`; without it, 503 `GEMINI_UNAVAILABLE` and nothing
-  changes. Today: 72 chunks (14 guide pages, 58 FAQ chunks).
+  changes. Today: 80 chunks (22 from the guide pages, 58 FAQ chunks).
 - **Search (AS2):** the question is embedded (`RETRIEVAL_QUERY`) and pgvector finds the `TOP_K` = 5 closest chunks by
   cosine distance, **only those within `MAX_DISTANCE` = 0.40** (measured on our content: on-topic questions
   0.21–0.37, off-topic ones 0.44 and more). Without Gemini: the chunks sharing the most words with the question.
@@ -74,8 +74,8 @@ filings), marketplace (the "Ask a CA" link).
 - `content/faqs/` files are copied word for word, with `source` and `retrieved` in the front matter
 
 ## Known issues
-- **Our own guides are DRAFT** (not checked against official sources). The official FAQ copies are word for word but
-  dated 2026-09-28 and must be refreshed when the official pages change. No official TDS, CMP-08 or current GSTR-4
+- Our own guides were reviewed on 2026-09-29 (V1) and must be re-checked when the rules change. The official FAQ
+  copies are word for word but dated 2026-09-28 and must be refreshed when the official pages change. No official TDS, CMP-08 or current GSTR-4
   FAQs could be downloaded (those pages are built by JavaScript, or outdated), so those answers rest on our guides.
 - The free Gemini tier can answer 503 ("high demand") or 429 (quota used up); the chat then shows the passages it
   found.

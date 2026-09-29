@@ -5,7 +5,7 @@ All scheduled user alerts (T-7/T-3/T-1 and overdue reminders by email + tray), p
 
 ## What exists now
 The notification tray with the bell (AL1), email settings (AL3), the daily reminders (AL2), the penalty rules (AL4,
-every amount still empty) and the estimator on the filing page and the dashboard (AL5).
+checked against official sources on 29 Sep 2026, some still proposals) and the estimator on the filing page and the dashboard (AL5).
 - **Backend** (`services/alerts_service.py`, `routes/alerts.py`, `schemas/alerts.py`; model `models/alerts.py`):
   - **`notify(user, type, title, body, link=None, email=False)`** adds a tray entry (does not commit). With
     `email=True` it also emails `notification.txt`, unless the user switched that type off. The email is **queued
@@ -33,8 +33,9 @@ every amount still empty) and the estimator on the filing page and the dashboard
     `penalty_exposure(business)` adds the late fees of all overdue (late, not filed) filings; interest is not
     included (it needs each filing's tax). `label` is "Estimate (rules pending verification)" while a rule is
     `TODO_VERIFY`.
-  - `seed.py`: `seed_penalty_rules()` adds one rule per form (7 rows), **every amount NULL**, `TODO_VERIFY` in
-    `source_reference`, effective from 1 April 2025.
+  - `seed.py`: `seed_penalty_rules()` adds one rule per form (7 rows) with the values checked on 29 Sep 2026
+    (`PENALTY_RULES`, each with its official source; a value not read from an official text keeps `TODO_VERIFY`),
+    effective from 1 April 2025. Re-running the seed updates rows seeded earlier.
 - **Worker:** `alerts.reminders` runs `send_reminders` every day at 08:15 IST (`backend/worker.py`). On demand, for
   demos: `conda run -n ca-helper --cwd backend flask --app app alerts send-reminders [--date 2026-10-06]` (`--date`
   runs it as if it were that day; what it records counts as sent).
@@ -98,8 +99,10 @@ neither uses the other while it is being imported. Keep it that way (no `from ..
 - Every penalty figure is shown with its `label`; a NULL amount is never treated as 0
 
 ## Known issues
-- **Every penalty amount is NULL (`TODO_VERIFY`)**, so every estimate is "pending" until someone fills the rules
-  from official sources (`docs/TODO_VERIFY.md`, "Penalties"). The ITR's fixed fee goes in `flat_late_fee`.
+- **Some penalty values are still proposals** (`TODO_VERIFY`: the GSTR-1 and GSTR-4 daily fees, GST interest 18%,
+  ITR interest), so those estimates say "rules pending verification"; only the TDS rules are fully confirmed
+  (`docs/TODO_VERIFY.md`). Caps that depend on turnover or income store the small-business value (₹2,000 for GST
+  returns, ₹5,000 for the ITR); the TDS cap (the TDS of the statement) is not stored.
 - GST late fees and caps that depend on turnover, and fees that differ for CGST/SGST, cannot be expressed: one
   rule per form and period. Interest needs the tax due, which we do not store.
 - No "dismiss" for tray entries yet (the column exists).
