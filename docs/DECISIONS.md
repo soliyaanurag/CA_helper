@@ -4,6 +4,20 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-29: Gemini: retry only 503, and log the model and Google's reason
+
+**What**
+- Every Gemini client is built by one helper, `_client()` in `app/utils/gemini_client.py` (used by `ask_gemini` and
+  `embed_texts`). It retries **only 503** ("this model is currently experiencing high demand"), up to 3 attempts.
+  A **429** (quota used up) is no longer retried.
+- A failed call is logged with the model and Google's reason, e.g. `Gemini call failed (model gemini-3.6-flash):
+  429 RESOURCE_EXHAUSTED: You exceeded your current quota.` (Google's message never contains our prompt; errors
+  without a code, like a timeout, are logged by name).
+
+**Why:** retrying a 429 right away only used up more of the small free quota (one click could cost 3 requests), and
+the old log line ("ClientError") hid the cause: a wrong model name, a retired model and a used-up quota all looked
+the same.
+
 ## 2026-09-29: AI assistant (B3: AS1–AS5)
 
 **What**
@@ -42,7 +56,7 @@ keeps every answer checkable, and the relevance cut-off keeps unrelated question
 - **Nothing is sent before an admin approves** (module contract). Approval tells businesses with a not-filed filing
   of the forms that fit the change's GST schemes / entity types / states (tray + email), their active CAs (tray),
   and adds 15 urgency points for 30 days. Due dates are never changed automatically.
-- The Gemini client retries a 429/503 answer up to 3 times (Gemini often answers "high demand" for a moment).
+- The Gemini client retries a 503 ("high demand") answer up to 3 times; since 29 Sept not a 429 (see that entry).
 
 **Why:** the monitor must stay explainable and safe: public news only, the site's rules respected, an admin in the
 loop before anyone is alarmed, and no legal value (a due date) changed by a scraper or a model (rule 3).
