@@ -167,6 +167,14 @@ def test_answer_cites_the_sources_it_used(knowledge, gemini, owner):
     assert "GSTR-2B" not in gemini["prompts"][0].split("Sources:")[1].split("Question:")[0]
 
 
+def test_answer_question_uses_the_given_context_and_saves_nothing(knowledge, gemini, database):
+    result = assistant_service.answer_question("What is GSTR-3B?", "A test context.")
+
+    assert result["answer"] == "GSTR-3B is the summary return [1]."
+    assert "A test context." in gemini["prompts"][0]
+    assert database.session.query(ChatMessage).count() == 0
+
+
 def test_the_prompt_has_categories_but_no_personal_data(
     knowledge, gemini, owner, business_with_filings, database
 ):

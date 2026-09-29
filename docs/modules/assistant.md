@@ -18,7 +18,9 @@ AS1–AS5 work (B3).
 - **Search (AS2):** the question is embedded (`RETRIEVAL_QUERY`) and pgvector finds the `TOP_K` = 5 closest chunks by
   cosine distance, **only those within `MAX_DISTANCE` = 0.40** (measured on our content: on-topic questions
   0.21–0.37, off-topic ones 0.44 and more). Without Gemini: the chunks sharing the most words with the question.
-- **Answer (AS2):** `ask(user, question)`: Gemini gets `PROMPT` (answer only from the numbered sources, cite them as
+- **Answer (AS2):** `answer_question(question, context)` does the work and saves nothing (also used by
+  `eval/assistant/evaluate.py`); `ask(user, question)` calls it with `user_context(user)` and saves both messages.
+  In detail, Gemini gets `PROMPT` (answer only from the numbered sources, cite them as
   [n], plain English, no amount / rate / limit / date that is not in the sources, "ask_a_ca" when a professional is
   needed), the user context and the chunks, and replies with JSON `{answer, sources, ask_a_ca}`; cited numbers
   outside the sources are dropped (numbers written in the text are picked up too). Nothing relevant found → "I could
