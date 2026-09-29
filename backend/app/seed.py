@@ -11,14 +11,15 @@ verified practice profile, and four sample CAs (sample-ca-N@demo.local, random
 passwords nobody knows, so they cannot log in) fill the marketplace list. The
 service catalog is seeded here too (an admin editor comes later), and the four
 sample CAs get prices so some typical price ranges show up. The legal rule
-thresholds and the obligation templates of the 7 forms are seeded too, all marked
-TODO_VERIFY until someone checks them (docs/TODO_VERIFY.md). The penalty rules of the 7
-forms are seeded with every amount empty (NULL, TODO_VERIFY): no amount is confirmed yet.
+thresholds, the obligation templates and the penalty rules of the 7 forms are seeded too,
+each with its official source; the values not confirmed yet are marked TODO_VERIFY
+(docs/TODO_VERIFY.md). These three seeds also update rows seeded earlier, so a corrected
+value reaches every database on the next `make seed` / `make sync`.
 The official NIC activity codes are loaded from content/reference/nic_2008.csv, and the
 regulatory monitor's news sources are added.
 
 Every seed function
-must be safe to re-run (it skips rows that already exist) and must not commit:
+must be safe to re-run (it skips or updates rows that already exist) and must not commit:
 run_all_seeds() commits once at the end. Add a new table's seed function to SEEDS.
 """
 
@@ -371,11 +372,17 @@ def seed_ca_prices() -> None:
 
 
 # --- Legal values (CLAUDE.md rule 3) ----------------------------------------------
-# NOT VERIFIED YET. Every value below is marked TODO_VERIFY and listed in
-# docs/TODO_VERIFY.md. When someone checks a value against the official source,
-# they update its row here (value + source) and in that file.
+# Checked against official sources on 29 Sep 2026 (docs/TODO_VERIFY.md, "Verified values").
+# A value whose source_reference still contains TODO_VERIFY is a proposal nobody has
+# confirmed from an official text yet. When the law changes, add a row with a new
+# effective_from instead of editing the old one.
 
 RULES_FROM = date(2025, 4, 1)  # effective_from of every value below
+
+MSME_SOURCE = (
+    "Udyam Registration portal (udyamregistration.gov.in), MSME classification from "
+    "1 April 2025 (MSMED Act; notification S.O. 1364(E), 21.03.2025)"
+)
 
 # (key, value, unit, description, source_reference)
 RULE_THRESHOLDS = [
@@ -384,99 +391,112 @@ RULE_THRESHOLDS = [
         "25000000",
         "inr",
         "Micro: investment up to ₹2.5 crore",
-        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+        MSME_SOURCE,
     ),
     (
         "msme.micro.max_turnover",
         "100000000",
         "inr",
         "Micro: turnover up to ₹10 crore",
-        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+        MSME_SOURCE,
     ),
     (
         "msme.small.max_investment",
         "250000000",
         "inr",
         "Small: investment up to ₹25 crore",
-        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+        MSME_SOURCE,
     ),
     (
         "msme.small.max_turnover",
         "1000000000",
         "inr",
         "Small: turnover up to ₹100 crore",
-        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+        MSME_SOURCE,
     ),
     (
         "msme.medium.max_investment",
         "1250000000",
         "inr",
         "Medium: investment up to ₹125 crore",
-        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+        MSME_SOURCE,
     ),
     (
         "msme.medium.max_turnover",
         "5000000000",
         "inr",
         "Medium: turnover up to ₹500 crore",
-        "TODO_VERIFY: MSME classification limits, Ministry of MSME",
+        MSME_SOURCE,
     ),
     (
         "gst.registration.min_turnover",
         "2000000",
         "inr",
         "GST registration needed above ₹20 lakh (lower limit, for services)",
-        "TODO_VERIFY: CGST Act section 22 and notifications",
+        "CBIC, 'GST - An Update' (1 May 2019), cbic-gst.gov.in: registration needed above "
+        "₹20 lakh for services (₹10 lakh in Manipur, Mizoram, Nagaland, Tripura) and ₹40 lakh "
+        "for goods (₹20 lakh in some states); CGST Act s.22, Notification 10/2019-CT",
     ),
     (
         "gst.qrmp.max_turnover",
         "50000000",
         "inr",
         "Quarterly returns (QRMP) allowed up to ₹5 crore",
-        "TODO_VERIFY: QRMP scheme, CBIC",
+        "GST portal FAQ 'Quarterly Return and Monthly Payment (QRMP) Scheme' "
+        "(tutorial.gst.gov.in/userguide/returns/FAQs_change_profile.htm)",
     ),
     (
         "gst.composition.max_turnover",
         "15000000",
         "inr",
         "Composition scheme allowed up to ₹1.5 crore (goods)",
-        "TODO_VERIFY: CGST Act section 10 and notifications",
+        "CBIC, 'GST - An Update' (1 May 2019): composition up to ₹1.5 crore for goods "
+        "(₹75 lakh in special category states); CGST Act s.10, Notification 14/2019-CT",
     ),
     (
         "itr.presumptive_44ad.max_turnover",
         "20000000",
         "inr",
         "Presumptive scheme (44AD) allowed up to ₹2 crore",
-        "TODO_VERIFY: Income-tax Act section 44AD",
+        "incometax.gov.in, File ITR-4 (Sugam) FAQ Q9: s.44AD up to ₹2 crore (₹3 crore when "
+        "cash receipts are at most 5%)",
     ),
     (
         "itr.audit_44ab.min_turnover",
         "10000000",
         "inr",
         "Tax audit needed above ₹1 crore",
-        "TODO_VERIFY: Income-tax Act section 44AB",
+        "incometax.gov.in, Income Tax Forms FAQ: tax audit above ₹1 crore for a business "
+        "(₹10 crore when cash is at most 5%); s.44AB of the 1961 Act, s.63 of the 2025 Act",
     ),
 ]
 
 
+def _upsert(model, lookup: dict, values: dict) -> None:
+    """Add the row found by `lookup`, or give an existing one the current `values`."""
+    stmt = select(model)
+    for column, value in lookup.items():
+        stmt = stmt.where(getattr(model, column) == value)
+    row = db.session.scalar(stmt)
+    if row is None:
+        db.session.add(model(**lookup, **values))
+        return
+    for column, value in values.items():
+        setattr(row, column, value)
+
+
 def seed_rule_thresholds() -> None:
     for key, value, unit, description, source in RULE_THRESHOLDS:
-        exists = db.session.scalar(
-            select(RuleThreshold.id).where(
-                RuleThreshold.key == key, RuleThreshold.effective_from == RULES_FROM
-            )
+        _upsert(
+            RuleThreshold,
+            {"key": key, "effective_from": RULES_FROM},
+            {
+                "value": Decimal(value),
+                "unit": unit,
+                "description": description,
+                "source_reference": source,
+            },
         )
-        if not exists:
-            db.session.add(
-                RuleThreshold(
-                    key=key,
-                    value=Decimal(value),
-                    unit=unit,
-                    description=description,
-                    source_reference=source,
-                    effective_from=RULES_FROM,
-                )
-            )
 
 
 # How each form applies and when it is due. Due-date rules (compliance_service.due_date):
@@ -487,14 +507,17 @@ def seed_rule_thresholds() -> None:
 # Applicability: every key must match the regulatory profile, e.g. {"gst_scheme": [...]};
 # {} means every business.
 # (form, name, frequency, applicability, due_date_rule, source_reference)
+GST_FAQ = "tutorial.gst.gov.in/userguide/returns/"
 OBLIGATION_TEMPLATES = [
     (
         FormCode.ITR,
         "Income tax return",
         Frequency.YEARLY,
         {},
-        {"month": 7, "day": 31, "audit_month": 10, "audit_day": 31},
-        "TODO_VERIFY: Income-tax Act section 139(1)",
+        {"month": 8, "day": 31, "audit_month": 10, "audit_day": 31},
+        "incometax.gov.in, Income Tax Returns FAQ Q16 and Q24: 31 August for non-audit cases "
+        "(31 July only for returns without business income), 31 October with a tax audit; "
+        "s.139(1) of the 1961 Act, s.263 of the 2025 Act as amended by Finance Act 2026",
     ),
     (
         FormCode.GSTR_1,
@@ -502,7 +525,7 @@ OBLIGATION_TEMPLATES = [
         Frequency.MONTHLY,
         {"gst_scheme": ["regular_monthly"]},
         {"day": 11},
-        "TODO_VERIFY: CGST Rules rule 59",
+        f"GST portal FAQ 'Form GSTR-1' Q10 ({GST_FAQ}GSTR_1.htm): 11th of the next month",
     ),
     (
         FormCode.GSTR_1,
@@ -510,7 +533,7 @@ OBLIGATION_TEMPLATES = [
         Frequency.QUARTERLY,
         {"gst_scheme": ["regular_qrmp"]},
         {"quarters": [[7, 13], [10, 13], [1, 13], [4, 13]]},
-        "TODO_VERIFY: CGST Rules rule 59, QRMP",
+        f"GST portal FAQ 'Form GSTR-1' Q10 ({GST_FAQ}GSTR_1.htm): 13th after the quarter",
     ),
     (
         FormCode.GSTR_3B,
@@ -518,7 +541,7 @@ OBLIGATION_TEMPLATES = [
         Frequency.MONTHLY,
         {"gst_scheme": ["regular_monthly"]},
         {"day": 20},
-        "TODO_VERIFY: CGST Rules rule 61",
+        f"GST portal FAQ 'Form GSTR-3B' ({GST_FAQ}GSTR3B.htm): 20th of the next month",
     ),
     (
         FormCode.GSTR_3B,
@@ -526,7 +549,9 @@ OBLIGATION_TEMPLATES = [
         Frequency.QUARTERLY,
         {"gst_scheme": ["regular_qrmp"]},
         {"quarters": [[7, 22], [10, 22], [1, 22], [4, 22]]},
-        "TODO_VERIFY: CGST Rules rule 61, QRMP (22nd or 24th by state)",
+        f"GST portal FAQ 'Form GSTR-3B' ({GST_FAQ}GSTR3B.htm) and GSTN QRMP advisory Q28: "
+        "22nd or 24th after the quarter by state; the app uses the 22nd for every state "
+        "(the earlier date; docs/DECISIONS.md 2026-09-29)",
     ),
     (
         FormCode.CMP_08,
@@ -534,15 +559,18 @@ OBLIGATION_TEMPLATES = [
         Frequency.QUARTERLY,
         {"gst_scheme": ["composition"]},
         {"quarters": [[7, 18], [10, 18], [1, 18], [4, 18]]},
-        "TODO_VERIFY: CGST Rules rule 62",
+        f"GST portal FAQ 'Filing Form GST CMP-08' Q3 ({GST_FAQ}FAQs_CMP02.htm): 18th after "
+        "the quarter",
     ),
     (
         FormCode.GSTR_4,
         "GSTR-4",
         Frequency.YEARLY,
         {"gst_scheme": ["composition"]},
-        {"month": 4, "day": 30},
-        "TODO_VERIFY: CGST Rules rule 62",
+        {"month": 6, "day": 30},
+        "TODO_VERIFY: 30 June after the FY from FY 2024-25 (CGST Rules r.62 as amended by "
+        "Notification 12/2024-CT, 10.07.2024; not read, the GST portal FAQ still says the "
+        "30th of the month after the FY)",
     ),
     (
         FormCode.TDS_24Q,
@@ -550,7 +578,8 @@ OBLIGATION_TEMPLATES = [
         Frequency.QUARTERLY,
         {"files_24q": [True]},
         {"quarters": [[7, 31], [10, 31], [1, 31], [5, 31]]},
-        "TODO_VERIFY: Income-tax Rules rule 31A",
+        "incometax.gov.in, Form 138 (earlier 24Q) user manual: 31 July, 31 October, "
+        "31 January, 31 May",
     ),
     (
         FormCode.TDS_26Q,
@@ -558,59 +587,112 @@ OBLIGATION_TEMPLATES = [
         Frequency.QUARTERLY,
         {"files_26q": [True]},
         {"quarters": [[7, 31], [10, 31], [1, 31], [5, 31]]},
-        "TODO_VERIFY: Income-tax Rules rule 31A",
+        "incometax.gov.in, Form 140 (earlier 26Q) user manual: 31 July, 31 October, "
+        "31 January, 31 May",
     ),
 ]
 
 
 def seed_obligation_templates() -> None:
     for form, name, frequency, applicability, rule, source in OBLIGATION_TEMPLATES:
-        exists = db.session.scalar(
-            select(ObligationTemplate.id).where(
-                ObligationTemplate.form_code == form,
-                ObligationTemplate.frequency == frequency,
-                ObligationTemplate.effective_from == RULES_FROM,
-            )
+        _upsert(
+            ObligationTemplate,
+            {"form_code": form, "frequency": frequency, "effective_from": RULES_FROM},
+            {
+                "name": name,
+                "applicability": applicability,
+                "due_date_rule": rule,
+                "source_reference": source,
+            },
         )
-        if not exists:
-            db.session.add(
-                ObligationTemplate(
-                    form_code=form,
-                    name=name,
-                    frequency=frequency,
-                    applicability=applicability,
-                    due_date_rule=rule,
-                    source_reference=source,
-                    effective_from=RULES_FROM,
-                )
-            )
 
 
-# One penalty rule per form: (form, where to look), every amount empty until it is confirmed
-# from an official source (docs/TODO_VERIFY.md, "Penalties"). The sections named are only
-# pointers for whoever verifies them, and must be checked too.
+# One penalty rule per form: (form, amounts, source_reference). Amounts are rupees
+# (annual_interest_rate is % a year); a missing amount stays empty (NULL) and the estimator
+# says so. Where a fee or cap depends on turnover or income, the value for a small business
+# (turnover up to ₹1.5 crore) is stored and the others are named in the source.
+# docs/TODO_VERIFY.md, "Penalties", lists what each value rests on.
+GST_LATE_FEE = "CBIC Circular 26/26/2017-GST: ₹50 a day (₹25 CGST + ₹25 SGST), nil ₹20"
+GST_INTEREST = "TODO_VERIFY: interest 18% a year (CGST Act s.50, Notification 13/2017-CT; not read)"
 PENALTY_RULES = [
-    (FormCode.GSTR_1, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
-    (FormCode.GSTR_3B, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
-    (FormCode.CMP_08, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
-    (FormCode.GSTR_4, "TODO_VERIFY: CGST Act s.47 (late fee) and s.50 (interest)"),
-    (FormCode.TDS_24Q, "TODO_VERIFY: Income-tax Act s.234E (late fee)"),
-    (FormCode.TDS_26Q, "TODO_VERIFY: Income-tax Act s.234E (late fee)"),
-    (FormCode.ITR, "TODO_VERIFY: Income-tax Act s.234F (flat late fee) and s.234A (interest)"),
+    (
+        FormCode.GSTR_1,
+        {
+            "late_fee_per_day": "50",
+            "nil_return_late_fee_per_day": "20",
+            "max_late_fee": "2000",
+            "annual_interest_rate": "0",
+        },
+        "TODO_VERIFY: ₹50/₹20 a day as for GSTR-3B (Notification 4/2018-CT; not read). Cap: "
+        "Notification 20/2021-CT, CGST ₹1,000 up to ₹1.5 crore (₹250 nil, ₹2,500 up to "
+        "₹5 crore), doubled for SGST. No tax is paid with GSTR-1, so no interest.",
+    ),
+    (
+        FormCode.GSTR_3B,
+        {
+            "late_fee_per_day": "50",
+            "nil_return_late_fee_per_day": "20",
+            "max_late_fee": "2000",
+            "annual_interest_rate": "18",
+        },
+        f"{GST_LATE_FEE}. Cap: Notification 19/2021-CT, CGST ₹1,000 up to ₹1.5 crore (₹250 "
+        f"nil, ₹2,500 up to ₹5 crore), doubled for SGST. {GST_INTEREST}",
+    ),
+    (
+        FormCode.CMP_08,
+        {"late_fee_per_day": "0", "max_late_fee": "0", "annual_interest_rate": "18"},
+        f"GST portal FAQ 'Filing Form GST CMP-08' Q9: no late fee. {GST_INTEREST}",
+    ),
+    (
+        FormCode.GSTR_4,
+        {
+            "late_fee_per_day": "50",
+            "nil_return_late_fee_per_day": "20",
+            "max_late_fee": "2000",
+            "annual_interest_rate": "18",
+        },
+        "TODO_VERIFY: ₹50/₹20 a day (Notification 73/2017-CT; not read). Cap: Notification "
+        f"21/2021-CT, CGST ₹1,000 (₹250 nil), doubled for SGST. {GST_INTEREST}",
+    ),
+    (
+        FormCode.TDS_24Q,
+        {"late_fee_per_day": "200", "annual_interest_rate": "0"},
+        "TRACES FAQ on late filing fee (tdscpc.gov.in): ₹200 a day (s.234E), at most the TDS "
+        "of the statement (not stored). A late statement has no interest (that is for late "
+        "deposit).",
+    ),
+    (
+        FormCode.TDS_26Q,
+        {"late_fee_per_day": "200", "annual_interest_rate": "0"},
+        "TRACES FAQ on late filing fee (tdscpc.gov.in): ₹200 a day (s.234E), at most the TDS "
+        "of the statement (not stored). A late statement has no interest (that is for late "
+        "deposit).",
+    ),
+    (
+        FormCode.ITR,
+        {"flat_late_fee": "5000", "annual_interest_rate": "12"},
+        "incometax.gov.in, Income Tax Returns FAQ Q25: ₹5,000 (₹1,000 when income is at most "
+        "₹5 lakh; s.234F, s.428 of the 2025 Act). TODO_VERIFY: interest 1% a month (s.234A; "
+        "not read).",
+    ),
 ]
+
+PENALTY_COLUMNS = (
+    "late_fee_per_day",
+    "nil_return_late_fee_per_day",
+    "max_late_fee",
+    "flat_late_fee",
+    "annual_interest_rate",
+)
 
 
 def seed_penalty_rules() -> None:
-    for form, source in PENALTY_RULES:
-        exists = db.session.scalar(
-            select(PenaltyRule.id).where(
-                PenaltyRule.form_code == form, PenaltyRule.effective_from == RULES_FROM
-            )
-        )
-        if not exists:
-            db.session.add(
-                PenaltyRule(form_code=form, source_reference=source, effective_from=RULES_FROM)
-            )
+    for form, amounts, source in PENALTY_RULES:
+        values = {"source_reference": source}
+        for column in PENALTY_COLUMNS:
+            amount = amounts.get(column)
+            values[column] = Decimal(amount) if amount is not None else None
+        _upsert(PenaltyRule, {"form_code": form, "effective_from": RULES_FROM}, values)
 
 
 # The official NIC activity codes (ON9): reference data, never typed by hand.

@@ -1,6 +1,6 @@
 """Financial-year periods and the due-date calculator (compliance_service, CO2).
 
-The rules here are made up for the tests; the real ones are seeded from app/seed.py.
+The rules here are made up for the tests, except the last test, which checks seeded ones.
 """
 
 from datetime import date
@@ -69,3 +69,14 @@ def test_quarterly_uses_the_quarters_own_date():
 def test_yearly_is_due_after_the_year_and_later_with_an_audit():
     assert due_date(YEARLY, date(2027, 3, 31)) == date(2027, 7, 31)
     assert due_date(YEARLY, date(2027, 3, 31), audit=True) == date(2027, 10, 31)
+
+
+def test_the_seeded_itr_and_gstr4_dates(legal_rules, database):
+    """The real seeded rules (checked on 29 Sep 2026): ITR on 31 August without an audit and
+    31 October with one; GSTR-4 on 30 June after the financial year."""
+    templates = {t.form_code: t for t in database.session.query(ObligationTemplate)}
+    year_end = date(2027, 3, 31)
+
+    assert due_date(templates["itr"], year_end) == date(2027, 8, 31)
+    assert due_date(templates["itr"], year_end, audit=True) == date(2027, 10, 31)
+    assert due_date(templates["gstr_4"], year_end) == date(2027, 6, 30)

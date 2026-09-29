@@ -1,5 +1,5 @@
 {
-  "source": "GST state codes (the first two digits of a GSTIN), as listed on the GST portal. TODO_VERIFY: confirm against the official list (docs/TODO_VERIFY.md).",
+  "source": "GST state codes (the first two digits of a GSTIN). Checked on 29 Sep 2026 against the State Codes master of the GST e-invoice portal (einvoice1.gst.gov.in/Others/MasterCodes): all 36 codes match; 25 (Daman and Diu, merged into 26) and 28 (old Andhra Pradesh) are no longer used.",
   "states": [
     { "name": "Andaman and Nicobar Islands", "code": "35" },
     { "name": "Andhra Pradesh", "code": "37" },
