@@ -33,6 +33,11 @@ Capacity (MA7): `capacity` is the most businesses a CA has ACTIVE engagements wi
 A full CA is hidden from the list, and a request, an acceptance, an accepted quote or
 a pro-bono match that would add a client answers 409 CA_AT_CAPACITY.
 
+Matching score (MA8): for a registered business, "Find a CA" gives each CA points with a
+reason (its filings the CA handles and specializes in, same city, fee at or below the
+typical fee, a good rating, free client slots, experience; POINTS_* below) and lists the
+highest total first.
+
 Ratings (MA17): rate_engagement(business, id, stars, review) after completion, once;
 rating_summary(ca_profile_id) -> {rating_average, rating_count}; latest_reviews(ca_profile_id).
 
@@ -115,6 +120,17 @@ IDENTITY_FIELDS = ("membership_no", "cop_number")
 
 # The typical price range of a service is shown once this many CAs offer it.
 MIN_CAS_FOR_RANGE = 3
+
+# Matching score (MA8): points per reason, added up; product weights, not legal values.
+POINTS_PER_FORM_OFFERED = 20  # the CA has a price for one of the business's open filings
+POINTS_PER_SPECIALIZATION = 5  # ... and lists that form as a specialization
+POINTS_SAME_CITY = 15  # the CA's city is in the business address
+POINTS_PER_FAIR_PRICE = 5  # the CA's fee for a filing is at or below the typical (median) fee
+POINTS_GOOD_RATING = 10  # an average rating of GOOD_RATING stars or more
+GOOD_RATING = 4.0
+POINTS_HAS_ROOM = 5  # at least half of the CA's client slots are free
+POINTS_PER_YEAR_OF_EXPERIENCE = 1
+MAX_EXPERIENCE_YEARS_COUNTED = 10  # 25 years count as 10, so experience never outweighs the rest
 
 
 def _only_listed_cas(stmt):
@@ -329,11 +345,12 @@ def list_verified_cas(
     keeps CAs whose city contains the text (any case); `service` (a catalog code)
     keeps CAs who offer that service, and each item then has their `price`.
 
-    For a `user` with a registered business the list is ranked for it: each item also
-    gets `my_prices` (the CA's price for each of the business's open filing forms) and
-    `same_city` (the CA's city is in the business address); CAs offering more of those
-    forms come first, then same-city CAs, then the usual order. Without a registered
-    business the order and the items are as before (my_prices [], same_city null).
+    For a `user` with a registered business the list is ranked for it (MA8): each item
+    also gets `my_prices` (the CA's price for each of the business's open filing forms),
+    `same_city` (the CA's city is in the business address), `match_reasons` and
+    `match_score` (their sum, see _match_reasons()); the highest score comes first, then
+    the usual order. Without a registered business the order is as before (my_prices [],
+    same_city, match_score null, match_reasons []).
     """
     stmt = select(CaProfile).join(CaProfile.user)
     stmt = _only_listed_cas(stmt)
@@ -356,12 +373,21 @@ def list_verified_cas(
     if user is not None:
         business = onboarding_service.business_of_user(user)
 
-    # One row per CA on this page: {"profile", "my_prices", "same_city"}.
+    # One row per CA on this page:
+    # {"profile", "my_prices", "same_city", "match_score", "match_reasons"}.
     rows = []
     if business is None:
         result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
         for profile in result.items:
-            rows.append({"profile": profile, "my_prices": [], "same_city": None})
+            rows.append(
+                {
+                    "profile": profile,
+                    "my_prices": [],
+                    "same_city": None,
+                    "match_score": None,
+                    "match_reasons": [],
+                }
+            )
         total = result.total
     else:
         forms = set()
@@ -370,12 +396,20 @@ def list_verified_cas(
                 forms.add(filing.form_code)
         itr_service_code = _itr_service_code(business)
         address = business.address.lower()
+        medians = {}
+        for row in list_catalog():
+            medians[row["id"]] = row["median_price"]
         for profile in db.session.scalars(stmt):
+            my_prices = _my_prices(profile, forms, itr_service_code)
+            same_city = profile.city.lower() in address
+            reasons = _match_reasons(profile, forms, my_prices, same_city, medians)
             rows.append(
                 {
                     "profile": profile,
-                    "my_prices": _my_prices(profile, forms, itr_service_code),
-                    "same_city": profile.city.lower() in address,
+                    "my_prices": my_prices,
+                    "same_city": same_city,
+                    "match_reasons": reasons,
+                    "match_score": sum(reason["points"] for reason in reasons),
                 }
             )
         # sort() keeps the usual order (experience, name) between CAs that rank the same.
@@ -407,6 +441,8 @@ def list_verified_cas(
                 "price": price,
                 "my_prices": my_prices,
                 "same_city": same_city,
+                "match_score": row["match_score"],
+                "match_reasons": row["match_reasons"],
                 "rating_average": ratings["rating_average"],
                 "rating_count": ratings["rating_count"],
             }
@@ -422,21 +458,95 @@ def _my_prices(profile: CaProfile, forms: set, itr_service_code: str | None) -> 
             continue
         if service.form_code == FormCode.ITR and service.code != itr_service_code:
             continue
-        if service.form_code not in best or price < best[service.form_code]:
-            best[service.form_code] = price
+        if service.form_code not in best or price < best[service.form_code]["price"]:
+            best[service.form_code] = {"price": price, "service_id": service.id}
     result = []
-    for form, price in best.items():
-        result.append({"form_code": form, "price": price})
+    for form, cheapest in best.items():
+        result.append(
+            {"form_code": form, "price": cheapest["price"], "service_id": cheapest["service_id"]}
+        )
     return result
 
 
-def _ranking_key(row: dict):
-    """Sort order for a business: CAs offering more of its filings first, then same-city CAs.
+def _form_names(form_codes) -> str:
+    """The form names for a list of form codes, e.g. GSTR-3B, ITR."""
+    names = []
+    for code in form_codes:
+        names.append(compliance_service.FORM_FOLDERS[FormCode(code)])
+    return ", ".join(names)
 
-    Python sorts small values first, so the count is negated (-3 comes before -1) and
-    `not same_city` is False (= 0) for a same-city CA.
+
+def _match_reasons(
+    profile: CaProfile, forms: set, my_prices: list, same_city: bool, medians: dict
+) -> list[dict]:
+    """Why this CA suits the business (MA8): [{reason, points}], like the CA urgency score.
+
+    `forms` are the business's open filing forms, `my_prices` the CA's price for those
+    they offer (with `service_id`), `medians` {service_id: typical (median) price}.
+    The points are product weights (POINTS_* above), not legal values.
     """
-    return (-len(row["my_prices"]), not row["same_city"])
+    reasons = []
+    if len(my_prices) > 0:
+        offered = [item["form_code"] for item in my_prices]
+        reasons.append(
+            {
+                "reason": f"Handles {len(offered)} of your filings ({_form_names(offered)})",
+                "points": len(offered) * POINTS_PER_FORM_OFFERED,
+            }
+        )
+    specialized = [code for code in sorted(forms) if code in profile.specializations]
+    if len(specialized) > 0:
+        reasons.append(
+            {
+                "reason": f"Specializes in {_form_names(specialized)}",
+                "points": len(specialized) * POINTS_PER_SPECIALIZATION,
+            }
+        )
+    if same_city:
+        reasons.append({"reason": f"In your city ({profile.city})", "points": POINTS_SAME_CITY})
+
+    fair = []
+    for item in my_prices:
+        typical = medians.get(item["service_id"])
+        if typical is not None and item["price"] <= typical:
+            fair.append(item["form_code"])
+    if len(fair) > 0:
+        reasons.append(
+            {
+                "reason": f"Fee at or below the typical fee ({_form_names(fair)})",
+                "points": len(fair) * POINTS_PER_FAIR_PRICE,
+            }
+        )
+
+    ratings = rating_summary(profile.id)
+    if ratings["rating_count"] > 0 and ratings["rating_average"] >= GOOD_RATING:
+        average = ratings["rating_average"]
+        count = ratings["rating_count"]
+        reasons.append(
+            {"reason": f"Rated {average} by {count} client(s)", "points": POINTS_GOOD_RATING}
+        )
+
+    free_slots = profile.capacity - len(active_client_ids(profile.id))
+    if free_slots * 2 >= profile.capacity:  # at least half of their client slots are free
+        reasons.append({"reason": "Has room for new clients", "points": POINTS_HAS_ROOM})
+
+    years = min(profile.years_experience, MAX_EXPERIENCE_YEARS_COUNTED)
+    if years > 0:
+        reasons.append(
+            {
+                "reason": f"{profile.years_experience} years of experience",
+                "points": years * POINTS_PER_YEAR_OF_EXPERIENCE,
+            }
+        )
+    return reasons
+
+
+def _ranking_key(row: dict):
+    """Sort order for a business: the highest match score first.
+
+    Python sorts small values first, so the score is negated (-80 comes before -35).
+    """
+    return -row["match_score"]
 
 
 def _price_of(profile: CaProfile, service_code: str):

@@ -4,6 +4,27 @@ Newest first. One entry per decision: date, what, why. Anything decided in chat 
 in the same PR.
 
 
+## 2026-09-29: Matching score and evaluations (B5: MA8, X3)
+
+**What**
+- **Matching score (MA8):** points per reason, added up, like the CA urgency score: open filings the CA prices
+  (20 each) and specializes in (5 each), same city (15), fee at or below the typical fee (5 per filing), average
+  rating ≥ 4 (10), at least half the client slots free (5), a point per year of experience up to 10. "Find a CA"
+  lists the highest total first and shows every reason with its points. No language reason (businesses have no
+  language field); capacity numbers stay hidden from businesses.
+- **Evaluations (X3), agreed sizes:** 40 NIC descriptions, 15 made-up OCR documents, 25 assistant questions and
+  10 real news items (instead of 100 / 30 / 50 / 20). Each `eval/<name>/evaluate.py` calls the app's own service
+  functions and has a `--keywords-only` mode, so it runs without the Gemini quota.
+- `assistant_service.answer_question(question, context)` was split out of `ask()` (no history saved), so the
+  evaluation measures the exact chat code.
+- **News items are our own short summaries** of real public items (URL, title and date kept), because news texts
+  are not ours to copy and PIB refuses automated downloads.
+- The datasets are labelled by Claude and should be checked by a teammate before the report.
+
+**Why:** a weighted sum with written reasons is explainable in one sentence and to the user ("why this CA");
+small, checked datasets and scripts that reuse the real code give honest numbers for the report now, and can be
+rerun with Gemini when the quota allows.
+
 ## 2026-09-29: Legal values checked against official sources (V1, CO6)
 
 **What**
@@ -30,7 +51,6 @@ in the same PR.
 
 **Why:** the rule "never invent a legal value" needs a named source per value; updating seeded rows keeps every
 teammate's database in step with the reviewed values.
-
 
 ## 2026-09-29: Local OCR (B2: ON12, ON13, DO8, DO9, CO10 filed–verified)
 

@@ -324,13 +324,13 @@ def _citation(number: int, chunk: KbChunk) -> dict:
     }
 
 
-def ask(user: User, question: str) -> dict:
-    """Answer a question from the knowledge base, with its sources (AS2-AS4).
+def answer_question(question: str, context: str) -> dict:
+    """Answer a question from the knowledge base, with its sources (AS2, AS4). Saves nothing.
 
-    Returns {answer, citations [{number, title, url, source_path, excerpt}], ask_a_ca,
-    ai_used}. The question and the answer are saved in the user's history (AS5). One commit.
+    `context` is what the prompt may say about the user (user_context()). Returns {answer,
+    citations [{number, title, url, source_path, excerpt}], ask_a_ca, ai_used}. Used by
+    ask() and by the evaluation script (eval/assistant/evaluate.py).
     """
-    question = question.strip()
     chunks, _ = search(question)
     ai_used = False
     if not chunks:
@@ -340,9 +340,7 @@ def ask(user: User, question: str) -> dict:
         )
         numbers, ask_a_ca = [], True
     else:
-        prompt = PROMPT.format(
-            context=user_context(user), sources=_numbered(chunks), question=question
-        )
+        prompt = PROMPT.format(context=context, sources=_numbered(chunks), question=question)
         try:
             reply = gemini_client.ask_gemini(prompt, want_json=True)
             answer, numbers, ask_a_ca = _parse_reply(reply, len(chunks))
@@ -360,6 +358,13 @@ def ask(user: User, question: str) -> dict:
     lowered = question.lower()
     ask_a_ca = ask_a_ca or any(re.search(rf"\b{word}\b", lowered) for word in ASK_A_CA_WORDS)
     citations = [_citation(number, chunks[number - 1]) for number in numbers]
+    return {"answer": answer, "citations": citations, "ask_a_ca": ask_a_ca, "ai_used": ai_used}
+
+
+def ask(user: User, question: str) -> dict:
+    """answer_question() for this user, saved in their history (AS3, AS5). One commit."""
+    question = question.strip()
+    result = answer_question(question, user_context(user))
 
     db.session.add(ChatMessage(user_id=user.id, role=ChatRole.USER, content=question))
     db.session.flush()  # the question gets the earlier time, so it is listed first
@@ -367,12 +372,16 @@ def ask(user: User, question: str) -> dict:
         ChatMessage(
             user_id=user.id,
             role=ChatRole.ASSISTANT,
-            content=answer,
-            citations={"sources": citations, "ask_a_ca": ask_a_ca, "ai_used": ai_used},
+            content=result["answer"],
+            citations={
+                "sources": result["citations"],
+                "ask_a_ca": result["ask_a_ca"],
+                "ai_used": result["ai_used"],
+            },
         )
     )
     db.session.commit()
-    return {"answer": answer, "citations": citations, "ask_a_ca": ask_a_ca, "ai_used": ai_used}
+    return result
 
 
 # ---------------------------------------------------------------------------

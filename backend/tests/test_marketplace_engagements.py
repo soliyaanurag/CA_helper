@@ -28,6 +28,7 @@ from app.models import (
     EngagementItem,
     Notification,
     ObligationTemplate,
+    Rating,
     RegulatoryProfile,
 )
 from app.models.base import utcnow
@@ -707,6 +708,119 @@ def test_cas_offering_my_filings_come_first_with_their_prices(
     # Before registering nothing changes: the usual order (experience, name), no ranking data.
     assert [row["full_name"] for row in plain] == ["Aaron Far", "Zara Near"]
     assert all(row["my_prices"] == [] and row["same_city"] is None for row in plain)
+    assert all(row["match_score"] is None and row["match_reasons"] == [] for row in plain)
+
+
+# --- MA8: the matching score and its reasons ---------------------------------------------
+
+
+def _reasons(row) -> dict:
+    """{reason: points} of one CA in the list."""
+    result = {}
+    for item in row["match_reasons"]:
+        result[item["reason"]] = item["points"]
+    return result
+
+
+def _ca_named(rows, name):
+    return next(row for row in rows if row["full_name"] == name)
+
+
+def test_the_match_score_adds_up_its_reasons(client, setup, auth_headers):
+    # setup: a Pune business with GSTR-3B and GSTR-1 due; a Pune CA with 5 years, room
+    # for 10 clients, prices for both and GSTR-3B as a specialization.
+    rows = client.get(f"{BASE}/cas", headers=setup["business_headers"]).get_json()["items"]
+
+    row = rows[0]
+    assert _reasons(row) == {
+        "Handles 2 of your filings (GSTR-1, GSTR-3B)": 2
+        * marketplace_service.POINTS_PER_FORM_OFFERED,
+        "Specializes in GSTR-3B": marketplace_service.POINTS_PER_SPECIALIZATION,
+        "In your city (Pune)": marketplace_service.POINTS_SAME_CITY,
+        "Has room for new clients": marketplace_service.POINTS_HAS_ROOM,
+        "5 years of experience": 5 * marketplace_service.POINTS_PER_YEAR_OF_EXPERIENCE,
+    }
+    assert row["match_score"] == sum(_reasons(row).values())
+
+
+def test_the_best_match_comes_first_not_the_most_experienced(
+    client, make_business, add_filing, make_ca, database, auth_headers
+):
+    owner, business = make_business()
+    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
+    _, veteran = make_ca({}, name="Aaron Veteran")  # 30 years, but none of my filings
+    veteran.years_experience = 30
+    make_ca({"gstr_3b": "600"}, name="Zara Match")
+    database.session.commit()
+
+    rows = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
+
+    assert [row["full_name"] for row in rows] == ["Zara Match", "Aaron Veteran"]
+    # Experience counts at most MAX_EXPERIENCE_YEARS_COUNTED years.
+    assert _reasons(rows[1])["30 years of experience"] == (
+        marketplace_service.MAX_EXPERIENCE_YEARS_COUNTED
+        * marketplace_service.POINTS_PER_YEAR_OF_EXPERIENCE
+    )
+
+
+def test_a_fee_at_or_below_the_typical_fee_earns_points(
+    client, make_business, add_filing, make_ca, auth_headers
+):
+    owner, business = make_business()
+    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
+    # Three CAs price GSTR-3B, so the typical (median) fee is ₹600.
+    make_ca({"gstr_3b": "500"}, name="Asha Low")
+    make_ca({"gstr_3b": "600"}, name="Bina Median")
+    make_ca({"gstr_3b": "700"}, name="Chitra High")
+
+    rows = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
+
+    fair = "Fee at or below the typical fee (GSTR-3B)"
+    assert fair in _reasons(_ca_named(rows, "Asha Low"))
+    assert fair in _reasons(_ca_named(rows, "Bina Median"))
+    assert fair not in _reasons(_ca_named(rows, "Chitra High"))
+    assert rows[-1]["full_name"] == "Chitra High"
+
+
+def test_a_good_rating_and_free_slots_earn_points(
+    client, make_business, add_filing, make_ca, database, auth_headers
+):
+    owner, business = make_business()
+    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
+    _, rated = make_ca({"gstr_3b": "600"}, name="Rated CA")
+    _, busy = make_ca({"gstr_3b": "600"}, name="Busy CA")
+    busy.capacity = 3
+    # Two finished engagements rated 5 and 4 stars (average 4.5).
+    for stars in (5, 4):
+        other_owner, other_business = make_business(name=f"Client {stars}")
+        done = Engagement(
+            business_id=other_business.id,
+            ca_profile_id=rated.id,
+            status=EngagementStatus.COMPLETED,
+        )
+        database.session.add(done)
+        database.session.flush()
+        database.session.add(Rating(engagement_id=done.id, stars=stars))
+    # Busy CA: 2 active clients of 3 slots, so less than half is free.
+    for number in (1, 2):
+        other_owner, other_business = make_business(name=f"Active client {number}")
+        database.session.add(
+            Engagement(
+                business_id=other_business.id,
+                ca_profile_id=busy.id,
+                status=EngagementStatus.ACTIVE,
+            )
+        )
+    database.session.commit()
+
+    rows = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
+
+    rated_reasons = _reasons(_ca_named(rows, "Rated CA"))
+    busy_reasons = _reasons(_ca_named(rows, "Busy CA"))
+    assert rated_reasons["Rated 4.5 by 2 client(s)"] == marketplace_service.POINTS_GOOD_RATING
+    assert "Has room for new clients" in rated_reasons
+    assert "Has room for new clients" not in busy_reasons
+    assert [row["full_name"] for row in rows] == ["Rated CA", "Busy CA"]
 
 
 # --- MA12: requests nobody answers within 48 hours expire -----------------------------

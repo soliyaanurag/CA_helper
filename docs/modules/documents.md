@@ -115,6 +115,8 @@ other while it is being imported. Keep it that way.
 - A filed filing's links and acknowledgement cannot be removed or deleted (they are its proof)
 
 ## Known issues
+- The OCR evaluation (`eval/ocr/`, 95.9% of fields) found that a TDS "Provisional Receipt" is not recognised as an
+  acknowledgement (no keyword for it), and that Tesseract can cut a long token number on a scan.
 - A CA sees a client's files in the CA workspace (`documents_by_filing`) and uploads only acknowledgements (CW5);
   a fulfilled document request links its file to the filing, so `ca_can_access_document` covers it.
 - Deleting keeps the encrypted file on disk (soft delete); nothing cleans up old files.
