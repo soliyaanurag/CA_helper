@@ -25,7 +25,7 @@ Without `--keywords-only` the scripts use Gemini when `GEMINI_API_KEY` is set; w
 own fallbacks run and the script says so. The datasets were labelled by Claude (`labelled_by` / `created_by`
 `claude`) and should be checked by a teammate before the numbers go into the report.
 
-## Results (29 Sep 2026, main + MA8)
+## Results (29 Sep 2026, main with the reviewed guides of V1, + MA8)
 
 The Gemini free tier answered 429 (quota used up) all day, so every result below is **without Gemini text
 generation**; embeddings worked. Rerun without `--keywords-only` when the quota is back to measure the AI paths.
@@ -35,5 +35,5 @@ generation**; embeddings worked. Rerun without `--keywords-only` when the quota 
 | OCR (all local) | 95.9% of fields (71/74): text PDF 96.0%, photo 100%, scanned PDF 91.7%. Misses: a TDS "Provisional Receipt" is not recognised as an acknowledgement (2 documents), and Tesseract cut one scanned token number short. |
 | NIC, keyword shortlist only | top-1 35.0% (14/40), top-3 72.5% (29/40); the right code is in the shortlist Gemini chooses from for 85.0% (34/40), so that is the most Gemini can reach. |
 | Assistant, vector search (embeddings) | right page found for 21/21 questions; 2 of 3 out-of-scope questions found nothing ("register a company with MCA" found GST pages); "Ask a CA" on for the notice question. Answer points and citations not measured (no Gemini answers). |
-| Assistant, word search only | right page found for 19/21; out-of-scope declined 1/3. |
+| Assistant, word search only | right page found for 18/21; out-of-scope declined 1/3. |
 | Regulatory, keywords only | kept 7/7 relevant items and ignored 3/3 others (precision and recall 100%); forms and change type right 7/7. Dates and states are only read by Gemini (not measured). The items are short summaries that name the form clearly, so this is an easy set for the keyword filter. |
