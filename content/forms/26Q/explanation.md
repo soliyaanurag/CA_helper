@@ -3,14 +3,14 @@ form: 26Q
 status: DONE
 ---
 
-# 26Q: what it is and why it matters
+# Form 140 (earlier 26Q): what it is and why it matters
 
 <!-- Reviewed on 29 Sep 2026 against the official pages listed at the bottom (V1). Content rule
      (content/README.md): no legal thresholds, rates or due dates here; the app shows them from the
      rule tables. -->
 
 ## What is it?
-26Q is the quarterly **TDS return for payments other than salary** to residents, such as contractor bills, professional fees, commission or rent. You report the TDS you deducted from each payee. Under the Income-tax Act, 2025 (from tax year 2026-27) the same return is called **Form 140**.
+26Q is the quarterly **TDS return for payments other than salary** to residents, such as contractor bills, professional fees, commission or rent. You report the TDS you deducted from each payee. Under the Income-tax Act, 2025 (from tax year 2026-27) the same return is called **Form 140**, and TDS on these payments is section 393 (sections 193 to 194T of the 1961 Act). Returns for quarters up to March 2026 stay 26Q, including corrections filed later.
 
 ## Who has to file it?
 Businesses that deduct TDS on such payments. The app shows it when your profile says you deduct TDS. You need a TAN, registered on the income-tax e-filing portal.

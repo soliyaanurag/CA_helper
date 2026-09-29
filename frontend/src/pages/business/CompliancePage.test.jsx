@@ -59,6 +59,15 @@ describe("compliance calendar page", () => {
     expect(within(rows[3]).getByText("Upcoming")).toBeInTheDocument();
   });
 
+  it("shows a TDS return of this year under its new name", async () => {
+    loginAs("business");
+    const tds = { ...FILINGS[0], id: "t1", form_code: "tds_24q", period_label: "Q2 2026-27" };
+    fakeApi({ [`GET ${URL}`]: [200, [tds]] });
+    renderApp("/business/compliance");
+
+    expect(await screen.findByText("Form 138 (earlier 24Q)")).toBeInTheDocument();
+  });
+
   it("groups by month, with the days left", async () => {
     loginAs("business");
     fakeApi({ [`GET ${URL}`]: [200, FILINGS] });

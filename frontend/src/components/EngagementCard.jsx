@@ -2,7 +2,7 @@ import { Stars } from "@/components/Stars";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { expiresInText, formatDate, formatDateTime } from "@/lib/dates";
-import { ENGAGEMENT_STATUS_LABELS, FORM_LABELS, label } from "@/lib/labels";
+import { ENGAGEMENT_STATUS_LABELS, filingFormLabel, label } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
 // Badge colour for each engagement status.
@@ -127,7 +127,9 @@ export function EngagementCard({ engagement, title, children }) {
             {items.map((item) => (
               <tr key={item.id} className="border-b">
                 <td className="py-1 pr-3">
-                  {item.form_code ? label(FORM_LABELS, item.form_code) : "Removed filing"}{" "}
+                  {item.form_code
+                    ? filingFormLabel(item.form_code, item.period_label)
+                    : "Removed filing"}{" "}
                   {item.period_label}
                   {item.due_date && (
                     <span className="text-muted-foreground">

@@ -5,7 +5,7 @@ import { errorMessage } from "@/api/client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { daysLeftText, formatDate } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 
 /**
  * /ca/batches ("Deadline batches"): every filing the CA still has to file, across
@@ -36,7 +36,8 @@ export function CaBatchesPage() {
           <Card key={batch.form_code + batch.due_date}>
             <CardHeader>
               <CardTitle>
-                {label(FORM_LABELS, batch.form_code)} · due {formatDate(batch.due_date)}
+                {filingFormLabel(batch.form_code, batch.filings[0]?.period_label)} · due{" "}
+                {formatDate(batch.due_date)}
               </CardTitle>
               <CardDescription>
                 {daysLeftText(batch.due_date)} · {batch.ready_count} of {batch.filings.length}{" "}

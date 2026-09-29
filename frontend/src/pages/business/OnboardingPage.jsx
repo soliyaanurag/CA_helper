@@ -551,10 +551,10 @@ const LINES = [
   ["gst_scheme", "GST scheme", (value) => label(GST_SCHEME_LABELS, value)],
   ["itr_form", "Income tax return form", (value) => label(ITR_FORM_LABELS, value)],
   ["presumptive_eligible", "Presumptive scheme", yesNo],
-  ["audit_applicable", "Tax audit (s.44AB)", yesNo],
+  ["audit_applicable", "Tax audit (s.44AB; s.63 from tax year 2026-27)", yesNo],
   ["other_audit_applicable", "Accounts audited under another law", yesNo],
-  ["files_24q", "TDS return 24Q (salaries)", yesNo],
-  ["files_26q", "TDS return 26Q (other payments)", yesNo],
+  ["files_24q", "TDS return, salary (Form 138, earlier 24Q)", yesNo],
+  ["files_26q", "TDS return, other payments (Form 140, earlier 26Q)", yesNo],
 ];
 
 // The short summary at the top of the profile, e.g. Micro · QRMP · ITR-4 · 26Q.

@@ -37,9 +37,9 @@ import { daysLeftText, daysUntil, formatDate, formatDateTime } from "@/lib/dates
 import {
   DOCUMENT_TYPE_LABELS,
   ENTITY_TYPE_LABELS,
-  FORM_LABELS,
-  MSME_TIER_LABELS,
+  filingFormLabel,
   label,
+  MSME_TIER_LABELS,
 } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
@@ -100,7 +100,7 @@ function Header({ page }) {
   return (
     <div className="space-y-1">
       <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold">
-        {label(FORM_LABELS, item.form_code)} · {item.period_label}
+        {filingFormLabel(item.form_code, item.period_label)} · {item.period_label}
         <StatusBadge status={item.status} />
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -729,7 +729,7 @@ function PeerInsights({ item }) {
   const peers = usePeerInsights(item.id);
   if (!peers.isSuccess) return null;
   const data = peers.data;
-  const form = label(FORM_LABELS, item.form_code);
+  const form = filingFormLabel(item.form_code, item.period_label);
 
   let who = `all ${data.business_count} businesses on CA Helper that filed ${form}`;
   if (data.scope === "segment") {

@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 
 // /business/pro-bono: a micro business asks for a free (pro-bono) CA for some filings.
 // A CA with free slots takes the request; it then appears in "My engagements".
@@ -89,7 +89,7 @@ function QueuedRequest({ request }) {
         <ul className="list-disc pl-5">
           {request.filings.map((filing) => (
             <li key={filing.id}>
-              {label(FORM_LABELS, filing.form_code)} {filing.period_label} · due{" "}
+              {filingFormLabel(filing.form_code, filing.period_label)} {filing.period_label} · due{" "}
               {formatDate(filing.due_date)}
             </li>
           ))}
@@ -157,7 +157,7 @@ function JoinForm({ filings, reason }) {
                 disabled={filing.blocked_reason !== null}
                 onChange={() => toggle(filing.id)}
               />
-              {label(FORM_LABELS, filing.form_code)} {filing.period_label}
+              {filingFormLabel(filing.form_code, filing.period_label)} {filing.period_label}
               <span className="font-normal text-muted-foreground">
                 · due {formatDate(filing.due_date)}
               </span>
