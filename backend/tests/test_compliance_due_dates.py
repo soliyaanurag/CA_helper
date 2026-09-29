@@ -80,3 +80,21 @@ def test_the_seeded_itr_and_gstr4_dates(legal_rules, database):
     assert due_date(templates["itr"], year_end) == date(2027, 8, 31)
     assert due_date(templates["itr"], year_end, audit=True) == date(2027, 10, 31)
     assert due_date(templates["gstr_4"], year_end) == date(2027, 6, 30)
+
+
+def test_the_seeded_itr_date_by_form(legal_rules, database):
+    """Individuals and HUFs with business income (ITR-3, ITR-4) without an audit: 31 August;
+    ITR-5 (firms, LLPs) without an audit: 31 July (TODO_VERIFY, the earlier of the two dates
+    the sources give); any audit, whatever the form: 31 October. GSTR-4: 30 June
+    (Notification 12/2024-CT)."""
+    itr = database.session.query(ObligationTemplate).filter_by(form_code="itr").one()
+    gstr_4 = database.session.query(ObligationTemplate).filter_by(form_code="gstr_4").one()
+    year_end = date(2027, 3, 31)
+
+    assert due_date(itr, year_end, itr_form="itr_3") == date(2027, 8, 31)
+    assert due_date(itr, year_end, itr_form="itr_4") == date(2027, 8, 31)
+    assert due_date(itr, year_end, itr_form="itr_5") == date(2027, 7, 31)
+    assert due_date(itr, year_end, audit=True, itr_form="itr_5") == date(2027, 10, 31)
+    assert due_date(itr, year_end, audit=True, itr_form="itr_6") == date(2027, 10, 31)
+    assert "TODO_VERIFY" in itr.source_reference and "ITR-5" in itr.source_reference
+    assert "12/2024-CT" in gstr_4.source_reference

@@ -56,6 +56,7 @@ from app.models.marketplace import (  # noqa: F401 (SERVICE_SPECIALIZATIONS: use
     ServiceUnit,
 )
 from app.models.regulatory import NewsSourceKind
+from app.services import onboarding_service
 from app.services.auth_service import normalize_email
 from app.utils.passwords import hash_password
 
@@ -503,7 +504,8 @@ def seed_rule_thresholds() -> None:
 #   monthly    {"day": 11}                       the 11th of the next month
 #   quarterly  {"quarters": [[7, 13], ...]}      [month, day] for Q1, Q2, Q3, Q4
 #   yearly     {"month": 7, "day": 31}           that date after the financial year ends
-#              (ITR also has "audit_month" / "audit_day" for businesses with a tax audit)
+#              (ITR also has "audit_month" / "audit_day" for businesses with an audit, and
+#              "by_itr_form" {"itr_5": [7, 31]}: another date without an audit for that form)
 # Applicability: every key must match the regulatory profile, e.g. {"gst_scheme": [...]};
 # {} means every business.
 # (form, name, frequency, applicability, due_date_rule, source_reference)
@@ -514,10 +516,18 @@ OBLIGATION_TEMPLATES = [
         "Income tax return",
         Frequency.YEARLY,
         {},
-        {"month": 8, "day": 31, "audit_month": 10, "audit_day": 31},
-        "incometax.gov.in, Income Tax Returns FAQ Q16 and Q24: 31 August for non-audit cases "
-        "(31 July only for returns without business income), 31 October with a tax audit; "
-        "s.139(1) of the 1961 Act, s.263 of the 2025 Act as amended by Finance Act 2026",
+        {
+            "month": 8,
+            "day": 31,
+            "audit_month": 10,
+            "audit_day": 31,
+            "by_itr_form": {"itr_5": [7, 31]},
+        },
+        "incometax.gov.in, Income Tax Returns FAQ Q16 and Q24: 31 August for individuals and HUFs "
+        "with business or professional income and no audit (31 July only without business "
+        "income: no profile of the app), 31 October with an audit; s.139(1) of the 1961 Act, "
+        "s.263 of the 2025 Act as amended by Finance Act 2026. TODO_VERIFY: ITR-5 (firms, LLPs) "
+        "without audit, 31 July used (sources say 31 July or 31 August; the earlier date)",
     ),
     (
         FormCode.GSTR_1,
@@ -579,7 +589,8 @@ OBLIGATION_TEMPLATES = [
         {"files_24q": [True]},
         {"quarters": [[7, 31], [10, 31], [1, 31], [5, 31]]},
         "incometax.gov.in, Form 138 (earlier 24Q) user manual: 31 July, 31 October, "
-        "31 January, 31 May",
+        "31 January, 31 May; shown as Form 138 from tax year 2026-27 (Income-tax Act 2025 "
+        "s.392 and Income-tax Rules 2026; compliance_service.RENAMED_FORMS)",
     ),
     (
         FormCode.TDS_26Q,
@@ -588,7 +599,8 @@ OBLIGATION_TEMPLATES = [
         {"files_26q": [True]},
         {"quarters": [[7, 31], [10, 31], [1, 31], [5, 31]]},
         "incometax.gov.in, Form 140 (earlier 26Q) user manual: 31 July, 31 October, "
-        "31 January, 31 May",
+        "31 January, 31 May; shown as Form 140 from tax year 2026-27 (Income-tax Act 2025 "
+        "s.393 and Income-tax Rules 2026; compliance_service.RENAMED_FORMS)",
     ),
 ]
 
@@ -735,6 +747,12 @@ def seed_news_sources() -> None:
             )
 
 
+def seed_filing_dates() -> None:
+    """Give filings created earlier the dates of the rules seeded above (a corrected rule
+    would otherwise reach a business's filings only when it edits its profile)."""
+    onboarding_service.resync_all_filings()
+
+
 # (name, function) in dependency order: users first, other data may refer to them.
 SEEDS = [
     ("demo users", seed_demo_users),
@@ -746,6 +764,7 @@ SEEDS = [
     ("penalty rules", seed_penalty_rules),
     ("NIC codes", seed_nic_codes),
     ("news sources", seed_news_sources),
+    ("filings synced to the rules", seed_filing_dates),  # last: needs the templates above
 ]
 
 

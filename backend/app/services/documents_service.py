@@ -166,7 +166,7 @@ def verify_acknowledgement(document: Document, filing) -> dict:
         return {"verified": False, "problems": [reason], **found}
 
     problems = []
-    form_name = compliance_service.FORM_FOLDERS[filing.form_code]
+    form_name = compliance_service.form_name(filing.form_code, filing.fy)
     if filing.form_code not in fields.get("form_codes", []):
         problems.append(f"It does not name the form {form_name}.")
     if not _period_shown(fields, filing):
@@ -235,7 +235,7 @@ def _own_document(business, document_id) -> Document:
 
 def _filing_name(filing) -> str:
     """e.g. "GSTR-3B (Q1 2026-27)", for messages."""
-    return f"{compliance_service.FORM_FOLDERS[filing.form_code]} ({filing.period_label})"
+    return compliance_service.filing_name(filing)
 
 
 def _open_filing(business, item_id):
