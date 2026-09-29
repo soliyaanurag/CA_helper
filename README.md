@@ -91,6 +91,7 @@ make migrate        # apply database migrations
 make seed           # demo users, one per role (logins in "Quick start (manual)")
 make seed-demo      # optional: fictional demo data for every flow ("Demo script" below)
 make assistant-ingest  # the AI assistant's knowledge base from content/ (needs GEMINI_API_KEY; re-run after content changes)
+make assistant-eval    # ask the assistant every question in eval/assistant/questions.md -> eval/assistant/RESULTS.md
 make dev-backend    # API (python main.py) with auto-reload -> http://localhost:8000
 make dev-worker     # background jobs (APScheduler), separate process
 make dev-frontend   # Vite dev server                      -> http://localhost:5173
@@ -206,6 +207,7 @@ these targets or `conda run`; an activated env is only for running things by han
 | `make migration name="onboarding: add businesses"` | new migration | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app db migrate -m "onboarding: add businesses"` |
 | `make seed` | dev seed data | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed` |
 | `make seed-demo` | fictional demo data (runs once) | `conda run --no-capture-output -n ca-helper --cwd backend flask --app app seed-demo` |
+| `make assistant-eval` | assistant answers + citations for `eval/assistant/questions.md` (Gemini; ~45 × 2 requests, 8 s apart) | `conda run --no-capture-output -n ca-helper python eval/assistant/run_eval.py` |
 | `make test` | all tests (backend needs `make infra`) | `conda run --no-capture-output -n ca-helper --cwd backend pytest`, then `conda run --no-capture-output -n ca-helper --cwd frontend npm test` |
 | `make lint` | ruff + ESLint + Prettier | `conda run -n ca-helper ruff check backend`, `conda run -n ca-helper ruff format --check backend`, `conda run -n ca-helper --cwd frontend npm run lint` (then `format:check`) |
 | `make format` | auto-fix formatting | `conda run -n ca-helper ruff check --fix backend`, `conda run -n ca-helper ruff format backend`, `conda run -n ca-helper --cwd frontend npm run format` |

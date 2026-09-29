@@ -17,7 +17,7 @@ FLASK := $(BACKEND) flask --app app
 # npm from the conda env (Node 22), running inside frontend/.
 NPM := $(PY) --cwd frontend npm
 
-.PHONY: help setup env-update infra infra-down migrate migration seed seed-demo assistant-ingest test lint format \
+.PHONY: help setup env-update infra infra-down migrate migration seed seed-demo assistant-ingest assistant-eval test lint format \
 	dev-backend dev-worker dev-frontend doctor feature sync check pr merge
 
 help: ## List all targets
@@ -57,6 +57,9 @@ seed-demo: .env ## Add the fictional demo data (14 businesses, engagements, file
 
 assistant-ingest: .env ## Build the AI assistant's knowledge base from content/ (needs GEMINI_API_KEY)
 	$(FLASK) assistant ingest
+
+assistant-eval: .env ## Ask the assistant every question in eval/assistant/questions.md -> RESULTS.md (Gemini)
+	$(PY) python eval/assistant/run_eval.py
 
 test: ## Run all tests: pytest (needs `make infra`), then Vitest
 	$(BACKEND) pytest
