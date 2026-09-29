@@ -7,7 +7,8 @@ upload files: a PDF with real text, a PNG photo of the page, or a "scanned" PDF 
 Layout:
 ```
 eval/ocr/
-  make_samples.py      writes samples/ and labels.csv (edit SAMPLES there, then run it again)
+  make_samples.py      writes samples/ and labels.csv (edit SAMPLES there, then run it again;
+                       the PDFs get new internal dates each time, so only rerun it to change samples)
   samples/<doc_id>.<pdf|png>
   labels.csv
   evaluate.py

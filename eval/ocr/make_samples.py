@@ -332,7 +332,7 @@ def main() -> None:
             rows.append([doc_id, doc_type, field, value, CREATED_BY])
 
     with open(HERE / "labels.csv", "w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, lineterminator="\n")
         writer.writerow(["doc_id", "doc_type", "field", "expected_value", "created_by"])
         writer.writerows(rows)
     print(f"Wrote {len(SAMPLES)} samples and {len(rows)} labels.")
