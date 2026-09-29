@@ -469,7 +469,7 @@ def _my_prices(profile: CaProfile, forms: set, itr_service_code: str | None) -> 
 
 
 def _form_names(form_codes) -> str:
-    """ "GSTR-3B, ITR" for a list of form codes."""
+    """The form names for a list of form codes, e.g. GSTR-3B, ITR."""
     names = []
     for code in form_codes:
         names.append(compliance_service.FORM_FOLDERS[FormCode(code)])

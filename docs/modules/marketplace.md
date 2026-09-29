@@ -65,10 +65,20 @@ for again, and a CA who answers after the deadline gets 409 `REQUEST_EXPIRED`.
   `set_verification()`, which needs the certificate (409 `CERTIFICATE_MISSING`). `pro_bono_slots_per_month`
   is on the profile form ("Free (pro-bono) slots per month"; not sent → the saved number stays). The profile
   response adds `pro_bono_slots_per_month`, `rejection_reason`, `has_certificate`.
-- **Ranked for the business:** for a business with a registered business, `list_verified_cas()` adds
-  `my_prices` (the CA's price for each of its open filing forms, the ITR one by its ITR form) and `same_city`
-  (the CA's city is in its address), and ranks CAs offering more of its filings first, then same city, then
-  the usual order. There is no language badge: businesses have no language field.
+- **Ranked for the business (MA8, matching score):** for a business with a registered business,
+  `list_verified_cas()` adds `my_prices` (the CA's price for each of its open filing forms, the ITR one by its ITR
+  form), `same_city` (the CA's city is in its address), `match_reasons` (`[{reason, points}]`) and `match_score`
+  (their sum), and lists the highest score first, then the usual order. `_match_reasons()` gives points like the
+  CA urgency score (CW6), each with a sentence: `POINTS_PER_FORM_OFFERED` (20 per open filing the CA has a price
+  for), `POINTS_PER_SPECIALIZATION` (5 per such form in the CA's specializations), `POINTS_SAME_CITY` (15),
+  `POINTS_PER_FAIR_PRICE` (5 per filing whose fee is at or below the typical (median) fee; only once
+  `MIN_CAS_FOR_RANGE` CAs price it), `POINTS_GOOD_RATING` (10 for an average of `GOOD_RATING` = 4.0 or more),
+  `POINTS_HAS_ROOM` (5 when at least half of the client slots are free; the numbers are not shown) and
+  `POINTS_PER_YEAR_OF_EXPERIENCE` (1 per year, at most `MAX_EXPERIENCE_YEARS_COUNTED` = 10). The weights are
+  product choices, not legal values. Before registration `match_score` is null and `match_reasons` empty. "Find a
+  CA" shows "Why this CA (match n)" with each reason and its points. There is no language reason: businesses have
+  no language field (the language filter still works). Tests: the MA8 section of
+  `tests/test_marketplace_engagements.py`, the ranking test in `MarketplacePage.test.jsx`.
 - **CA pages:** `CaProfilePage` has the certificate upload, the pro-bono field, a warning before saving a new
   membership or CoP number when verified, the rejection reason, and "Preview: how businesses see you".
   `CaServicesPage` warns when a priced service's specialization (`specialization` in the catalog, from
@@ -234,6 +244,8 @@ MA12), documents (CoP upload, later), alerts (`notify()` for tray entries).
   rows `save_own_menu()` already reactivates.
 
 ## Known issues
+- The matching score (MA8) reads each listed CA's ratings and active clients one CA at a time: fine for tens of
+  CAs, slow for thousands (then compute it in SQL).
 - Engagements requested before the ITR fix keep the ITR service they were created with.
 - Nothing soft-deletes a CA profile or a catalog service yet. The planned admin "remove" and the admin catalog
   editor must follow the rule above: inserting a new row for the same user, membership number or code fails on
