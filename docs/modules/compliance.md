@@ -154,6 +154,9 @@ onboarding (the regulatory profile, passed in by `register_business()`), core-au
 - Period labels: `"Apr 2026"` (monthly), `"Q1 2026-27"` (quarterly), `"FY 2026-27"` (yearly)
 
 ## Known issues
+- A corrected due-date rule (`make seed`) reaches filings created earlier only when `sync_filings` runs for that
+  business again (after a profile edit). After the V1 change (ITR 31 August, GSTR-4 30 June), existing test
+  or demo businesses keep the old dates until then; new registrations get the new ones.
 - GSTR-3B under QRMP uses the 22nd for every state; some states have the 24th (a decision, `docs/TODO_VERIFY.md` "Simplifications"). GSTR-4's 30 June is still `TODO_VERIFY`.
 - Only the current financial year is created; nothing creates next year's filings yet (a worker job, X2/ON14).
 - The yearly ITR filing is the current year's (FY 2026-27, due in 2027); last year's return is not added.
