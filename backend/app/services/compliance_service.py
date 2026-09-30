@@ -475,11 +475,12 @@ def get_filing(business, item_id) -> dict:
     checklist = checklist_with_ticks(filing)
     acknowledgement = None
     if filing.acknowledgement_document_id is not None:
-        document, _ = documents_service.read_document(filing.acknowledgement_document_id)
+        # Only the stored metadata: the file itself is not opened for the page.
+        document = documents_service.get_document(filing.acknowledgement_document_id)
         acknowledgement = {
             "filename": document.original_filename,
             "uploaded_at": document.created_at,
-            # Why it is (not) verified, read from the file (DO8).
+            # Why it is (not) verified, from the fields OCR read when it was uploaded (DO8).
             "verification": documents_service.verify_acknowledgement(document, filing),
         }
     return {

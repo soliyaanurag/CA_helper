@@ -15,7 +15,7 @@ from app.models import Business, ComplianceItem, User
 from app.models.compliance import ComplianceStatus
 from app.models.enums import UserRole
 from app.models.onboarding import EntityType
-from app.services import compliance_service
+from app.services import compliance_service, documents_service
 
 ITEMS = "/api/v1/compliance/items"
 PDF = b"%PDF-1.4 acknowledgement"
@@ -223,6 +223,23 @@ def test_mark_filed_with_the_acknowledgement_and_download_it(client, owner, data
     assert download.status_code == 200
     assert download.data == PDF
     assert download.mimetype == "application/pdf"
+
+
+def test_the_filing_page_does_not_open_the_acknowledgement_file(
+    client, owner, database, monkeypatch
+):
+    item_id = filing_id(database)
+    mark_filed(client, owner, item_id, file=(io.BytesIO(PDF), "ack.pdf", "application/pdf"))
+
+    def file_unreadable(document_id):
+        raise AssertionError("the page must not read the file")
+
+    monkeypatch.setattr(documents_service, "read_document", file_unreadable)
+    response = client.get(f"{ITEMS}/{item_id}", headers=owner)
+
+    assert response.status_code == 200
+    assert response.get_json()["acknowledgement"]["filename"] == "ack.pdf"
+    assert "verified" in response.get_json()["acknowledgement"]["verification"]
 
 
 def test_a_wrong_file_type_is_refused_and_nothing_changes(client, owner, database):

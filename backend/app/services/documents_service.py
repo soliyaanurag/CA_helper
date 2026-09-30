@@ -4,6 +4,7 @@ Used by other modules (no commit):
 add_document(owner_id, uploaded_by_id, upload, doc_type) -> Document   store a file
 on_document_uploaded(document, data)                                   local OCR (ON12, DO8, DO9)
 verify_acknowledgement(document, filing) -> dict                       proves the filing? (DO8)
+get_document(document_id) -> Document                                 its metadata (404 if missing)
 read_document(document_id) -> (Document, bytes)                        its metadata and contents
 remove_document(document_id)                                           delete row, links, file
 document_ids_for_filings(filing_ids) -> set                            documents linked to filings
@@ -186,7 +187,7 @@ def verify_acknowledgement(document: Document, filing) -> dict:
 
 def read_document(document_id) -> tuple[Document, bytes]:
     """A live document and its decrypted contents. 404 DOCUMENT_NOT_FOUND."""
-    document = _live_document(document_id)
+    document = get_document(document_id)
     return document, storage.open_file(document.storage_key)
 
 
@@ -227,7 +228,7 @@ def document_ids_for_filings(filing_ids) -> set:
 # --- The vault (DO2 to DO7) -----------------------------------------------------------
 
 
-def _live_document(document_id) -> Document:
+def get_document(document_id) -> Document:
     """A document. 404 DOCUMENT_NOT_FOUND."""
     document = db.session.get(Document, document_id) if document_id else None
     if document is None:
@@ -237,7 +238,7 @@ def _live_document(document_id) -> Document:
 
 def _own_document(business, document_id) -> Document:
     """One live document of this business's owner. 404 DOCUMENT_NOT_FOUND for anyone else's."""
-    document = _live_document(document_id)
+    document = get_document(document_id)
     if document.owner_id != business.user_id:
         raise ApiError(404, "DOCUMENT_NOT_FOUND", "This document was not found.")
     return document
@@ -424,7 +425,7 @@ def get_document_file(user: User, document_id) -> tuple[Document, bytes]:
 
     404 DOCUMENT_NOT_FOUND for everyone else (they do not learn that it exists).
     """
-    document = _live_document(document_id)
+    document = get_document(document_id)
     allowed = document.owner_id == user.id
     if not allowed and user.role == UserRole.CA:
         ca_profile_id = marketplace_service.own_profile_id(user)

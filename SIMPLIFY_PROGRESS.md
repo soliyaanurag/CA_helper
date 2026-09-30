@@ -162,6 +162,11 @@ Checks (all inside the containers):
   regulatory changes, so the row keys (`status`/`reviewed_at` out, `notified_at` in) are covered by the tests.
 - Checks: backend 606 passed; frontend 240; build OK; walk 0 failures.
 
+### 2.5f Filing page does not open the file (done)
+- `compliance.get_filing` reads the acknowledgement's row (`documents_service.get_document`, the former
+  `_live_document`) instead of `read_document`; verification uses the OCR fields stored at upload, as before.
+- Checks: backend 607 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -236,3 +241,4 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_regulatory_monitor.py::test_rejection_tells_nobody_and_a_change_is_reviewed_once | replaced by test_a_change_found_by_keywords_tells_nobody | regulatory: no approval; keyword-only finds only listed |
 | test_regulatory_monitor.py (new) test_updates_show_the_changes_about_my_forms, test_updates_are_for_businesses_and_cas | added | regulatory: new GET /regulatory/updates |
 | test_regulatory_monitor.py::test_scan_command | expects "new changes: 1" (was "new changes to review: 1") | regulatory: no admin approval |
+| test_compliance_filing_page.py (new) test_the_filing_page_does_not_open_the_acknowledgement_file | added | compliance: the page shows the acknowledgement without opening the file |
