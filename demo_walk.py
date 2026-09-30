@@ -113,6 +113,18 @@ def main():
     check("register business", r.status_code == 201, r.data[:300])
     r = c.get("/api/v1/compliance/dashboard", headers=B)
     check("business dashboard", r.status_code == 200, r.data[:200])
+    r = c.put("/api/v1/onboarding/business", json={**form, "gst_qrmp": False}, headers=B)
+    changes = r.get_json().get("changes", {}) if r.is_json else {}
+    check("edit business -> what changed", r.status_code == 200
+          and set(changes.get("filings", {})) == {"added", "removed", "kept_with_ca"}
+          and any(line["line"] == "gst_scheme" for line in changes.get("profile", [])), r.data[:300])
+    c.put("/api/v1/onboarding/business", json=form, headers=B)  # back to quarterly
+    r = c.post("/api/v1/onboarding/nic-suggestions", headers=B)
+    picks = r.get_json().get("picks", []) if r.is_json else []
+    check("NIC suggestions", r.status_code == 200 and len(picks) > 0, r.data[:300])
+    if picks:
+        r = c.put("/api/v1/onboarding/business/nic-code", json={"code": picks[0]["code"]}, headers=B)
+        check("save NIC code", r.status_code == 200, r.data[:200])
 
     # 3. Filing page: tick, choose self, mark filed with an acknowledgement -> verified
     items = c.get("/api/v1/compliance/items", headers=B).get_json()

@@ -45,7 +45,7 @@ def main() -> None:
                 SimpleNamespace(description=row["description"])
             )
             picks = [pick["code"] for pick in result["picks"]]
-            shortlist = [nic.code for nic in result["shortlist"]]
+            shortlist = [nic["code"] for nic in result["shortlist"]]
             ai_used += int(result["ai_used"])
             top1 += int(bool(picks) and picks[0] in good)
             top3 += int(bool(good.intersection(picks[:3])))

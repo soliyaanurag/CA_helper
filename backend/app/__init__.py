@@ -208,7 +208,7 @@ def health():
 API_PREFIX = "/api/v1"
 BLUEPRINTS = [
     auth.bp,
-    onboarding.blp,
+    onboarding.bp,
     compliance.blp,
     ca_workspace.blp,
     marketplace.blp,

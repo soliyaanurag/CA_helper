@@ -114,7 +114,6 @@ def test_switching_to_monthly_returns_changes_the_profile_and_filings(client, he
         "profile"
     ]
     # Each quarter becomes the month it starts with (Q1 -> Apr ...); 8 more months each.
-    assert changes["filings"]["moved"] == 8
     assert changes["filings"]["added"] == 16
     assert changes["filings"]["removed"] == 0
     assert live_forms(database)["gstr_3b"] == 12
@@ -127,7 +126,7 @@ def test_switching_back_to_quarterly_removes_the_extra_months(client, headers, d
     response = client.put(URL, json=FORM, headers=headers)
 
     changes = response.get_json()["changes"]["filings"]
-    assert (changes["moved"], changes["removed"]) == (8, 16)
+    assert changes["removed"] == 16
     labels = {
         item.period_label
         for item in database.session.query(ComplianceItem).filter_by(form_code="gstr_3b")

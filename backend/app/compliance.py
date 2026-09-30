@@ -364,20 +364,16 @@ def _status_for(due: date, today: date) -> ComplianceStatus:
 
 def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=()) -> dict:
     """Make the business's filings of the current financial year match its profile.
-    Does not commit.
+    Does not commit. Returns {"added", "removed", "kept_with_ca"} counts.
 
     - Every applicable form and period gets a filing, from 1 April: periods whose due
       date has passed start as "overdue" (the business may have filed them before it
       joined; it can mark them filed).
     - A filing that no longer applies is deleted, unless it is filed, with a CA
       (status "with_ca") or in `keep_ids` (filings in an open engagement).
-    - A not-started filing whose period or due date changed gets the new one: the audit
-      answer moves the ITR date; switching between monthly and quarterly returns turns
-      "Q1" into "Apr" (both start on 1 April, and only one live filing per form and start
-      date may exist).
-
-    Returns {"added", "restored", "removed", "moved", "kept_with_ca"} counts ("restored" is
-    always 0 now that nothing is soft-deleted).
+    - A not-started filing gets the current period and due date: the audit answer moves
+      the ITR date; switching between monthly and quarterly returns turns "Q1" into "Apr"
+      (both start on 1 April, and there is one filing per form and start date).
     """
     fy_start = financial_year_start(today)
     fy = fy_label(fy_start)
@@ -403,29 +399,14 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
         .where(ComplianceItem.business_id == business_id, ComplianceItem.fy == fy)
         .order_by(ComplianceItem.created_at)
     ).all()
-    live = {}
+    existing = {}
     for item in this_year:
-        live[(item.form_code, item.period_start)] = item
+        existing[(item.form_code, item.period_start)] = item
 
-    def reshape(item, template, label, end, due):
-        """Give a not-started filing the wanted template, period and due date."""
-        item.template_id = template.id
-        item.period_label = label
-        item.period_end = end
-        item.due_date = due
-        item.status = _status_for(due, today)
-
-    counts = {"added": 0, "restored": 0, "removed": 0, "moved": 0, "kept_with_ca": 0}
+    counts = {"added": 0, "removed": 0, "kept_with_ca": 0}
     for key, (template, label, start, end, due) in wanted.items():
-        item = live.get(key)
-        if item is not None:
-            not_started = item.status in (ComplianceStatus.UPCOMING, ComplianceStatus.OVERDUE)
-            if not_started and (item.period_end, item.due_date) != (end, due):
-                reshape(item, template, label, end, due)
-                counts["moved"] += 1
-            elif item.template_id != template.id:
-                item.template_id = template.id  # a newer rule row; dates and status stay
-        else:
+        item = existing.get(key)
+        if item is None:
             db.session.add(
                 ComplianceItem(
                     business_id=business_id,
@@ -440,8 +421,16 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
                 )
             )
             counts["added"] += 1
+            continue
+        item.template_id = template.id  # the rule row in force now
+        not_started = item.status in (ComplianceStatus.UPCOMING, ComplianceStatus.OVERDUE)
+        if not_started and (item.period_end, item.due_date) != (end, due):
+            item.period_label = label
+            item.period_end = end
+            item.due_date = due
+            item.status = _status_for(due, today)
 
-    for key, item in live.items():
+    for key, item in existing.items():
         if key in wanted or item.status in DONE_STATUSES:
             continue
         if item.status == ComplianceStatus.WITH_CA or item.id in keep_ids:

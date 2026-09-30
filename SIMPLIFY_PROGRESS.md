@@ -244,6 +244,23 @@ working, stop and ask.
 - Snapshot: + `terms_accepted` gone from POST /auth/login (3 roles). 102 known, 0 unexplained.
 - Checks: backend 597 passed; frontend 240; build OK; walk 0 failures.
 
+### 4.2 onboarding (done)
+- Plain Flask; `read_business_form()` holds the form checks with the same rules and messages (formats, lengths,
+  amount range, required-when rules, GSTIN check character/state/PAN, dropping values that do not apply);
+  `business_to_dict`, `profile_to_dict`, `nic_to_dict`, `business_page`.
+- Section 4: `get_threshold(key, today)` = the row with the latest `effective_from` up to today (the old
+  `effective_to` check is gone; every ended rule has a successor). `compliance.sync_filings` is one short loop and
+  returns `{added, removed, kept_with_ca}` (no `restored`, `moved`); the frontend "What changed" box lost those two
+  lines. `resync_all_filings` returns `{businesses, added, removed}`.
+- `suggest_nic_codes` returns JSON-ready dicts (shortlist as `{code, description}`); eval/nic/evaluate.py reads
+  `nic["code"]` (one line).
+- Until ca_workspace is converted, the four business-page schemas it inherits from (BusinessSchema,
+  RegulatoryProfileSchema, NicCodeSchema, MyBusinessSchema) live in ca_workspace.py; `get_my_business` still
+  returns rows for it.
+- Fixed while converting: a business without a saved profile answers `profile: null` (as before), not a crash.
+- demo_walk.py now also edits the business (checks the What-changed keys), asks for NIC suggestions and saves one.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -330,3 +347,7 @@ working, stop and ask.
 | test_auth_login.py::test_login_says_whether_the_terms_were_accepted, test_accept_terms_records_consent_once | deleted | auth: accept-terms endpoint and consent gate removed |
 | test_app_factory.py::test_openapi_spec_lists_health_and_every_tag, test_swagger_ui_is_served | deleted | flask-smorest removed (sections 1 and 6), Q4 |
 | test_auth_me_and_permissions.py::test_openapi_marks_login_and_health_public_and_the_rest_protected (+ its PUBLIC_AUTH_PATHS list) | deleted. **Flag:** a third OpenAPI test Q4 did not name; same reason (nothing uses /api/openapi.json) | flask-smorest removed (sections 1 and 6), Q4 |
+| test_compliance_items.py::test_an_audit_moves_the_itr_due_date | the `counts["moved"] == 1` check removed (the due date check stays) | onboarding: "What changed" counts without `moved` |
+| test_onboarding_edit.py::test_switching_to_monthly_returns_changes_the_profile_and_filings, test_switching_back_to_quarterly_removes_the_extra_months | the `moved` checks removed (added/removed and the labels are still checked) | onboarding: "What changed" counts without `moved` |
+| test_compliance_legal_update.py::test_resync_reports_what_moved | renamed test_resync_moves_the_due_date_back_to_the_rule; checks the ITR due date instead of `counts["moved"]` | onboarding: sync counts without `moved` |
+| frontend OnboardingPage.test.jsx (edit test fixture) | `filings` without `restored`/`moved` | onboarding: update the frontend "What changed" box |

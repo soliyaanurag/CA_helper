@@ -98,6 +98,18 @@ def validation_error(errors: dict, location: str = "json") -> ApiError:
     return ApiError(422, "VALIDATION_ERROR", "Some fields are invalid.", {location: errors})
 
 
+def iso(value) -> str | None:
+    """A date or datetime as ISO text for JSON, e.g. "2026-10-13" (None stays None)."""
+    return value.isoformat() if value is not None else None
+
+
+def money(value) -> str | None:
+    """An amount as text with 2 decimals, e.g. "1250.00" (None stays None)."""
+    if value is None:
+        return None
+    return f"{Decimal(value).quantize(Decimal('0.01')):f}"
+
+
 # --- pagination --------------------------------------------------------------------------
 
 

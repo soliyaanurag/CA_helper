@@ -200,8 +200,7 @@ def test_an_audit_moves_the_itr_due_date(business, database):
     database.session.commit()
     before = by_key(database)[("itr", "FY 2026-27")].due_date
 
-    counts = sync_filings(business.id, profile(other_audit_applicable=True), TODAY)
+    sync_filings(business.id, profile(other_audit_applicable=True), TODAY)
     database.session.commit()
 
-    assert counts["moved"] == 1
     assert by_key(database)[("itr", "FY 2026-27")].due_date > before

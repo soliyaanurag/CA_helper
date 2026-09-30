@@ -660,10 +660,7 @@ function WhatChanged({ changes }) {
   const filings = changes.filings;
   const filingLines = [];
   if (filings.added) filingLines.push(`${plural(filings.added, "filing")} added`);
-  if (filings.restored) filingLines.push(`${plural(filings.restored, "filing")} back again`);
   if (filings.removed) filingLines.push(`${plural(filings.removed, "filing")} no longer needed`);
-  if (filings.moved)
-    filingLines.push(`${plural(filings.moved, "filing")} with a new period or due date`);
   if (filings.kept_with_ca) {
     filingLines.push(
       `${plural(filings.kept_with_ca, "filing")} kept although no longer needed, because a CA has it`,

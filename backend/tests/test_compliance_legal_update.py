@@ -157,7 +157,7 @@ def test_seed_moves_not_started_filings_to_the_current_rule(database, make_user,
     assert database.session.get(ComplianceItem, filed.id).due_date == date(2026, 1, 1)
 
 
-def test_resync_reports_what_moved(database, make_user, legal_rules):
+def test_resync_moves_the_due_date_back_to_the_rule(database, make_user, legal_rules):
     llp = make_business(database, make_user, EntityType.LLP)
     itr_of(database, llp).due_date = date(2027, 8, 31)
     database.session.commit()
@@ -165,7 +165,7 @@ def test_resync_reports_what_moved(database, make_user, legal_rules):
     counts = onboarding_service.resync_all_filings(TODAY)
 
     assert counts["businesses"] == 1
-    assert counts["moved"] == 1
+    assert itr_of(database, llp).due_date == date(2027, 7, 31)
     assert counts["added"] == counts["removed"] == 0
 
 

@@ -60,14 +60,17 @@ from app.models import (
     DocumentRequest,
     DocumentRequestStatus,
     DocumentType,
+    EntityType,
     FormCode,
+    GstScheme,
+    ItrForm,
+    MsmeTier,
     NotificationType,
     today_in_india,
     User,
     UserRole,
     utcnow,
 )
-from app.onboarding import MyBusinessSchema
 from app.utils import (
     ApiError,
     current_business,
@@ -75,10 +78,74 @@ from app.utils import (
     ErrorSchema,
     require_ca_access,
     roles_required,
+    state_code,
 )
 
 
 # --- Request and response shapes ---------------------------------------------------------
+
+
+# The business page shapes (the same as GET /onboarding/business).
+
+
+class BusinessSchema(Schema):
+    """The business as its owner sees it (all fields, decrypted)."""
+
+    id = fields.UUID(required=True)
+    legal_name = fields.String(required=True)
+    entity_type = fields.String(validate=validate.OneOf(list(EntityType)), required=True)
+    state = fields.String(required=True)
+    address = fields.String(required=True)
+    description = fields.String(required=True)
+    annual_turnover = fields.Decimal(as_string=True, required=True)
+    investment_amount = fields.Decimal(as_string=True, required=True)
+    pan = fields.String(required=True)
+    phone = fields.String(required=True)
+    gst_registered = fields.Boolean(required=True)
+    gstin = fields.String(allow_none=True)
+    gst_composition = fields.Boolean(required=True)
+    gst_qrmp = fields.Boolean(required=True)
+    accounts_audited_other_law = fields.Boolean(required=True)
+    deducts_tds = fields.Boolean(required=True)
+    tan = fields.String(allow_none=True)
+    pays_salary_above_limit = fields.Boolean(required=True)
+    cin_llpin = fields.String(allow_none=True)
+    udyam_number = fields.String(allow_none=True)
+    # True when the saved state is not in the state list (typed before the list existed):
+    # the form asks the user to choose it again.
+    state_needs_review = fields.Function(lambda business: state_code(business.state) is None)
+
+
+class RegulatoryProfileSchema(Schema):
+    """The computed profile; `explanations` has a "why" sentence for each line."""
+
+    msme_tier = fields.String(validate=validate.OneOf(list(MsmeTier)), required=True)
+    gst_scheme = fields.String(validate=validate.OneOf(list(GstScheme)), required=True)
+    gst_registration_suggested = fields.Boolean(required=True)
+    itr_form = fields.String(validate=validate.OneOf(list(ItrForm)), required=True)
+    presumptive_eligible = fields.Boolean(required=True)
+    audit_applicable = fields.Boolean(required=True)
+    other_audit_applicable = fields.Boolean(required=True)
+    files_24q = fields.Boolean(required=True)
+    files_26q = fields.Boolean(required=True)
+    roc_not_tracked = fields.Boolean(required=True)
+    explanations = fields.Dict(keys=fields.String(), values=fields.String(), required=True)
+    rule_version = fields.String(required=True)
+    computed_at = fields.DateTime(required=True)
+
+
+class NicCodeSchema(Schema):
+    """One official NIC activity code, e.g. 10712 "Manufacture of biscuits, cakes, ..."."""
+
+    code = fields.String(required=True)
+    description = fields.String(required=True)
+
+
+class MyBusinessSchema(Schema):
+    business = fields.Nested(BusinessSchema, required=True)
+    profile = fields.Nested(RegulatoryProfileSchema, required=True)
+    # The NIC code the user confirmed; null until they choose one.
+    nic_code = fields.Nested(NicCodeSchema, allow_none=True)
 
 
 class CaDashboardSchema(Schema):
