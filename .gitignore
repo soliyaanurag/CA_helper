@@ -27,8 +27,6 @@ __pycache__/
 htmlcov/
 *.egg-info/
 .venv/
-# Symlink to your ca-helper conda env, created by `make setup` for VS Code
-.conda-env
 
 # ---------------------------------------------------------------------------
 # Node / frontend
@@ -45,7 +43,5 @@ frontend/coverage/
 Thumbs.db
 .idea/
 *.swp
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/
 *.log

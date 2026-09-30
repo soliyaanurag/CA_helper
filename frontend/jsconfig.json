@@ -1,9 +1,0 @@
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "paths": { "@/*": ["./src/*"] }
-  },
-  "include": ["src", "vite.config.js"]
-}

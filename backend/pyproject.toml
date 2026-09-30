@@ -1,6 +1,4 @@
-# pytest configuration for the backend. (Ruff settings live in the root ruff.toml.)
-# Dependencies are NOT declared here: they live in requirements.txt and
-# requirements-dev.txt, the single source used by conda and CI.
+# pytest configuration for the backend. Dependencies live in requirements.txt.
 
 [tool.pytest.ini_options]
 # All tests live in tests/ (shared fixtures: tests/conftest.py).

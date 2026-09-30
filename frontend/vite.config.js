@@ -11,10 +11,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // Forward API calls to the Flask dev server (make dev-backend), so the browser
-    // only ever talks to one origin (no CORS needed). "/api" covers both the versioned
-    // module routes (/api/v1/...) and the unversioned /api/health and /api/docs.
-    proxy: { "/api": "http://localhost:8000" },
+    // Forward API calls to Flask, so the browser only ever talks to one origin (no CORS
+    // needed). In Docker Compose API_URL is http://backend:8000.
+    proxy: { "/api": process.env.API_URL || "http://127.0.0.1:8000" },
   },
   test: {
     environment: "jsdom",

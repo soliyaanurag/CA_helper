@@ -31,3 +31,37 @@ the tag and branch were made after that.
 - Baseline `api_snapshot_baseline.json`: 184 endpoint entries, every GET route called. A second run: no differences.
 - Known gaps of the snapshot (the tests cover these): the demo data has no regulatory changes and no assistant
   history, so those list shapes are empty lists; POST responses are not recorded (except login).
+
+## Step 1: Docker Compose, delete tooling (done)
+
+### Q2 (step 1): the npm packages behind the deleted config files
+The plan deletes `eslint.config.js`, `.prettierrc.json`, `.prettierignore` and `components.json`, but does not name the
+npm packages that only they use (`eslint`, `@eslint/js`, `eslint-config-prettier`, `eslint-plugin-react-hooks`,
+`eslint-plugin-react-refresh`, `globals`, `prettier`, `prettier-plugin-tailwindcss`, `shadcn`) or the `lint`,
+`format`, `format:check` npm scripts, which would fail without their configs.
+**Answer:** remove the 8 lint/format packages and the `lint`, `format`, `format:check` scripts; keep `shadcn`
+(`src/index.css` imports `shadcn/tailwind.css`).
+
+Done:
+- `docker-compose.yml` exactly as plan section 9 (db without a host port, Mailpit, backend, worker with profile,
+  frontend). `main.py` listens on 0.0.0.0; Vite proxies `/api` to `API_URL` or `http://127.0.0.1:8000`.
+- Deleted: Makefile, scripts/, environment.yml, .vscode/, .editorconfig, .gitattributes, ruff.toml,
+  backend/requirements-dev.txt (pytest moved into requirements.txt, ruff dropped), frontend .prettierrc.json,
+  .prettierignore, eslint.config.js, components.json, jsconfig.json, .npmrc. npm: the 8 lint/format packages and
+  scripts removed (Q2).
+- CI installs `backend/requirements.txt`; ruff, ESLint and Prettier steps removed (migrations and OpenAPI steps
+  stay until steps 2 and 5).
+- `.env.example`: DATABASE_URL points at the `db` container, POSTGRES_*/DB_HOST_PORT/TEST_DATABASE_URL/MAIL_SERVER
+  removed (compose sets them), secret placeholders with how to generate them. `.gitignore`: conda link and
+  .vscode exceptions removed.
+- CLAUDE.md moved to docs/old-CLAUDE.md; new CLAUDE.md = plan section 8 word for word.
+- Local machine: the old `make infra` containers (project `ca-helper`) were stopped; their volume
+  `ca-helper_pgdata` is kept (not deleted). The new stack uses a new volume `ca_helper_pgdata`.
+  In `.env`, the host of DATABASE_URL was changed from localhost to `db` (nothing else in .env was changed).
+
+Checks (all inside the containers):
+- `docker compose up -d`: db, mailpit, backend, frontend up; `flask db upgrade` + `flask seed-demo` OK;
+  /api/health OK directly and through the Vite proxy.
+- backend 644 passed; frontend 240 passed (36 files); `npm run build` OK.
+- Snapshot compare: no differences.
+- Tests changed: none.
