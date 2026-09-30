@@ -1,8 +1,7 @@
-"""Routes for the regulatory monitor (all under /api/v1, admins only).
+"""Routes for the regulatory monitor (all under /api/v1).
 
-    GET  /admin/regulatory/changes?status=      changes found in the news, newest first
-    POST /admin/regulatory/changes/<id>/approve  approve: affected businesses are told
-    POST /admin/regulatory/changes/<id>/reject   reject: nobody is told
+    GET  /regulatory/updates                     the changes about my forms (business, CA)
+    GET  /admin/regulatory/changes               changes found in the news, newest first (admin)
     GET  /admin/regulatory/sources               the news sources
     POST /admin/regulatory/sources               add a source
     PUT  /admin/regulatory/sources/<id>          switch a source on or off
@@ -18,7 +17,6 @@ from flask_smorest import Blueprint
 from app.errors import ErrorSchema
 from app.models.enums import UserRole
 from app.schemas.regulatory import (
-    ChangeListArgsSchema,
     NewsSourceEnabledSchema,
     NewsSourceInputSchema,
     NewsSourceSchema,
@@ -28,37 +26,24 @@ from app.schemas.regulatory import (
 from app.services import regulatory_service
 from app.utils.decorators import current_user, roles_required
 
-blp = Blueprint("regulatory", __name__, description="Regulatory news monitor (admin)")
+blp = Blueprint("regulatory", __name__, description="Regulatory news monitor")
 
 
-# The changes found in the news (pending ones wait for an admin).
+# The changes about my forms: a business's own filings, a CA's active clients' filings.
+@blp.route("/regulatory/updates", methods=["GET"])
+@roles_required(UserRole.BUSINESS, UserRole.CA)
+@blp.response(200, RegulatoryChangeSchema(many=True))
+def list_updates():
+    return regulatory_service.list_updates(current_user())
+
+
+# Every change found in the news. Those Gemini extracted were sent to the affected users
+# at once; those found by keywords only were not sent to anyone.
 @blp.route("/admin/regulatory/changes", methods=["GET"])
 @roles_required(UserRole.ADMIN)
-@blp.arguments(ChangeListArgsSchema, location="query")
 @blp.response(200, RegulatoryChangeSchema(many=True))
-def list_changes(args):
-    return regulatory_service.list_changes(args["status"])
-
-
-# Approve a change: the affected businesses get a tray entry and an email, their CAs a
-# tray entry, and the client's urgency rises.
-@blp.route("/admin/regulatory/changes/<uuid:change_id>/approve", methods=["POST"])
-@roles_required(UserRole.ADMIN)
-@blp.response(200, RegulatoryChangeSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="CHANGE_NOT_FOUND")
-@blp.alt_response(409, schema=ErrorSchema, description="CHANGE_NOT_PENDING (already reviewed)")
-def approve_change(change_id):
-    return regulatory_service.approve_change(current_user(), change_id)
-
-
-# Reject a change: nobody is told.
-@blp.route("/admin/regulatory/changes/<uuid:change_id>/reject", methods=["POST"])
-@roles_required(UserRole.ADMIN)
-@blp.response(200, RegulatoryChangeSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="CHANGE_NOT_FOUND")
-@blp.alt_response(409, schema=ErrorSchema, description="CHANGE_NOT_PENDING (already reviewed)")
-def reject_change(change_id):
-    return regulatory_service.reject_change(current_user(), change_id)
+def list_changes():
+    return regulatory_service.list_changes()
 
 
 @blp.route("/admin/regulatory/sources", methods=["GET"])
@@ -103,5 +88,5 @@ def scan_command():
     click.echo(
         f"Sources: {counts['sources']}, blocked by robots.txt: {counts['blocked_by_robots']}, "
         f"failed: {counts['failed']}, new articles: {counts['new_articles']}, "
-        f"new changes to review: {counts['changes']}"
+        f"new changes: {counts['changes']}"
     )

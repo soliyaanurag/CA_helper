@@ -146,6 +146,22 @@ Checks (all inside the containers):
 - Snapshot: only section 4 differences (`/alerts/settings` gone, `/auth/settings` new).
 - Checks: backend 604 passed; frontend 240; build OK; walk 0 failures.
 
+### 2.5e Regulatory: no admin approval (backend done)
+- `regulatory_changes.status`, `reviewed_at`, `reviewed_by_id` and RegulatoryChangeStatus removed; `notified_at` added.
+- scan_news: a change Gemini extracted is sent at once (`_notify_affected`: tray + email to the affected
+  businesses, tray to their active CAs, a regulatory_change_matches row each, `notified_at` set). A keyword-only
+  change is saved, `notified_at` stays empty, nobody is told. `active_changes_for` no longer checks a status.
+- Removed: `POST /admin/regulatory/changes/<id>/approve`, `/reject`, the `?status=` filter (now ignored),
+  error CHANGE_NOT_PENDING. The CLI line says "new changes: n" (was "new changes to review").
+- New `GET /api/v1/regulatory/updates` (business and CA; admin 403): the same rows as the admin list, filtered to
+  the changes that name one of "your forms". **Decision:** a business's forms = the forms of its filings; a CA's
+  forms = the forms of the filings in their ACTIVE engagements (the plan does not say which forms a CA has).
+  Keyword-only rows are recognisable by `affected_categories.extracted_by == "keywords"` (for the page's
+  "Found by keywords: read the article").
+- Snapshot: only section 4 differences (new route; `?status=all` now 200 instead of 422). The demo data has no
+  regulatory changes, so the row keys (`status`/`reviewed_at` out, `notified_at` in) are covered by the tests.
+- Checks: backend 606 passed; frontend 240; build OK; walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -211,3 +227,12 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_alerts_notifications.py::test_tray_and_settings_need_a_login | renamed test_the_tray_needs_a_login; the /alerts/settings case removed | alerts: notification_settings removed |
 | test_alerts_notifications.py: test_settings_default_to_on_with_engagement_emails_always_sent, test_saving_settings_twice_keeps_one_row_per_type, test_engagement_emails_cannot_be_switched_off, test_admins_have_no_settings_page | replaced by test_emails_are_on_by_default, test_switching_emails_off_and_on, test_code_emails_are_sent_even_when_emails_are_off, test_settings_need_a_login, test_admins_have_no_settings_page (all on /api/v1/auth/settings) | alerts: one email switch, new /auth/settings |
 | test_alerts_reminders.py::test_switched_off_emails_still_reach_the_tray | the owner's switch is off -> 2 tray entries, no email (was: one type off, overdue still emailed) | alerts: one email switch |
+| test_regulatory_monitor.py::test_gemini_extracts_the_change_as_pending | renamed test_gemini_extracts_the_change; checks `notified_at` instead of status "pending" | regulatory: no admin approval |
+| test_regulatory_monitor.py `pending` fixture | replaced by `found` (scan inside the test, after the business/CA exist) | regulatory: no admin approval |
+| test_regulatory_monitor.py::test_admin_sees_pending_changes_with_their_article | renamed ..._sees_the_changes_...; no `?status=` | regulatory: no admin approval |
+| test_regulatory_monitor.py::test_approval_tells_the_business_and_its_ca | rewritten as test_a_change_from_gemini_tells_the_business_and_its_ca_at_once | regulatory: auto-notify |
+| test_regulatory_monitor.py::test_approval_raises_the_clients_urgency, test_old_changes_no_longer_raise_urgency | renamed/cleaned: no approve call (the scan notifies) | regulatory: auto-notify |
+| test_regulatory_monitor.py::test_a_change_for_another_scheme_or_state_tells_nobody, test_a_filed_filing_is_not_affected | scan after the setup instead of approving | regulatory: auto-notify |
+| test_regulatory_monitor.py::test_rejection_tells_nobody_and_a_change_is_reviewed_once | replaced by test_a_change_found_by_keywords_tells_nobody | regulatory: no approval; keyword-only finds only listed |
+| test_regulatory_monitor.py (new) test_updates_show_the_changes_about_my_forms, test_updates_are_for_businesses_and_cas | added | regulatory: new GET /regulatory/updates |
+| test_regulatory_monitor.py::test_scan_command | expects "new changes: 1" (was "new changes to review: 1") | regulatory: no admin approval |

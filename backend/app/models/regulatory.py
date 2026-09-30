@@ -2,10 +2,11 @@
 
     news_sources               a configured site or feed (NewsSource)
     news_articles              one scraped article (NewsArticle)
-    regulatory_changes         a change Gemini extracted, waiting for an admin (RegulatoryChange)
-    regulatory_change_matches  a business hit by an approved change, N-N (RegulatoryChangeMatch)
+    regulatory_changes         a change found in an article (RegulatoryChange)
+    regulatory_change_matches  a business told about a change, N-N (RegulatoryChangeMatch)
 
-Only an approved change is sent to businesses. Article text is public news, never PII.
+A change Gemini extracted is sent to the businesses it affects at once; a change found by
+keywords only is listed but nobody is told. Article text is public news, never PII.
 """
 
 import uuid
@@ -29,12 +30,6 @@ class ChangeType(StrEnum):
     RATE_CHANGE = "rate_change"
     NEW_RULE = "new_rule"
     OTHER = "other"
-
-
-class RegulatoryChangeStatus(StrEnum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
 
 
 class NewsSource(BaseModel):
@@ -62,7 +57,7 @@ class NewsArticle(BaseModel):
 
 
 class RegulatoryChange(BaseModel):
-    """A deadline or rule change extracted from an article, reviewed by an admin."""
+    """A deadline or rule change found in an article."""
 
     __tablename__ = "regulatory_changes"
     article_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("news_articles.id"), index=True)
@@ -75,15 +70,12 @@ class RegulatoryChange(BaseModel):
     affected_categories: Mapped[dict] = mapped_column(JSONB)
     # The dates it mentions, e.g. {"old_due_date": "2026-10-20", "new_due_date": "2026-10-31"}.
     dates: Mapped[dict] = mapped_column(JSONB)
-    status: Mapped[str] = mapped_column(
-        String(50), default=RegulatoryChangeStatus.PENDING
-    )
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    # When the affected users were told (empty for a change found by keywords only).
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class RegulatoryChangeMatch(BaseModel):
-    """A business affected by an approved change (at most once per change)."""
+    """A business told about a change (at most once per change)."""
 
     __tablename__ = "regulatory_change_matches"
     __table_args__ = (UniqueConstraint("change_id", "business_id"),)

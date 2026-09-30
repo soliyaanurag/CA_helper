@@ -8,18 +8,16 @@ How it works, step by step:
      change word ("due date", "extended", "late fee", ...).
   3. Gemini (app/utils/gemini_client.py) reads such an article and returns the change as
      JSON; we keep only known values. Without Gemini, a simple keyword version is saved.
-     The change is saved as "pending": nobody is told anything yet.
-  4. An admin approves or rejects it (list_changes, approve_change, reject_change).
-  5. On approval: the businesses with an open filing of those forms (and of the right
-     GST scheme / entity type / state, if the change says so) get a tray entry and an
-     email; their active CAs get a tray entry, and the client's urgency score rises
-     (regulatory_points in ca_workspace_service reads active_changes_for()).
+  4. A change Gemini extracted is sent at once: the businesses with an open filing of
+     those forms (and of the right GST scheme / entity type / state, if the change says
+     so) get a tray entry and an email; their active CAs get a tray entry, and the
+     client's urgency score rises (ca_workspace_service reads active_changes_for()).
+     A change found by keywords only is saved and listed, but nobody is told.
 
 Public functions:
   scan_news() -> dict                               RE2 + RE3 (worker job, CLI)
-  list_changes(status) -> list[dict]                RE4 (admin)
-  approve_change(admin, change_id) -> dict          RE4 + RE5
-  reject_change(admin, change_id) -> dict           RE4
+  list_changes() -> list[dict]                      every change found (admin)
+  list_updates(user) -> list[dict]                  the changes about my forms (business, CA)
   list_sources() / add_source(data) / set_source_enabled(source_id, enabled)   RE1
   active_changes_for(business_id, today=None) -> list[RegulatoryChange]        urgency hook
 
@@ -47,9 +45,9 @@ from app.extensions import db
 from app.models import NewsArticle, NewsSource, RegulatoryChange, RegulatoryChangeMatch, User
 from app.models.alerts import NotificationType
 from app.models.base import today_in_india, utcnow
-from app.models.enums import FormCode
+from app.models.enums import FormCode, UserRole
 from app.models.onboarding import EntityType, GstScheme
-from app.models.regulatory import ChangeType, NewsSourceKind, RegulatoryChangeStatus
+from app.models.regulatory import ChangeType, NewsSourceKind
 from app.services import (
     alerts_service,
     auth_service,
@@ -68,7 +66,8 @@ DOWNLOAD_TIMEOUT_SECONDS = 15
 MAX_DOWNLOAD_BYTES = 2_000_000
 MAX_ITEMS_PER_SOURCE = 30  # newest items of a feed or links of a page, per run
 MAX_EXTRACTIONS_PER_RUN = 10  # articles sent to Gemini per run (keeps the quota safe)
-RECENT_DAYS = 30  # an approved change raises the CA's urgency for this many days
+RECENT_DAYS = 30  # a change raises the CA's urgency for this many days
+MAX_LISTED_CHANGES = 100
 
 # Words that suggest a change to a deadline or rule (step 2).
 CHANGE_WORDS = [
@@ -377,7 +376,7 @@ def _dates(data: dict) -> dict:
 
 def _change_from_keywords(article: NewsArticle) -> dict:
     """Without Gemini: the article's title as the summary and the forms it names.
-    The admin reads the article before approving."""
+    Nobody is told about such a change; the page links to the article."""
     text = article.title + " " + article.content
     change_type = ChangeType.OTHER.value
     # Only a done deal counts: "due date extended", not "request for extension".
@@ -410,7 +409,8 @@ def _extract_change(article: NewsArticle) -> dict | None:
 
 
 def scan_news() -> dict:
-    """Fetch every enabled source, save new articles and the changes found in them.
+    """Fetch every enabled source, save new articles and the changes found in them, and
+    tell the affected users about each change Gemini extracted.
 
     Returns counts: {sources, blocked_by_robots, failed, new_articles, changes}.
     Commits once at the end.
@@ -448,8 +448,12 @@ def scan_news() -> dict:
             values = _extract_change(article)
             if values is None or not values["form_codes"]:
                 continue
-            db.session.add(RegulatoryChange(article_id=article.id, **values))
+            change = RegulatoryChange(article_id=article.id, **values)
+            db.session.add(change)
             counts["changes"] += 1
+            if values["affected_categories"]["extracted_by"] == "ai":
+                db.session.flush()  # gives change.id
+                _notify_affected(change)
 
     db.session.commit()
     log.info("News scan: %s", counts)
@@ -457,12 +461,12 @@ def scan_news() -> dict:
 
 
 # ---------------------------------------------------------------------------------
-# Admin review and notifying the affected businesses (RE4, RE5)
+# Telling the affected businesses and listing the changes (RE4, RE5)
 # ---------------------------------------------------------------------------------
 
 
 def _change_row(change: RegulatoryChange) -> dict:
-    """A change with its article and source, for the admin page."""
+    """A change with its article and source, for the pages."""
     article = db.session.get(NewsArticle, change.article_id)
     source = db.session.get(NewsSource, article.source_id)
     match_count = db.session.scalar(
@@ -477,9 +481,8 @@ def _change_row(change: RegulatoryChange) -> dict:
         "form_codes": change.form_codes,
         "affected_categories": change.affected_categories,
         "dates": change.dates,
-        "status": change.status,
         "created_at": change.created_at,
-        "reviewed_at": change.reviewed_at,
+        "notified_at": change.notified_at,
         "article_title": article.title,
         "article_url": article.url,
         "published_at": article.published_at,
@@ -488,24 +491,42 @@ def _change_row(change: RegulatoryChange) -> dict:
     }
 
 
-def list_changes(status: str | None = None) -> list[dict]:
-    """Changes with their article, newest first (at most 100); `status` filters."""
-    stmt = select(RegulatoryChange).order_by(RegulatoryChange.created_at.desc()).limit(100)
-    if status:
-        stmt = stmt.where(RegulatoryChange.status == RegulatoryChangeStatus(status))
+def list_changes() -> list[dict]:
+    """Every change with its article, newest first (at most MAX_LISTED_CHANGES)."""
+    stmt = (
+        select(RegulatoryChange)
+        .order_by(RegulatoryChange.created_at.desc())
+        .limit(MAX_LISTED_CHANGES)
+    )
     rows = []
     for change in db.session.scalars(stmt):
         rows.append(_change_row(change))
     return rows
 
 
-def _pending_change(change_id) -> RegulatoryChange:
-    change = db.session.get(RegulatoryChange, change_id)
-    if change is None:
-        raise ApiError(404, "CHANGE_NOT_FOUND", "This change does not exist.")
-    if change.status != RegulatoryChangeStatus.PENDING:
-        raise ApiError(409, "CHANGE_NOT_PENDING", "This change was already reviewed.")
-    return change
+def list_updates(user: User) -> list[dict]:
+    """The changes that name one of the user's forms, newest first: for a business the
+    forms of its filings, for a CA the forms of their active clients' filings. Changes
+    found by keywords only are included (affected_categories.extracted_by = "keywords")."""
+    filings = []
+    if user.role == UserRole.BUSINESS:
+        business = onboarding_service.business_of_user(user)
+        if business is not None:
+            filings = compliance_service.list_filings(business)
+    else:
+        profile_id = marketplace_service.own_profile_id(user)
+        if profile_id is not None:
+            filing_ids = [filing_id for _, _, filing_id in marketplace_service.active_work(profile_id)]
+            filings = compliance_service.get_filings_by_ids(filing_ids).values()
+    my_forms = set()
+    for filing in filings:
+        my_forms.add(filing.form_code)
+
+    rows = []
+    for row in list_changes():
+        if my_forms & set(row["form_codes"]):
+            rows.append(row)
+    return rows
 
 
 def _fits(values: list[str] | None, value: str) -> bool:
@@ -539,13 +560,10 @@ def forms_text(form_codes: list[str]) -> str:
     return ", ".join(names)
 
 
-def approve_change(admin: User, change_id) -> dict:
-    """Approve a pending change and tell every affected business (tray + email) and
-    their active CAs (tray). Commits once; the emails go out after the commit."""
-    change = _pending_change(change_id)
-    change.status = RegulatoryChangeStatus.APPROVED
-    change.reviewed_at = utcnow()
-    change.reviewed_by_id = admin.id
+def _notify_affected(change: RegulatoryChange) -> None:
+    """Tell every affected business (tray + email) and their active CAs (tray), and
+    record the matches. Does not commit; the emails go out after the commit."""
+    change.notified_at = utcnow()
 
     title = f"Regulatory update: {forms_text(change.form_codes)}"
     body = change.summary
@@ -578,24 +596,9 @@ def approve_change(admin: User, change_id) -> dict:
                 link=f"/ca/clients/{business['id']}",
             )
 
-    db.session.commit()
-    log.info("Regulatory change %s approved by %s", change.id, admin.id)
-    return _change_row(change)
-
-
-def reject_change(admin: User, change_id) -> dict:
-    """Reject a pending change: nobody is told."""
-    change = _pending_change(change_id)
-    change.status = RegulatoryChangeStatus.REJECTED
-    change.reviewed_at = utcnow()
-    change.reviewed_by_id = admin.id
-    db.session.commit()
-    log.info("Regulatory change %s rejected by %s", change.id, admin.id)
-    return _change_row(change)
-
 
 def active_changes_for(business_id, today: date | None = None) -> list[RegulatoryChange]:
-    """Approved changes that affected this business in the last RECENT_DAYS days
+    """Changes the business was told about in the last RECENT_DAYS days
     (ca_workspace adds urgency points for each)."""
     today = today or today_in_india()
     since = today - timedelta(days=RECENT_DAYS)
@@ -604,10 +607,9 @@ def active_changes_for(business_id, today: date | None = None) -> list[Regulator
         .join(RegulatoryChangeMatch, RegulatoryChangeMatch.change_id == RegulatoryChange.id)
         .where(
             RegulatoryChangeMatch.business_id == business_id,
-            RegulatoryChange.status == RegulatoryChangeStatus.APPROVED,
             RegulatoryChangeMatch.notified_at >= since,
         )
-        .order_by(RegulatoryChange.reviewed_at.desc())
+        .order_by(RegulatoryChange.notified_at.desc())
     )
     return list(db.session.scalars(stmt))
 

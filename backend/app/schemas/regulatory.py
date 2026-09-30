@@ -1,14 +1,8 @@
-"""Request and response shapes for /api/v1/admin/regulatory/..."""
+"""Request and response shapes for /api/v1/regulatory/... and /api/v1/admin/regulatory/..."""
 
 from marshmallow import Schema, fields, validate
 
-from app.models.regulatory import NewsSourceKind, RegulatoryChangeStatus
-
-
-class ChangeListArgsSchema(Schema):
-    """?status=pending | approved | rejected (empty = all)."""
-
-    status = fields.String(validate=validate.OneOf(list(RegulatoryChangeStatus)), load_default=None)
+from app.models.regulatory import NewsSourceKind
 
 
 class RegulatoryChangeSchema(Schema):
@@ -22,14 +16,14 @@ class RegulatoryChangeSchema(Schema):
     affected_categories = fields.Dict(required=True)
     # {old_due_date?, new_due_date?, period?}
     dates = fields.Dict(required=True)
-    status = fields.String(required=True)
     created_at = fields.DateTime(required=True)
-    reviewed_at = fields.DateTime(allow_none=True)
+    # When the affected users were told; null for a change found by keywords only.
+    notified_at = fields.DateTime(allow_none=True)
     article_title = fields.String(required=True)
     article_url = fields.String(required=True)
     published_at = fields.DateTime(allow_none=True)
     source_name = fields.String(required=True)
-    match_count = fields.Integer(required=True)  # businesses told about it (after approval)
+    match_count = fields.Integer(required=True)  # businesses told about it
 
 
 class NewsSourceSchema(Schema):
