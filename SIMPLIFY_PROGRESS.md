@@ -11,24 +11,6 @@ How to check after every step:
   `docker compose exec backend python ../api_snapshot.py --compare`). It uses its own database
   `ca_helper_snapshot` on the same server, so it never touches the dev data.
 
-## Step 3: Mechanical merge (done)
-- Backend app is now: `__init__.py` (Config, flask-smorest Api subclass, JWT callbacks, /api/health, BLUEPRINTS,
-  create_app), `models.py` (db + every table + encryption), `utils.py` (errors, page schemas, passwords, email with
-  the 13 templates as one dict, access control, GSTIN, money, file check, Gemini), `ocr.py` (ocr + document_text),
-  one file per feature (`auth.py` ... `admin.py`: schemas, then logic, then routes, still flask-smorest),
-  `seed.py`, `demo_seed.py`. Old packages models/, services/, routes/, schemas/, utils/, templates/ and config.py,
-  extensions.py, errors.py are gone.
-- Mechanical renames only: `x_service.f()` -> `x.f()`; route view functions that had the same name as their service
-  function got a `_view` suffix (step 4 rewrites the routes); one local variable `documents` -> `files_by_filing`
-  (ca_workspace.get_client, it hid the module). `require_ca_access` imports marketplace inside the function.
-- Emails: `jinja2.Template(EMAIL_TEMPLATES[name])` (plain text like the old .txt files; `render_template_string`
-  would HTML-escape). All 13 templates checked to render byte-for-byte the same as before.
-- Tests: only import lines changed (aliases like `from app import compliance as compliance_service`, so bodies are
-  untouched), plus test_health.py's logger name `app.routes.health` -> `app` (the module moved) and
-  test_api_prefix.py imports API_PREFIX/BLUEPRINTS from `app`. eval/ scripts: imports only (aliases; step 7).
-- Checks: backend 604 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures; worker jobs
-  listed; `flask db` works.
-
 ## Answered questions
 
 ### Q1 (step 0): which main to start from?
@@ -213,6 +195,24 @@ routes).
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
 audit log, the matching score, per-type email settings and regulatory approval. Everything else follows rule 5.
+
+## Step 3: Mechanical merge (done)
+- Backend app is now: `__init__.py` (Config, flask-smorest Api subclass, JWT callbacks, /api/health, BLUEPRINTS,
+  create_app), `models.py` (db + every table + encryption), `utils.py` (errors, page schemas, passwords, email with
+  the 13 templates as one dict, access control, GSTIN, money, file check, Gemini), `ocr.py` (ocr + document_text),
+  one file per feature (`auth.py` ... `admin.py`: schemas, then logic, then routes, still flask-smorest),
+  `seed.py`, `demo_seed.py`. Old packages models/, services/, routes/, schemas/, utils/, templates/ and config.py,
+  extensions.py, errors.py are gone.
+- Mechanical renames only: `x_service.f()` -> `x.f()`; route view functions that had the same name as their service
+  function got a `_view` suffix (step 4 rewrites the routes); one local variable `documents` -> `files_by_filing`
+  (ca_workspace.get_client, it hid the module). `require_ca_access` imports marketplace inside the function.
+- Emails: `jinja2.Template(EMAIL_TEMPLATES[name])` (plain text like the old .txt files; `render_template_string`
+  would HTML-escape). All 13 templates checked to render byte-for-byte the same as before.
+- Tests: only import lines changed (aliases like `from app import compliance as compliance_service`, so bodies are
+  untouched), plus test_health.py's logger name `app.routes.health` -> `app` (the module moved) and
+  test_api_prefix.py imports API_PREFIX/BLUEPRINTS from `app`. eval/ scripts: imports only (aliases; step 7).
+- Checks: backend 604 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures; worker jobs
+  listed; `flask db` works.
 
 ## Changed or deleted tests (with their section 4 item)
 
