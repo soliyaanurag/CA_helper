@@ -341,6 +341,13 @@ working, stop and ask.
 - Checks: backend 597 passed; frontend 240 passed (one run under load had 3 timing failures; two reruns: 240/240);
   build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.10 admin (done)
+- Plain Flask routes (dashboard, stats, users with search and pages, CA list / detail / certificate / verify /
+  reject). `marketplace.admin_row` returns JSON-ready rows now (admin is its only user).
+- Suspend, reactivate and the audit log were removed in step 2.5b.
+- No test changed. Every feature module is now a plain Flask blueprint (`bp`).
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |

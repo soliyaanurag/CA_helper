@@ -1467,8 +1467,8 @@ def complete_if_all_filed(engagement_id) -> bool:
 def admin_row(profile: CaProfile) -> dict:
     """Everything an admin sees about a CA (their numbers too, for checking)."""
     return {
-        "id": profile.id,
-        "user_id": profile.user_id,
+        "id": str(profile.id),
+        "user_id": str(profile.user_id),
         "full_name": profile.user.full_name,
         "email": profile.user.email,
         "membership_no": profile.membership_no,
@@ -1482,9 +1482,9 @@ def admin_row(profile: CaProfile) -> dict:
         "about": profile.about,
         "verification_status": profile.verification_status,
         "rejection_reason": profile.rejection_reason,
-        "verified_at": profile.verified_at,
+        "verified_at": iso(profile.verified_at),
         "has_certificate": profile.cop_document_id is not None,
-        "updated_at": profile.updated_at,
+        "updated_at": iso(profile.updated_at),
     }
 
 
