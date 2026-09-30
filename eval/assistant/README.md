@@ -22,3 +22,14 @@ Script: `evaluate.py` calls `assistant_service.search()` and `assistant_service.
 code; nothing is saved). Metrics: retrieval (an expected source is among the passages found), out of scope (nothing
 found, so the assistant declines), must mention (every point is in the answer) and citations (cited sources ⊆
 expected sources), both only for answers Gemini wrote, and "Ask a CA".
+
+## Second set: `questions.md` (v1, 45 questions) and `run_eval.py`
+
+`questions.md` has 42 questions about the plain-language FAQ pages in `content/faqs/` (each with the key points a
+correct answer contains and the one file it should cite) and 3 out-of-scope questions. `run_eval.py`
+(`make assistant-eval`) sends each one to `assistant_service.answer_question()` with a category-level context (a
+business owner who has not registered; no personal data), then writes `results.csv` (answer, cited sources,
+"cited correctly", whether Gemini wrote the answer) and `RESULTS.md` (the table to score by hand: fill in the
+**correctness** column with correct / partial / wrong, and the summary counts). It needs the knowledge base
+(`make assistant-ingest`) and `GEMINI_API_KEY`; it waits 8 s between questions (`--delay`) for the free tier's
+per-minute limit.
