@@ -332,6 +332,15 @@ working, stop and ask.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures (with a
   real "Scan now").
 
+### 4.9 assistant (done)
+- Plain Flask routes (ask, history, clear); the ingest / search / answer code is unchanged apart from comments.
+  `flask assistant ingest` still works. Uses `onboarding.get_profile`; `onboarding.get_my_business` deleted (no
+  caller left).
+- Kept for the tests and eval: `ask`, `answer_question`, `search`, `build_chunks`, `ingest_knowledge`, `MAX_CHUNK`.
+- No test changed.
+- Checks: backend 597 passed; frontend 240 passed (one run under load had 3 timing failures; two reruns: 240/240);
+  build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |

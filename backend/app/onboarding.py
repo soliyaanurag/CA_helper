@@ -778,15 +778,6 @@ def business_of_user(user: User) -> Business | None:
     return db.session.scalar(select(Business).where(Business.user_id == user.id))
 
 
-def get_my_business(business: Business) -> dict:
-    """The business with its profile and NIC code, as rows (the CA's client page)."""
-    return {
-        "business": business,
-        "profile": get_profile(business),
-        "nic_code": nic_code_of(business),
-    }
-
-
 def get_msme_tier(business: Business) -> str | None:
     """The MSME tier of the business's profile, e.g. "micro" (None without a profile)."""
     profile = get_profile(business)

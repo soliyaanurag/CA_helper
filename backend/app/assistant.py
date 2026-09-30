@@ -1,36 +1,18 @@
-"""Request and response shapes for /api/v1/assistant/...
-
-Business logic for the AI assistant: a searchable knowledge base, and answers with sources.
-
-ingest_knowledge() -> dict      AS1: read content/, cut it into chunks, embed and save them
-ask(user, question) -> dict     AS2-AS4: find the best chunks, let Gemini answer from them
-list_history(user) -> list      AS5: the user's questions and answers, oldest first
-clear_history(user) -> None     AS5: soft-delete them
+"""The AI assistant: a searchable knowledge base, and answers with their sources.
 
 How an answer is made ("RAG", retrieval-augmented generation):
-  1. Search: the question becomes a vector (gemini_client.embed_texts) and pgvector finds
-     the TOP_K closest chunks (cosine distance, only those within MAX_DISTANCE). Without
+  1. Search: the question becomes a vector (utils.embed_texts) and pgvector finds the
+     TOP_K closest chunks (cosine distance, only those within MAX_DISTANCE). Without
      Gemini: the chunks sharing the most words with the question.
   2. Answer: Gemini gets the question, those chunks numbered [1]..[5] and category-level
      facts about the user (e.g. "proprietorship, micro, regular_qrmp"; never a name, PAN,
-     GSTIN or amount; rule 1), and must answer only from the chunks, citing their numbers.
+     GSTIN or amount), and must answer only from the chunks, citing their numbers.
      Without Gemini, the answer is the found passages themselves.
-  3. "Ask a CA" (AS4) is suggested when Gemini says the question needs a professional's
+  3. "Ask a CA" is suggested when Gemini says the question needs a professional's
      judgment, or the question mentions notices, penalties, appeals, ...
 
-The knowledge base is our own guides (content/forms/, still DRAFT) and official FAQ pages
-copied into content/faqs/ with their source URL. kb_chunks holds only this public text.
-
-Routes for the AI assistant (all under /api/v1), for business owners and CAs.
-
-    POST   /api/v1/assistant/ask       ask a question: an answer with its sources (AS2-AS4)
-    GET    /api/v1/assistant/history   the user's past questions and answers (AS5)
-    DELETE /api/v1/assistant/history   clear them
-
-    flask assistant ingest             build / refresh the knowledge base from content/ (AS1)
-
-Each route only checks who is calling, reads the input, calls one function in
-app/assistant.py and returns its result as JSON.
+The knowledge base is our own guides (content/forms/) and official FAQ pages copied into
+content/faqs/ with their source URL. kb_chunks holds only this public text.
 """
 
 import json
@@ -39,55 +21,25 @@ import re
 
 import click
 import yaml
-from flask_smorest import Blueprint
-from marshmallow import fields, Schema, validate
+from flask import Blueprint, jsonify
 from sqlalchemy import delete, select
 
 from app import compliance, onboarding, utils
-from app.models import ChatMessage, ChatRole, db, KbChunk, today_in_india, User, UserRole
-from app.utils import ApiError, current_user, REPO_ROOT, roles_required
-
-
-# --- Request and response shapes ---------------------------------------------------------
-
-
-class QuestionSchema(Schema):
-    """POST /assistant/ask. Do not type personal details: they are removed before Gemini."""
-
-    question = fields.String(required=True, validate=validate.Length(3, 500))
-
-
-class CitationSchema(Schema):
-    """One source an answer used: our guide or an official FAQ page."""
-
-    number = fields.Integer(required=True, metadata={"description": "The [n] in the answer"})
-    title = fields.String(required=True)
-    url = fields.String(allow_none=True, metadata={"description": "The official page, if any"})
-    source_path = fields.String(required=True, metadata={"description": "e.g. content/faqs/..."})
-    excerpt = fields.String(required=True, metadata={"description": "The start of the passage"})
-
-
-class AnswerSchema(Schema):
-    answer = fields.String(required=True)
-    citations = fields.List(fields.Nested(CitationSchema), required=True)
-    ask_a_ca = fields.Boolean(required=True, metadata={"description": "Suggest the marketplace"})
-    ai_used = fields.Boolean(required=True, metadata={"description": "False: passages only"})
-
-
-class ChatMessageSchema(Schema):
-    id = fields.UUID(required=True)
-    role = fields.String(validate=validate.OneOf(list(ChatRole)), required=True)
-    content = fields.String(required=True)
-    citations = fields.List(fields.Nested(CitationSchema), required=True)
-    ask_a_ca = fields.Boolean(required=True)
-    ai_used = fields.Boolean(required=True)
-    created_at = fields.DateTime(required=True)
-
-
-# --- Logic -------------------------------------------------------------------------------
-
+from app.models import ChatMessage, ChatRole, KbChunk, User, UserRole, db, today_in_india
+from app.utils import (
+    MISSING,
+    REPO_ROOT,
+    ApiError,
+    current_user,
+    iso,
+    json_body,
+    roles_required,
+    validation_error,
+)
 
 log = logging.getLogger(__name__)
+
+bp = Blueprint("assistant", __name__)
 
 CONTENT_DIR = REPO_ROOT / "content"
 MAX_CHUNK = 1500  # characters: about one section of a guide or a few FAQ answers
@@ -97,7 +49,7 @@ TOP_K = 5  # chunks given to Gemini per question
 MAX_DISTANCE = 0.40
 HISTORY_SIZE = 50  # messages shown in the chat
 
-# AS4: words that point to a question a professional should look at.
+# Words that point to a question a professional should look at.
 ASK_A_CA_WORDS = (
     "notice", "penalty", "penalties", "appeal", "scrutiny", "demand", "refund", "raid",
     "assessment", "prosecution", "dispute", "tribunal", "cancelled", "cancellation", "summons",
@@ -111,9 +63,7 @@ COMMON_WORDS = {
 }  # fmt: skip
 
 
-# ---------------------------------------------------------------------------
-# AS1: building the knowledge base
-# ---------------------------------------------------------------------------
+# --- Building the knowledge base ----------------------------------------------------------
 
 
 def _knowledge_files() -> list:
@@ -194,7 +144,7 @@ def build_chunks() -> list[dict]:
 
 
 def ingest_knowledge() -> dict:
-    """Bring kb_chunks in line with content/ (AS1; `flask assistant ingest`). One commit.
+    """Bring kb_chunks in line with content/ (`flask assistant ingest`). One commit.
 
     Only new or changed chunks are embedded, so running it again is cheap; chunks whose
     text is gone are deleted (reference data, not an entity). Needs Gemini for the
@@ -243,9 +193,7 @@ def ingest_knowledge() -> dict:
     return {"chunks": len(chunks), "embedded": len(changed), "removed": removed}
 
 
-# ---------------------------------------------------------------------------
-# AS2: search
-# ---------------------------------------------------------------------------
+# --- Search -------------------------------------------------------------------------------
 
 
 def _keyword_search(question: str) -> list[KbChunk]:
@@ -280,9 +228,7 @@ def search(question: str) -> tuple[list[KbChunk], bool]:
     return list(db.session.scalars(closest)), True
 
 
-# ---------------------------------------------------------------------------
-# AS3: what the assistant may know about the user (categories only, rule 1)
-# ---------------------------------------------------------------------------
+# --- What the assistant may know about the user (categories only) -------------------------
 
 
 def user_context(user: User) -> str:
@@ -293,7 +239,7 @@ def user_context(user: User) -> str:
     business = onboarding.business_of_user(user)
     if business is None:
         return "The user is a business owner who has not registered their business in the app yet."
-    profile = onboarding.get_my_business(business)["profile"]
+    profile = onboarding.get_profile(business)
     facts = [f"entity type: {business.entity_type}"]
     if profile is not None:
         facts.append(f"MSME tier: {profile.msme_tier}")
@@ -316,9 +262,7 @@ def user_context(user: User) -> str:
     return "About the user's business (categories only): " + ", ".join(facts) + "."
 
 
-# ---------------------------------------------------------------------------
-# AS2 + AS4: the answer
-# ---------------------------------------------------------------------------
+# --- The answer -----------------------------------------------------------------------------
 
 PROMPT = """You are the help assistant of CA Helper, an app that helps small Indian businesses
 understand their GST, income-tax and TDS filings. The app never files returns itself.
@@ -375,7 +319,7 @@ def _citation(number: int, chunk: KbChunk) -> dict:
 
 
 def answer_question(question: str, context: str) -> dict:
-    """Answer a question from the knowledge base, with its sources (AS2, AS4). Saves nothing.
+    """Answer a question from the knowledge base, with its sources. Saves nothing.
 
     `context` is what the prompt may say about the user (user_context()). Returns {answer,
     citations [{number, title, url, source_path, excerpt}], ask_a_ca, ai_used}. Used by
@@ -412,7 +356,7 @@ def answer_question(question: str, context: str) -> dict:
 
 
 def ask(user: User, question: str) -> dict:
-    """answer_question() for this user, saved in their history (AS3, AS5). One commit."""
+    """answer_question() for this user, saved in their history. One commit."""
     question = question.strip()
     result = answer_question(question, user_context(user))
 
@@ -434,16 +378,28 @@ def ask(user: User, question: str) -> dict:
     return result
 
 
-# ---------------------------------------------------------------------------
-# AS5: history
-# ---------------------------------------------------------------------------
+# --- Routes ------------------------------------------------------------------------------
 
 
-def list_history(user: User) -> list[dict]:
+@bp.post("/assistant/ask")
+@roles_required(UserRole.BUSINESS, UserRole.CA)
+def ask_question():
+    """Ask a question (3 to 500 characters). Personal details are removed before Gemini."""
+    question = json_body().get("question")
+    if question is None:
+        raise validation_error({"question": [MISSING]})
+    if not isinstance(question, str) or not 3 <= len(question) <= 500:
+        raise validation_error({"question": ["Length must be between 3 and 500."]})
+    return jsonify(ask(current_user(), question))
+
+
+@bp.get("/assistant/history")
+@roles_required(UserRole.BUSINESS, UserRole.CA)
+def history():
     """The user's last HISTORY_SIZE messages, oldest first."""
     rows = db.session.scalars(
         select(ChatMessage)
-        .where(ChatMessage.user_id == user.id)
+        .where(ChatMessage.user_id == current_user().id)
         .order_by(ChatMessage.created_at.desc())
         .limit(HISTORY_SIZE)
     ).all()
@@ -452,57 +408,28 @@ def list_history(user: User) -> list[dict]:
         extra = row.citations or {}
         messages.append(
             {
-                "id": row.id,
+                "id": str(row.id),
                 "role": row.role,
                 "content": row.content,
                 "citations": extra.get("sources", []),
                 "ask_a_ca": extra.get("ask_a_ca", False),
                 "ai_used": extra.get("ai_used", False),
-                "created_at": row.created_at,
+                "created_at": iso(row.created_at),
             }
         )
-    return messages
+    return jsonify(messages)
 
 
-def clear_history(user: User) -> None:
-    """Delete the user's messages. One commit."""
-    db.session.execute(delete(ChatMessage).where(ChatMessage.user_id == user.id))
+@bp.delete("/assistant/history")
+@roles_required(UserRole.BUSINESS, UserRole.CA)
+def clear_history():
+    db.session.execute(delete(ChatMessage).where(ChatMessage.user_id == current_user().id))
     db.session.commit()
+    return "", 204
 
 
-# --- Routes ------------------------------------------------------------------------------
-
-
-blp = Blueprint("assistant", __name__, description="AI assistant with sources")
-
-
-# Ask a question. The answer cites our guides and official FAQs; no personal data goes to Gemini.
-@blp.route("/assistant/ask", methods=["POST"])
-@roles_required(UserRole.BUSINESS, UserRole.CA)
-@blp.arguments(QuestionSchema)
-@blp.response(200, AnswerSchema)
-def ask_view(data):
-    return ask(current_user(), data["question"])
-
-
-# The user's conversation, oldest first.
-@blp.route("/assistant/history", methods=["GET"])
-@roles_required(UserRole.BUSINESS, UserRole.CA)
-@blp.response(200, ChatMessageSchema(many=True))
-def history():
-    return list_history(current_user())
-
-
-# Clear the conversation.
-@blp.route("/assistant/history", methods=["DELETE"])
-@roles_required(UserRole.BUSINESS, UserRole.CA)
-@blp.response(204)
-def clear_history_view():
-    clear_history(current_user())
-
-
-# `flask assistant ingest` (make assistant-ingest): build the knowledge base. Needs GEMINI_API_KEY.
-@blp.cli.command("ingest")
+# `flask assistant ingest`: build the knowledge base. Needs GEMINI_API_KEY.
+@bp.cli.command("ingest")
 def ingest_command():
     """Read content/forms and content/faqs, embed new or changed chunks, save them."""
     counts = ingest_knowledge()
