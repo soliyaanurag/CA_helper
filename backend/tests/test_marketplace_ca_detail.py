@@ -5,10 +5,14 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import CaProfile, CaService, CatalogService
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus, ServiceUnit
+from app.models import (
+    CaProfile,
+    CaService,
+    CatalogService,
+    CaVerificationStatus,
+    ServiceUnit,
+    UserRole,
+)
 
 _numbers = iter(range(100000, 999999))
 
@@ -26,14 +30,13 @@ def business_headers(make_user, auth_headers):
 def service(database):
     """Make a catalog service: service("gstr_3b", sort_order=2)."""
 
-    def _service(code, sort_order=1, is_active=True):
+    def _service(code, sort_order=1):
         row = CatalogService(
             code=code,
             name=code.upper(),
             description="A service.",
             unit=ServiceUnit.PER_RETURN,
             sort_order=sort_order,
-            is_active=is_active,
         )
         database.session.add(row)
         database.session.commit()
@@ -102,7 +105,7 @@ def test_lists_offered_services_in_catalog_order_with_ranges(
     add_ca({gst: "600"})
     add_ca({gst: "1000"})
     row = database.session.query(CaService).filter_by(service_id=dropped.id).one()
-    row.is_active = False  # the CA stopped offering GSTR-1
+    database.session.delete(row)  # the CA stopped offering GSTR-1
     database.session.commit()
 
     services = client.get(url(profile.id), headers=business_headers).get_json()["services"]
@@ -119,24 +122,13 @@ def test_lists_offered_services_in_catalog_order_with_ranges(
     assert services[0]["median_price"] is None  # only one CA offers ITR
 
 
-def test_hides_services_removed_from_the_catalog(client, business_headers, add_ca, service):
-    retired = service("old_service", is_active=False)
-    profile = add_ca({retired: "500"})
-
-    services = client.get(url(profile.id), headers=business_headers).get_json()["services"]
-
-    assert services == []
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [
         {"status": CaVerificationStatus.PENDING},
         {"status": CaVerificationStatus.REJECTED},
-        {"user_fields": {"is_active": False}},
-        {"user_fields": {"deleted_at": utcnow()}},
     ],
-    ids=["pending", "rejected", "deactivated", "deleted"],
+    ids=["pending", "rejected"],
 )
 def test_unlisted_cas_are_not_found(client, business_headers, add_ca, kwargs):
     profile = add_ca(**kwargs)

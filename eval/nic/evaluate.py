@@ -1,6 +1,6 @@
-"""NIC evaluation: top-1 and top-3 accuracy of the NIC code suggestions (ON10).
+"""NIC evaluation: top-1 and top-3 accuracy of the NIC code suggestions.
 
-Each description in descriptions.csv goes through onboarding_service.suggest_nic_codes(),
+Each description in descriptions.csv goes through onboarding.suggest_nic_codes(),
 the same function the registration page uses: a keyword shortlist of real codes, then
 Gemini picks 3 from it (or the best keyword matches without Gemini).
 
@@ -8,10 +8,10 @@ Gemini picks 3 from it (or the best keyword matches without Gemini).
     top-3      the expected (or an acceptable) code is among the 3 suggestions
     shortlist  it is in the keyword shortlist Gemini chooses from (Gemini can do no better)
 
-Needs the database with the NIC codes (make infra, make seed). Gemini is used when
+Needs the database with the NIC codes (docker compose up; flask --app app seed). Gemini is used when
 GEMINI_API_KEY is set (one request per description); --keywords-only never calls it.
-Run from the repo root:
-    conda run -n ca-helper python eval/nic/evaluate.py [--keywords-only]
+Run in the backend container:
+    docker compose exec backend python ../eval/nic/evaluate.py [--keywords-only]
 """
 
 import csv
@@ -31,7 +31,7 @@ def main() -> None:
         rows = list(csv.DictReader(file))
 
     with app_context() as context:
-        from app.services import onboarding_service
+        from app import onboarding
 
         if keywords_only:
             context.app.config["GEMINI_API_KEY"] = ""
@@ -41,11 +41,11 @@ def main() -> None:
             good = {row["expected_code"]}
             good.update(code for code in row["acceptable_codes"].split(";") if code)
             # suggest_nic_codes() only reads the description of the business.
-            result = onboarding_service.suggest_nic_codes(
+            result = onboarding.suggest_nic_codes(
                 SimpleNamespace(description=row["description"])
             )
             picks = [pick["code"] for pick in result["picks"]]
-            shortlist = [nic.code for nic in result["shortlist"]]
+            shortlist = [nic["code"] for nic in result["shortlist"]]
             ai_used += int(result["ai_used"])
             top1 += int(bool(picks) and picks[0] in good)
             top3 += int(bool(good.intersection(picks[:3])))

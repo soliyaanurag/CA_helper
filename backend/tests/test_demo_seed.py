@@ -5,10 +5,11 @@ from datetime import date
 import pytest
 from sqlalchemy import func, select
 
-from app import demo_seed
+from app import compliance as compliance_service, demo_seed
 from app.models import (
     Business,
     CaProfile,
+    CaVerificationStatus,
     ComplianceItem,
     Document,
     DocumentRequest,
@@ -18,8 +19,6 @@ from app.models import (
     Rating,
     User,
 )
-from app.models.marketplace import CaVerificationStatus
-from app.services import compliance_service
 from tests.test_seed_command import DEMO_ENV
 
 TODAY = date(2026, 9, 28)

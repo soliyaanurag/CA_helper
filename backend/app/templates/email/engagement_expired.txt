@@ -1,9 +1,0 @@
-Hello {{ owner_name }},
-
-{{ ca_name }} did not answer your request within 48 hours, so it has expired.
-The filings in it are free again.
-
-To pick another CA, open "Find a CA" in CA Helper and choose the service:
-{{ service_names }}
-
-CA Helper

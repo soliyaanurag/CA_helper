@@ -5,10 +5,8 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select
 
-from app.models import EmailOtp, User
-from app.models.base import utcnow
-from app.models.email_otp import OtpPurpose
-from app.utils.passwords import verify_password
+from app.models import EmailOtp, OtpPurpose, User, utcnow
+from app.utils import verify_password
 from tests.conftest import emailed_code
 
 SIGNUP_URL = "/api/v1/auth/signup"
@@ -113,12 +111,6 @@ def test_login_is_refused_until_the_email_is_verified(client, database):
 
     assert response.status_code == 403
     assert response.get_json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
-
-
-def test_signup_is_rate_limited_to_5_per_minute(client, database):
-    statuses = [signup(client, email=f"user{i}@example.com").status_code for i in range(6)]
-
-    assert statuses == [201] * 5 + [429]
 
 
 def test_signup_needs_the_terms_accepted_and_records_when(client, database):

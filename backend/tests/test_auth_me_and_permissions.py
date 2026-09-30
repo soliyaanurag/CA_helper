@@ -1,10 +1,12 @@
 """GET /api/v1/auth/me, JWT error responses, and the roles_required decorator."""
 
+import re
+import uuid
 from datetime import timedelta
 
 from flask_jwt_extended import create_access_token
 
-from app.models.enums import UserRole
+from app.models import UserRole
 
 ME_URL = "/api/v1/auth/me"
 
@@ -49,10 +51,10 @@ def test_me_with_expired_token_is_401(client, make_user):
     assert response.get_json()["error"]["code"] == "TOKEN_EXPIRED"
 
 
-def test_token_of_deactivated_user_is_401(client, make_user, auth_headers, database):
+def test_token_of_a_user_that_no_longer_exists_is_401(client, make_user, auth_headers, database):
     user = make_user()
     headers = auth_headers(user)
-    user.is_active = False
+    database.session.delete(user)
     database.session.commit()
 
     response = client.get(ME_URL, headers=headers)
@@ -84,22 +86,22 @@ def test_role_is_checked_against_the_database_not_the_token(
     assert response.status_code == 403
 
 
-PUBLIC_AUTH_PATHS = [
+PUBLIC = {
+    "/api/health",
     "/api/v1/auth/signup",
     "/api/v1/auth/verify-email",
     "/api/v1/auth/verify-email/resend",
     "/api/v1/auth/login",
     "/api/v1/auth/forgot-password",
     "/api/v1/auth/reset-password",
-]
+}
 
 
-def test_openapi_marks_login_and_health_public_and_the_rest_protected(client):
-    spec = client.get("/api/openapi.json").get_json()
-
-    assert spec["security"] == [{"bearerAuth": []}]
-    for path in PUBLIC_AUTH_PATHS:
-        assert spec["paths"][path]["post"]["security"] == [], path
-    assert spec["paths"]["/api/health"]["get"]["security"] == []
-    assert "security" not in spec["paths"]["/api/v1/auth/me"]["get"]
-    assert "security" not in spec["paths"]["/api/v1/auth/change-password"]["post"]
+def test_every_other_api_route_needs_a_login(app, client):
+    for rule in app.url_map.iter_rules():
+        if not rule.rule.startswith("/api/") or rule.rule in PUBLIC:
+            continue
+        url = re.sub(r"<[^>]+>", str(uuid.uuid4()), rule.rule)
+        for method in rule.methods - {"HEAD", "OPTIONS"}:
+            response = client.open(url, method=method)
+            assert response.status_code == 401, f"{method} {rule.rule} is not protected"

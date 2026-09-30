@@ -4,10 +4,8 @@ from datetime import date
 
 import pytest
 
-from app.models import ComplianceItem, User
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.services import compliance_service
+from app import compliance as compliance_service
+from app.models import ComplianceItem, ComplianceStatus, User, UserRole
 
 URL = "/api/v1/compliance/dashboard"
 

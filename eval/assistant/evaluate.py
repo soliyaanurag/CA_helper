@@ -1,7 +1,7 @@
 """Assistant evaluation: does the assistant find the right pages and answer correctly?
 
 Each question in questions.jsonl goes through the same code as the chat:
-assistant_service.search() (retrieval) and assistant_service.answer_question() (the
+assistant.search() (retrieval) and assistant.answer_question() (the
 answer; nothing is saved). The user context is a business owner who has not
 registered, so no profile is involved.
 
@@ -11,11 +11,11 @@ registered, so no profile is involved.
     citations        every cited source is an expected one (only answers Gemini wrote)
     ask a CA         the hint is on for questions marked expect_ask_a_ca
 
-Needs the database with the knowledge base (make assistant-ingest). With GEMINI_API_KEY
+Needs the database with the knowledge base (`docker compose exec backend flask --app app assistant ingest`). With GEMINI_API_KEY
 the search uses embeddings and Gemini writes the answers (2 requests per question);
 --keywords-only never calls Gemini (word-match search, passages instead of answers).
-Run from the repo root:
-    conda run -n ca-helper python eval/assistant/evaluate.py [--keywords-only]
+Run in the backend container:
+    docker compose exec backend python ../eval/assistant/evaluate.py [--keywords-only]
 """
 
 import json
@@ -44,14 +44,14 @@ def main() -> None:
     }
     rows = []
     with app_context() as context:
-        from app.services import assistant_service
+        from app import assistant
 
         if keywords_only:
             context.app.config["GEMINI_API_KEY"] = ""
         for item in questions:
-            chunks, vector_search = assistant_service.search(item["question"])
+            chunks, vector_search = assistant.search(item["question"])
             found = [chunk.source_path for chunk in chunks]
-            result = assistant_service.answer_question(item["question"], CONTEXT)
+            result = assistant.answer_question(item["question"], CONTEXT)
             cited = [citation["source_path"] for citation in result["citations"]]
             expected = set(item["expected_sources"])
             notes = []

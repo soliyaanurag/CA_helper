@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import select, update
 
 from app.models import EmailOtp, User
-from app.services.auth_service import OTP_MAX_ATTEMPTS
 from tests.conftest import emailed_code
 
 VERIFY_URL = "/api/v1/auth/verify-email"
@@ -60,23 +59,12 @@ def test_the_emailed_code_verifies_the_email_and_login_works(client, database, s
     assert login.status_code == 200
 
 
-def test_a_wrong_code_is_refused_and_counted(client, database, signed_up):
+def test_a_wrong_code_is_refused(client, database, signed_up):
     response = verify(client, wrong(signed_up))
 
     assert response.status_code == 400
     assert error_code(response) == "OTP_INVALID"
-    assert database.session.scalar(select(EmailOtp)).attempts == 1
     assert verify(client, signed_up).status_code == 204  # the right code still works
-
-
-def test_the_code_stops_working_after_too_many_wrong_guesses(client, signed_up):
-    for _ in range(OTP_MAX_ATTEMPTS):
-        assert error_code(verify(client, wrong(signed_up))) == "OTP_INVALID"
-
-    response = verify(client, signed_up)
-
-    assert response.status_code == 400
-    assert error_code(response) == "OTP_EXPIRED"
 
 
 def test_an_expired_code_is_refused(client, database, signed_up):
@@ -128,24 +116,21 @@ def test_resend_emails_a_new_code_that_replaces_the_old_one(client, database, si
     assert verify(client, new_code).status_code == 204
 
 
-def test_resend_sends_at_most_one_code_a_minute(client, signed_up, mailbox):
+def test_resend_sends_a_new_code_right_away(client, signed_up, mailbox):
     response = client.post(RESEND_URL, json={"email": EMAIL})
 
     assert response.status_code == 204
-    assert len(mailbox) == 1  # only the signup email
+    assert len(mailbox) == 2  # the signup email and the new code
 
 
-def test_resend_never_reveals_whether_an_account_exists(client, make_user, mailbox):
+def test_resend_for_an_unknown_or_verified_email_is_an_error(client, make_user, mailbox):
     make_user(email="verified@example.com")  # already verified
 
     unknown = client.post(RESEND_URL, json={"email": "nobody@example.com"})
     verified = client.post(RESEND_URL, json={"email": "verified@example.com"})
 
-    assert unknown.status_code == verified.status_code == 204
+    assert unknown.status_code == 404
+    assert unknown.get_json()["error"]["code"] == "USER_NOT_FOUND"
+    assert verified.status_code == 409
+    assert verified.get_json()["error"]["code"] == "EMAIL_ALREADY_VERIFIED"
     assert mailbox == []
-
-
-def test_resend_is_rate_limited_to_3_per_minute(client, database):
-    statuses = [client.post(RESEND_URL, json={"email": EMAIL}).status_code for _ in range(4)]
-
-    assert statuses == [204, 204, 204, 429]

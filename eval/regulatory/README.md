@@ -18,6 +18,6 @@ File: `items.jsonl` (one JSON object per line):
 or `other`; `forms` are our form codes; `states` are state names (empty = every state). An item the monitor should
 ignore has only `{"relevant": false}`.
 
-Script: `evaluate.py` runs the daily job's steps 2 and 3 on each item (`regulatory_service._looks_relevant()` and
+Script: `evaluate.py` runs the daily job's steps 2 and 3 on each item (`regulatory._looks_relevant()` and
 `_extract_change()`, nothing saved). Metrics: precision and recall of the items kept, then for the relevant items
 kept: forms and change type, and (only when Gemini read the item) the new due date and states.

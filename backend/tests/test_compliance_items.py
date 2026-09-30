@@ -4,11 +4,17 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem, RegulatoryProfile, User
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType, GstScheme
-from app.services.compliance_service import create_filings, sync_filings
+from app.compliance import create_filings, sync_filings
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    GstScheme,
+    RegulatoryProfile,
+    User,
+    UserRole,
+)
 
 TODAY = date(2026, 9, 27)
 URL = "/api/v1/compliance/items"
@@ -134,12 +140,8 @@ def test_list_before_registering_is_404(client, make_user, auth_headers):
 
 
 def by_key(database) -> dict:
-    """{(form, period label): filing} of the live filings."""
-    return {
-        (item.form_code, item.period_label): item
-        for item in items(database)
-        if item.deleted_at is None
-    }
+    """{(form, period label): filing} of the filings."""
+    return {(item.form_code, item.period_label): item for item in items(database)}
 
 
 def test_filings_whose_due_date_passed_start_overdue(business, database):
@@ -151,7 +153,7 @@ def test_filings_whose_due_date_passed_start_overdue(business, database):
     assert filings[("gstr_3b", "Q2 2026-27")].status == ComplianceStatus.UPCOMING
 
 
-def test_a_filing_that_no_longer_applies_is_soft_deleted(business, database):
+def test_a_filing_that_no_longer_applies_is_deleted(business, database):
     create_filings(business.id, profile(), TODAY)
     database.session.commit()
 
@@ -160,11 +162,10 @@ def test_a_filing_that_no_longer_applies_is_soft_deleted(business, database):
 
     assert counts["removed"] == 4
     assert not any(form == "tds_26q" for form, _ in by_key(database))
-    deleted = database.session.query(ComplianceItem).filter_by(form_code="tds_26q").all()
-    assert len(deleted) == 4 and all(item.deleted_at is not None for item in deleted)
+    assert database.session.query(ComplianceItem).filter_by(form_code="tds_26q").count() == 0
 
 
-def test_a_filing_that_applies_again_is_reactivated_not_inserted(business, database):
+def test_a_filing_that_applies_again_is_added_again(business, database):
     create_filings(business.id, profile(), TODAY)
     database.session.commit()
     sync_filings(business.id, profile(files_26q=False), TODAY)
@@ -173,7 +174,7 @@ def test_a_filing_that_applies_again_is_reactivated_not_inserted(business, datab
     counts = sync_filings(business.id, profile(), TODAY)
     database.session.commit()
 
-    assert (counts["restored"], counts["added"]) == (4, 0)
+    assert counts["added"] == 4
     assert database.session.query(ComplianceItem).filter_by(form_code="tds_26q").count() == 4
 
 
@@ -199,8 +200,7 @@ def test_an_audit_moves_the_itr_due_date(business, database):
     database.session.commit()
     before = by_key(database)[("itr", "FY 2026-27")].due_date
 
-    counts = sync_filings(business.id, profile(other_audit_applicable=True), TODAY)
+    sync_filings(business.id, profile(other_audit_applicable=True), TODAY)
     database.session.commit()
 
-    assert counts["moved"] == 1
     assert by_key(database)[("itr", "FY 2026-27")].due_date > before

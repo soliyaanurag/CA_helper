@@ -1,9 +1,8 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { NAV } from "@/routes";
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
-
-import { NAV } from "./routes";
 
 describe("routes", () => {
   it("gives every sidebar link a path inside its role's area", () => {

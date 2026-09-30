@@ -1,4 +1,4 @@
-"""Development seed data and the `flask seed` command (make seed).
+"""Development seed data and the `flask seed` command.
 
 Demo users, one per role, come from DEMO_* variables in .env:
 
@@ -14,7 +14,7 @@ sample CAs get prices so some typical price ranges show up. The legal rule
 thresholds, the obligation templates and the penalty rules of the 7 forms are seeded too,
 each with its official source; the values not confirmed yet are marked TODO_VERIFY
 (docs/TODO_VERIFY.md). These three seeds also update rows seeded earlier, so a corrected
-value reaches every database on the next `make seed` / `make sync`.
+value reaches every database on the next `flask seed`.
 The official NIC activity codes are loaded from content/reference/nic_2008.csv, and the
 regulatory monitor's news sources are added.
 
@@ -32,33 +32,31 @@ from decimal import Decimal
 
 import click
 from flask import Flask
-from sqlalchemy import select
+from flask_migrate import upgrade
+from sqlalchemy import select, text
 
-from app.config import REPO_ROOT
-from app.extensions import db
+from app import onboarding
+from app.auth import normalize_email
 from app.models import (
     CaProfile,
     CaService,
     CatalogService,
+    CaVerificationStatus,
+    db,
+    FormCode,
+    Frequency,
     NewsSource,
+    NewsSourceKind,
     NicCode,
     ObligationTemplate,
     PenaltyRule,
     RuleThreshold,
-    User,
-)
-from app.models.base import utcnow
-from app.models.compliance import Frequency
-from app.models.enums import FormCode, UserRole
-from app.models.marketplace import (  # noqa: F401 (SERVICE_SPECIALIZATIONS: used by tests)
-    SERVICE_SPECIALIZATIONS,
-    CaVerificationStatus,
     ServiceUnit,
+    User,
+    UserRole,
+    utcnow,
 )
-from app.models.regulatory import NewsSourceKind
-from app.services import onboarding_service
-from app.services.auth_service import normalize_email
-from app.utils.passwords import hash_password
+from app.utils import hash_password, REPO_ROOT
 
 log = logging.getLogger(__name__)
 
@@ -170,7 +168,7 @@ SAMPLE_CAS = [
 
 
 def _add_verified_profile(user_id, fields: dict) -> None:
-    """Add a verified CA profile unless the user already has one. Does not commit."""
+    """Add a verified CA profile unless the user already has one."""
     if db.session.scalar(select(CaProfile.id).where(CaProfile.user_id == user_id)):
         return
     db.session.add(
@@ -179,7 +177,7 @@ def _add_verified_profile(user_id, fields: dict) -> None:
 
 
 def _add_missing_specializations(user_id, specializations: list) -> None:
-    """Give an existing sample profile the specializations SAMPLE_CAS now lists. Does not commit.
+    """Give an existing sample profile the specializations SAMPLE_CAS now lists.
 
     Sample CAs cannot log in, so nobody else edits their profiles; this keeps databases
     seeded before a specialization was added in step with SAMPLE_CAS.
@@ -372,7 +370,7 @@ def seed_ca_prices() -> None:
                 )
 
 
-# --- Legal values (CLAUDE.md rule 3) ----------------------------------------------
+# --- Legal values (from official sources) ----------------------------------------------
 # Checked against official sources on 29 Sep 2026 (docs/TODO_VERIFY.md, "Verified values").
 # A value whose source_reference still contains TODO_VERIFY is a proposal nobody has
 # confirmed from an official text yet. When the law changes, add a row with a new
@@ -561,7 +559,7 @@ OBLIGATION_TEMPLATES = [
         {"quarters": [[7, 22], [10, 22], [1, 22], [4, 22]]},
         f"GST portal FAQ 'Form GSTR-3B' ({GST_FAQ}GSTR3B.htm) and GSTN QRMP advisory Q28: "
         "22nd or 24th after the quarter by state; the app uses the 22nd for every state "
-        "(the earlier date; docs/DECISIONS.md 2026-09-29)",
+        "(the earlier date, as the team decided on 2026-09-29)",
     ),
     (
         FormCode.CMP_08,
@@ -631,7 +629,6 @@ PENALTY_RULES = [
         FormCode.GSTR_1,
         {
             "late_fee_per_day": "50",
-            "nil_return_late_fee_per_day": "20",
             "max_late_fee": "2000",
             "annual_interest_rate": "0",
         },
@@ -643,7 +640,6 @@ PENALTY_RULES = [
         FormCode.GSTR_3B,
         {
             "late_fee_per_day": "50",
-            "nil_return_late_fee_per_day": "20",
             "max_late_fee": "2000",
             "annual_interest_rate": "18",
         },
@@ -659,7 +655,6 @@ PENALTY_RULES = [
         FormCode.GSTR_4,
         {
             "late_fee_per_day": "50",
-            "nil_return_late_fee_per_day": "20",
             "max_late_fee": "2000",
             "annual_interest_rate": "18",
         },
@@ -691,7 +686,6 @@ PENALTY_RULES = [
 
 PENALTY_COLUMNS = (
     "late_fee_per_day",
-    "nil_return_late_fee_per_day",
     "max_late_fee",
     "flat_late_fee",
     "annual_interest_rate",
@@ -707,7 +701,7 @@ def seed_penalty_rules() -> None:
         _upsert(PenaltyRule, {"form_code": form, "effective_from": RULES_FROM}, values)
 
 
-# The official NIC activity codes (ON9): reference data, never typed by hand.
+# The official NIC activity codes: reference data, never typed by hand.
 NIC_FILE = REPO_ROOT / "content" / "reference" / "nic_2008.csv"
 
 
@@ -729,7 +723,7 @@ def seed_nic_codes() -> None:
             existing.add(row["code"])
 
 
-# News sources for the regulatory monitor (RE1): (name, url, kind, enabled). Each one's
+# News sources for the regulatory monitor: (name, url, kind, enabled). Each one's
 # robots.txt was checked on 2026-09-28 and allows our bot; the scanner checks it again on
 # every run. The CBIC page is off until an admin switches it on (a busy home page).
 NEWS_SOURCES = [
@@ -750,7 +744,7 @@ def seed_news_sources() -> None:
 def seed_filing_dates() -> None:
     """Give filings created earlier the dates of the rules seeded above (a corrected rule
     would otherwise reach a business's filings only when it edits its profile)."""
-    onboarding_service.resync_all_filings()
+    onboarding.resync_all_filings()
 
 
 # (name, function) in dependency order: users first, other data may refer to them.
@@ -789,3 +783,14 @@ def register_commands(app: Flask) -> None:
 
         click.echo(f"Seeded: {', '.join(run_all_seeds())}")
         click.echo(seed_demo_data())
+
+    @app.cli.command("reset-db")
+    @click.confirmation_option(prompt="Delete every table and all data in DATABASE_URL?")
+    def reset_db_command() -> None:
+        """Drop every table, create them again with the migrations, then run the seed."""
+        # Dropping the whole schema also removes tables that no longer have a model.
+        with db.engine.begin() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+        upgrade()  # flask db upgrade: the migrations in backend/migrations/versions/
+        click.echo(f"Seeded: {', '.join(run_all_seeds())}")

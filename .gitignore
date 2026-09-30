@@ -8,13 +8,11 @@
 # ---------------------------------------------------------------------------
 # Generated files — never commit
 # ---------------------------------------------------------------------------
-/openapi.json
 
 # ---------------------------------------------------------------------------
-# Uploaded files and local instance data — never commit
+# Local instance data — never commit
 # ---------------------------------------------------------------------------
 backend/instance/
-uploads/
 
 # ---------------------------------------------------------------------------
 # Python
@@ -27,7 +25,7 @@ __pycache__/
 htmlcov/
 *.egg-info/
 .venv/
-# Symlink to your ca-helper conda env, created by `make setup` for VS Code
+# Old local link to the conda env (no longer used)
 .conda-env
 
 # ---------------------------------------------------------------------------
@@ -45,7 +43,5 @@ frontend/coverage/
 Thumbs.db
 .idea/
 *.swp
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/
 *.log

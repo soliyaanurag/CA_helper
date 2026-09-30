@@ -13,12 +13,9 @@ import pymupdf
 import pytest
 from werkzeug.datastructures import FileStorage
 
-from app.models import ComplianceItem, Document, User
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.services import compliance_service
-from app.utils import ocr
-from app.utils.document_text import guess_document_type, read_proof_fields, read_registration
+from app import compliance as compliance_service, ocr
+from app.models import ComplianceItem, ComplianceStatus, Document, User, UserRole
+from app.ocr import guess_document_type, read_proof_fields, read_registration
 
 ITEMS = "/api/v1/compliance/items"
 

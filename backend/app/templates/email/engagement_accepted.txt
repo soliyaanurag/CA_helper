@@ -1,8 +1,0 @@
-Hello {{ owner_name }},
-
-Good news: {{ ca_name }} has accepted your request at their listed prices.
-The filings in it are now marked "With CA".
-
-You can see the details in "My engagements" in CA Helper.
-
-CA Helper

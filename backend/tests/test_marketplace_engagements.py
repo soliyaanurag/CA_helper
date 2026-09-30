@@ -15,31 +15,37 @@ from decimal import Decimal
 import pytest
 from flask_jwt_extended import verify_jwt_in_request
 
-from app.errors import ApiError
+from app import marketplace as marketplace_service
 from app.models import (
     Business,
     CaProfile,
     CaService,
     CatalogService,
+    CaVerificationStatus,
     ComplianceItem,
     ComplianceItemDocument,
+    ComplianceStatus,
     Document,
+    DocumentType,
+    encrypt_bytes,
     Engagement,
     EngagementItem,
+    EngagementStatus,
+    EntityType,
+    FilingPath,
+    FormCode,
+    GstScheme,
+    ItrForm,
+    MsmeTier,
     Notification,
     ObligationTemplate,
     Rating,
     RegulatoryProfile,
+    UserRole,
+    utcnow,
 )
-from app.models.base import utcnow
-from app.models.compliance import ComplianceStatus, FilingPath
-from app.models.documents import DocumentType
-from app.models.enums import FormCode, UserRole
-from app.models.marketplace import CaVerificationStatus, EngagementStatus
-from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.seed import seed_service_catalog
-from app.services import marketplace_service
-from app.utils.decorators import require_ca_access
+from app.utils import ApiError, require_ca_access
 from worker import build_scheduler
 
 BASE = "/api/v1/marketplace"
@@ -684,143 +690,35 @@ def test_another_business_cannot_act_on_an_engagement(
     assert response.get_json()["error"]["code"] == "ENGAGEMENT_NOT_FOUND"
 
 
-# --- Find a CA ranked for the business's own filings ------------------------------------
+# --- Find a CA: the best rated first, then the most experienced, then by name ----------
 
 
-def test_cas_offering_my_filings_come_first_with_their_prices(
-    client, make_business, add_filing, make_ca, make_user, auth_headers, database
+def test_the_best_rated_come_first_then_experience_then_name(
+    client, make_business, make_ca, database, auth_headers
 ):
-    owner, business = make_business()
-    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
-    _, far_ca = make_ca({"tds_26q": "900"}, name="Aaron Far")  # none of my filings
-    _, near_ca = make_ca({"gstr_3b": "600"}, name="Zara Near")
-    far_ca.city = "Chennai"
-    database.session.commit()
-
-    ranked = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
-    unregistered = auth_headers(make_user(role=UserRole.BUSINESS))
-    plain = client.get(f"{BASE}/cas", headers=unregistered).get_json()["items"]
-
-    assert [row["full_name"] for row in ranked] == ["Zara Near", "Aaron Far"]
-    assert ranked[0]["my_prices"] == [{"form_code": "gstr_3b", "price": "600.00"}]
-    assert (ranked[0]["same_city"], ranked[1]["same_city"]) == (True, False)
-    assert ranked[1]["my_prices"] == []
-    # Before registering nothing changes: the usual order (experience, name), no ranking data.
-    assert [row["full_name"] for row in plain] == ["Aaron Far", "Zara Near"]
-    assert all(row["my_prices"] == [] and row["same_city"] is None for row in plain)
-    assert all(row["match_score"] is None and row["match_reasons"] == [] for row in plain)
-
-
-# --- MA8: the matching score and its reasons ---------------------------------------------
-
-
-def _reasons(row) -> dict:
-    """{reason: points} of one CA in the list."""
-    result = {}
-    for item in row["match_reasons"]:
-        result[item["reason"]] = item["points"]
-    return result
-
-
-def _ca_named(rows, name):
-    return next(row for row in rows if row["full_name"] == name)
-
-
-def test_the_match_score_adds_up_its_reasons(client, setup, auth_headers):
-    # setup: a Pune business with GSTR-3B and GSTR-1 due; a Pune CA with 5 years, room
-    # for 10 clients, prices for both and GSTR-3B as a specialization.
-    rows = client.get(f"{BASE}/cas", headers=setup["business_headers"]).get_json()["items"]
-
-    row = rows[0]
-    assert _reasons(row) == {
-        "Handles 2 of your filings (GSTR-1, GSTR-3B)": 2
-        * marketplace_service.POINTS_PER_FORM_OFFERED,
-        "Specializes in GSTR-3B": marketplace_service.POINTS_PER_SPECIALIZATION,
-        "In your city (Pune)": marketplace_service.POINTS_SAME_CITY,
-        "Has room for new clients": marketplace_service.POINTS_HAS_ROOM,
-        "5 years of experience": 5 * marketplace_service.POINTS_PER_YEAR_OF_EXPERIENCE,
-    }
-    assert row["match_score"] == sum(_reasons(row).values())
-
-
-def test_the_best_match_comes_first_not_the_most_experienced(
-    client, make_business, add_filing, make_ca, database, auth_headers
-):
-    owner, business = make_business()
-    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
-    _, veteran = make_ca({}, name="Aaron Veteran")  # 30 years, but none of my filings
+    owner, _ = make_business()
+    _, rated = make_ca({}, name="Zara Rated")
+    _, veteran = make_ca({}, name="Yash Veteran")
     veteran.years_experience = 30
-    make_ca({"gstr_3b": "600"}, name="Zara Match")
-    database.session.commit()
-
-    rows = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
-
-    assert [row["full_name"] for row in rows] == ["Zara Match", "Aaron Veteran"]
-    # Experience counts at most MAX_EXPERIENCE_YEARS_COUNTED years.
-    assert _reasons(rows[1])["30 years of experience"] == (
-        marketplace_service.MAX_EXPERIENCE_YEARS_COUNTED
-        * marketplace_service.POINTS_PER_YEAR_OF_EXPERIENCE
+    make_ca({}, name="Bina Same")
+    make_ca({}, name="Asha Same")
+    _, client_business = make_business(name="Old client")
+    done = Engagement(
+        business_id=client_business.id, ca_profile_id=rated.id, status=EngagementStatus.COMPLETED
     )
-
-
-def test_a_fee_at_or_below_the_typical_fee_earns_points(
-    client, make_business, add_filing, make_ca, auth_headers
-):
-    owner, business = make_business()
-    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
-    # Three CAs price GSTR-3B, so the typical (median) fee is ₹600.
-    make_ca({"gstr_3b": "500"}, name="Asha Low")
-    make_ca({"gstr_3b": "600"}, name="Bina Median")
-    make_ca({"gstr_3b": "700"}, name="Chitra High")
-
-    rows = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
-
-    fair = "Fee at or below the typical fee (GSTR-3B)"
-    assert fair in _reasons(_ca_named(rows, "Asha Low"))
-    assert fair in _reasons(_ca_named(rows, "Bina Median"))
-    assert fair not in _reasons(_ca_named(rows, "Chitra High"))
-    assert rows[-1]["full_name"] == "Chitra High"
-
-
-def test_a_good_rating_and_free_slots_earn_points(
-    client, make_business, add_filing, make_ca, database, auth_headers
-):
-    owner, business = make_business()
-    add_filing(business, FormCode.GSTR_3B, "Aug 2026")
-    _, rated = make_ca({"gstr_3b": "600"}, name="Rated CA")
-    _, busy = make_ca({"gstr_3b": "600"}, name="Busy CA")
-    busy.capacity = 3
-    # Two finished engagements rated 5 and 4 stars (average 4.5).
-    for stars in (5, 4):
-        other_owner, other_business = make_business(name=f"Client {stars}")
-        done = Engagement(
-            business_id=other_business.id,
-            ca_profile_id=rated.id,
-            status=EngagementStatus.COMPLETED,
-        )
-        database.session.add(done)
-        database.session.flush()
-        database.session.add(Rating(engagement_id=done.id, stars=stars))
-    # Busy CA: 2 active clients of 3 slots, so less than half is free.
-    for number in (1, 2):
-        other_owner, other_business = make_business(name=f"Active client {number}")
-        database.session.add(
-            Engagement(
-                business_id=other_business.id,
-                ca_profile_id=busy.id,
-                status=EngagementStatus.ACTIVE,
-            )
-        )
+    database.session.add(done)
+    database.session.flush()
+    database.session.add(Rating(engagement_id=done.id, stars=4))
     database.session.commit()
 
     rows = client.get(f"{BASE}/cas", headers=auth_headers(owner)).get_json()["items"]
 
-    rated_reasons = _reasons(_ca_named(rows, "Rated CA"))
-    busy_reasons = _reasons(_ca_named(rows, "Busy CA"))
-    assert rated_reasons["Rated 4.5 by 2 client(s)"] == marketplace_service.POINTS_GOOD_RATING
-    assert "Has room for new clients" in rated_reasons
-    assert "Has room for new clients" not in busy_reasons
-    assert [row["full_name"] for row in rows] == ["Rated CA", "Busy CA"]
+    assert [row["full_name"] for row in rows] == [
+        "Zara Rated",
+        "Yash Veteran",
+        "Asha Same",
+        "Bina Same",
+    ]
 
 
 # --- MA12: requests nobody answers within 48 hours expire -----------------------------
@@ -906,7 +804,7 @@ def _add_document(database, owner, filing=None, name="sales.pdf"):
         uploaded_by_id=owner.id,
         doc_type=DocumentType.SALES_REGISTER,
         original_filename=name,
-        storage_key="test-" + str(uuid.uuid4()),
+        content=encrypt_bytes(b"%PDF-1.4 test"),
         mime_type="application/pdf",
         size_bytes=10,
         sha256="0" * 64,
@@ -926,13 +824,13 @@ def _add_document(database, owner, filing=None, name="sales.pdf"):
 def test_access_only_while_the_engagement_is_active(client, setup):
     ca, business = setup["ca"], setup["business"]
     engagement = request_gst(client, setup)
-    assert marketplace_service.ca_has_active_access(ca.id, business.id) is False  # requested
+    assert marketplace_service.ca_can_see_business(ca.id, business.id) is False  # requested
 
     action(client, setup["ca_headers"], engagement["id"], "accept")
-    assert marketplace_service.ca_has_active_access(ca.id, business.id) is True
+    assert marketplace_service.ca_can_see_business(ca.id, business.id) is True
 
     action(client, setup["ca_headers"], engagement["id"], "complete")
-    assert marketplace_service.ca_has_active_access(ca.id, business.id) is False
+    assert marketplace_service.ca_can_see_business(ca.id, business.id) is False
 
 
 def test_access_is_per_ca_and_per_business(client, setup, make_ca, make_business):
@@ -941,8 +839,8 @@ def test_access_is_per_ca_and_per_business(client, setup, make_ca, make_business
     _, other_ca = make_ca({"gstr_3b": "700"}, name="Other CA")
     _, other_business = make_business("Someone Else")
 
-    assert marketplace_service.ca_has_active_access(other_ca.id, setup["business"].id) is False
-    assert marketplace_service.ca_has_active_access(setup["ca"].id, other_business.id) is False
+    assert marketplace_service.ca_can_see_business(other_ca.id, setup["business"].id) is False
+    assert marketplace_service.ca_can_see_business(setup["ca"].id, other_business.id) is False
 
 
 def test_each_ca_sees_only_the_filings_they_work_on(client, setup, make_ca, auth_headers):
@@ -956,24 +854,19 @@ def test_each_ca_sees_only_the_filings_they_work_on(client, setup, make_ca, auth
     ).get_json()
     action(client, auth_headers(second_user), second["id"], "accept")
 
-    assert marketplace_service.active_engagement_item_ids(setup["ca"].id, business.id) == {
+    assert marketplace_service.active_filing_ids(setup["ca"].id, business.id) == {
         setup["gst_3b"].id
     }
-    assert marketplace_service.active_engagement_item_ids(second_ca.id, business.id) == {
+    assert marketplace_service.active_filing_ids(second_ca.id, business.id) == {
         setup["gst_1"].id
     }
 
 
-def test_open_items_cover_requests_but_not_ended_ones(client, setup):
+def test_requested_filings_are_not_active_work(client, setup):
     ca, business = setup["ca"], setup["business"]
-    engagement = request_gst(client, setup)
+    request_gst(client, setup)
 
-    both = {setup["gst_3b"].id, setup["gst_1"].id}
-    assert marketplace_service.open_engagement_item_ids(ca.id, business.id) == both
-    assert marketplace_service.active_engagement_item_ids(ca.id, business.id) == set()
-
-    action(client, setup["ca_headers"], engagement["id"], "decline")
-    assert marketplace_service.open_engagement_item_ids(ca.id, business.id) == set()
+    assert marketplace_service.active_filing_ids(ca.id, business.id) == set()
 
 
 def test_documents_only_of_filings_in_active_work(client, setup, database):
@@ -986,15 +879,15 @@ def test_documents_only_of_filings_in_active_work(client, setup, database):
     unrelated = _add_document(database, owner, None, "other.pdf")
     engagement = request_gst(client, setup)
 
-    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is False  # not active yet
+    assert marketplace_service.ca_can_open_document(ca.id, linked.id) is False  # not active yet
 
     action(client, setup["ca_headers"], engagement["id"], "accept")
-    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is True
-    assert marketplace_service.ca_can_access_document(ca.id, acknowledgement.id) is True
-    assert marketplace_service.ca_can_access_document(ca.id, unrelated.id) is False
+    assert marketplace_service.ca_can_open_document(ca.id, linked.id) is True
+    assert marketplace_service.ca_can_open_document(ca.id, acknowledgement.id) is True
+    assert marketplace_service.ca_can_open_document(ca.id, unrelated.id) is False
 
     action(client, setup["ca_headers"], engagement["id"], "complete")
-    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is False
+    assert marketplace_service.ca_can_open_document(ca.id, linked.id) is False
 
 
 def test_require_ca_access_for_ca_routes(app, client, setup, make_user, auth_headers):

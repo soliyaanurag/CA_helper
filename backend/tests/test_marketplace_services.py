@@ -11,10 +11,14 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import CaProfile, CaService, CatalogService
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus, ServiceUnit
+from app.models import (
+    CaProfile,
+    CaService,
+    CatalogService,
+    CaVerificationStatus,
+    ServiceUnit,
+    UserRole,
+)
 
 SERVICES_URL = "/api/v1/marketplace/services"
 MENU_URL = "/api/v1/marketplace/ca-services"
@@ -25,7 +29,7 @@ _numbers = iter(range(100000, 999999))
 
 @pytest.fixture()
 def catalog(database):
-    """Two catalog services and one retired one. Returns {code: CatalogService}."""
+    """Two catalog services. Returns {code: CatalogService}."""
     services = {
         "gstr_3b": CatalogService(
             code="gstr_3b",
@@ -40,14 +44,6 @@ def catalog(database):
             description="ITR-3.",
             unit=ServiceUnit.PER_RETURN,
             sort_order=1,
-        ),
-        "retired": CatalogService(
-            code="retired",
-            name="Old service",
-            description="No longer offered.",
-            unit=ServiceUnit.ONE_TIME,
-            sort_order=3,
-            is_active=False,
         ),
     }
     for service in services.values():
@@ -146,11 +142,9 @@ def test_range_counts_only_listed_cas_and_current_prices(
         add_ca({gst: price})
     add_ca({gst: "1"}, status=CaVerificationStatus.PENDING)
     add_ca({gst: "1"}, status=CaVerificationStatus.REJECTED)
-    add_ca({gst: "1"}, user_fields={"is_active": False})
-    add_ca({gst: "1"}, user_fields={"deleted_at": utcnow()})
     dropped = add_ca({gst: "1"})
     row = database.session.query(CaService).join(CaProfile).filter_by(user_id=dropped.id).one()
-    row.is_active = False
+    database.session.delete(row)
     database.session.commit()
 
     row = get_services(client, auth_headers(make_user()))["gstr_3b"]
@@ -202,19 +196,15 @@ def test_saving_again_replaces_the_menu(client, auth_headers, catalog, add_ca, d
     response = client.put(MENU_URL, json=body, headers=auth_headers(ca))
 
     assert response.get_json()["items"] == [{"service_id": str(itr.id), "price": "2200.00"}]
-    dropped = database.session.query(CaService).filter_by(service_id=gst.id).one()
-    assert dropped.is_active is False  # soft-deleted, not removed
-    assert dropped.deleted_at is not None
+    assert database.session.query(CaService).filter_by(service_id=gst.id).count() == 0
 
-    # Offering it again brings the same row back.
+    # Offering it again adds a new row.
     body["items"].append({"service_id": str(gst.id), "price": "550"})
     client.put(MENU_URL, json=body, headers=auth_headers(ca))
 
     database.session.expire_all()
     rows = database.session.query(CaService).filter_by(service_id=gst.id).all()
     assert len(rows) == 1
-    assert rows[0].is_active is True
-    assert rows[0].deleted_at is None
     assert rows[0].price == Decimal("550.00")
 
 
@@ -236,9 +226,8 @@ def test_saving_needs_a_profile(client, make_user, auth_headers, catalog):
     assert response.get_json()["error"]["code"] == "CA_PROFILE_NOT_FOUND"
 
 
-@pytest.mark.parametrize("which", ["retired", "made_up"])
-def test_only_active_catalog_services_can_be_priced(client, auth_headers, catalog, add_ca, which):
-    service_id = catalog["retired"].id if which == "retired" else uuid.uuid4()
+def test_only_catalog_services_can_be_priced(client, auth_headers, catalog, add_ca):
+    service_id = uuid.uuid4()
     body = {"items": [{"service_id": str(service_id), "price": "500"}]}
 
     response = client.put(MENU_URL, json=body, headers=auth_headers(add_ca()))

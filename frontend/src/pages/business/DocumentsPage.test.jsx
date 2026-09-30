@@ -214,7 +214,7 @@ describe("document vault", () => {
   });
 });
 
-describe("document type check (DO9)", () => {
+describe("document type check", () => {
   it("warns when a file looks like another type", async () => {
     open({ [`GET ${LIST}`]: [200, documents([{ ...SALES, type_warning: "bank_statement" }])] });
 

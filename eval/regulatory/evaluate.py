@@ -1,7 +1,7 @@
 """Regulatory evaluation: does the news monitor keep the right items and read them correctly?
 
 Each item in items.jsonl (title + a short factual summary of a real public news item or
-official notice) goes through the same steps as the daily news job (regulatory_service):
+official notice) goes through the same steps as the daily news job (app/regulatory.py):
 step 2, the keyword filter (_looks_relevant), then step 3, the extraction
 (_extract_change: Gemini, or keywords without Gemini). Nothing is saved.
 
@@ -9,10 +9,10 @@ step 2, the keyword filter (_looks_relevant), then step 3, the extraction
     forms, change type           for relevant items it kept, exact matches
     new due date, states         the same, only for items Gemini read
 
-Needs the app (make infra); Gemini is used when GEMINI_API_KEY is set (one request per
+Needs the app (docker compose up); Gemini is used when GEMINI_API_KEY is set (one request per
 kept item); --keywords-only never calls it (then no dates or states are extracted).
-Run from the repo root:
-    conda run -n ca-helper python eval/regulatory/evaluate.py [--keywords-only]
+Run in the backend container:
+    docker compose exec backend python ../eval/regulatory/evaluate.py [--keywords-only]
 """
 
 import json
@@ -35,7 +35,7 @@ def main() -> None:
     rows = []
     with app_context() as context:
         from app.models import NewsArticle
-        from app.services import regulatory_service
+        from app import regulatory
 
         if keywords_only:
             context.app.config["GEMINI_API_KEY"] = ""
@@ -45,8 +45,8 @@ def main() -> None:
             # The same two steps as scan_news(); the article is never saved.
             article = NewsArticle(title=item["title"], content=item["text"])
             values = None
-            if regulatory_service._looks_relevant(article.title + " " + article.content):
-                values = regulatory_service._extract_change(article)
+            if regulatory._looks_relevant(article.title + " " + article.content):
+                values = regulatory._extract_change(article)
             kept = values is not None and bool(values["form_codes"])
             kept_total += int(kept)
             if kept and expected["relevant"]:

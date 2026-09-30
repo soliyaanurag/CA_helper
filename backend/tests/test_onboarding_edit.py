@@ -4,10 +4,9 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem
-from app.models.enums import UserRole
-from app.services import marketplace_service, onboarding_service
-from app.utils.gstin import gstin_check_character
+from app import marketplace as marketplace_service, onboarding as onboarding_service
+from app.models import Business, ComplianceItem, UserRole
+from app.utils import gstin_check_character
 from tests.test_onboarding_register import FORM, URL, register
 
 STATES_URL = "/api/v1/onboarding/states"
@@ -31,9 +30,9 @@ def headers(owner, auth_headers):
 
 
 def live_forms(database) -> dict:
-    """{form code: number of live filings}."""
+    """{form code: number of filings}."""
     counts = {}
-    for item in database.session.query(ComplianceItem).filter(ComplianceItem.deleted_at.is_(None)):
+    for item in database.session.query(ComplianceItem):
         counts[item.form_code] = counts.get(item.form_code, 0) + 1
     return counts
 
@@ -115,7 +114,6 @@ def test_switching_to_monthly_returns_changes_the_profile_and_filings(client, he
         "profile"
     ]
     # Each quarter becomes the month it starts with (Q1 -> Apr ...); 8 more months each.
-    assert changes["filings"]["moved"] == 8
     assert changes["filings"]["added"] == 16
     assert changes["filings"]["removed"] == 0
     assert live_forms(database)["gstr_3b"] == 12
@@ -128,11 +126,10 @@ def test_switching_back_to_quarterly_removes_the_extra_months(client, headers, d
     response = client.put(URL, json=FORM, headers=headers)
 
     changes = response.get_json()["changes"]["filings"]
-    assert (changes["moved"], changes["removed"]) == (8, 16)
+    assert changes["removed"] == 16
     labels = {
         item.period_label
         for item in database.session.query(ComplianceItem).filter_by(form_code="gstr_3b")
-        if item.deleted_at is None
     }
     assert labels == {"Q1 2026-27", "Q2 2026-27", "Q3 2026-27", "Q4 2026-27"}
 
@@ -145,7 +142,7 @@ def test_editing_keeps_filings_in_an_open_engagement(client, headers, database, 
     response = client.put(URL, json=FORM, headers=headers)  # back to quarterly: no May
 
     assert response.get_json()["changes"]["filings"]["kept_with_ca"] == 1
-    assert database.session.get(ComplianceItem, may.id).deleted_at is None
+    assert database.session.get(ComplianceItem, may.id) is not None
 
 
 def test_editing_before_registering_is_404(client, headers):

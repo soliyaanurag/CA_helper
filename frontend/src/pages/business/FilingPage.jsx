@@ -2,46 +2,53 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
-import { usePenaltyEstimate } from "@/api/alerts";
-import { CA_WORKSPACE_KEY, fulfilDocumentRequest, useMyDocumentRequests } from "@/api/caWorkspace";
-import { errorMessage } from "@/api/client";
 import {
-  FILINGS_KEY,
+  CA_WORKSPACE_KEY,
   chooseFilingPath,
+  DOCUMENTS_KEY,
+  downloadDocument,
+  errorMessage,
   filingKey,
+  FILINGS_KEY,
+  fulfilDocumentRequest,
+  linkDocument,
   markFiled,
   tickChecklist,
-  unmarkFiled,
-  useAcknowledgementFile,
-  useFiling,
-  usePeerInsights,
-} from "@/api/compliance";
-import {
-  DOCUMENTS_KEY,
-  UPLOAD_TYPES,
-  downloadDocument,
-  linkDocument,
   unlinkDocument,
+  unmarkFiled,
+  UPLOAD_TYPES,
   uploadDocument,
+  useAcknowledgementFile,
   useDocuments,
-} from "@/api/documents";
-import { useMyEngagements } from "@/api/marketplace";
-import { FormField } from "@/components/FormField";
-import { Markdown } from "@/components/Markdown";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { daysLeftText, daysUntil, formatDate, formatDateTime } from "@/lib/dates";
+  useFiling,
+  useMyDocumentRequests,
+  useMyEngagements,
+  usePeerInsights,
+  usePenaltyEstimate,
+} from "@/api";
+import { FormField, Markdown, StatusBadge } from "@/components/shared";
 import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@/components/ui";
+import {
+  daysLeftText,
+  daysUntil,
   DOCUMENT_TYPE_LABELS,
   ENTITY_TYPE_LABELS,
   filingFormLabel,
+  formatDate,
+  formatDateTime,
+  formatRupees,
   label,
   MSME_TIER_LABELS,
-} from "@/lib/labels";
-import { formatRupees } from "@/lib/money";
+} from "@/lib";
 
 // Statuses in which the business itself can still act on the filing.
 const OPEN_FOR_BUSINESS = ["upcoming", "docs_pending", "ready", "overdue"];
@@ -111,7 +118,7 @@ function Header({ page }) {
   );
 }
 
-// --- What being late may cost (AL5) ------------------------------------------------------
+// --- What being late may cost --------------------------------------------------------------
 
 // Shown on every penalty figure: the rules are not checked against official sources yet.
 const PENDING_LABEL = "Estimate (rules pending verification)";
@@ -177,7 +184,7 @@ function PenaltyFigures({ estimate }) {
   );
 }
 
-// --- How the filing gets done: path, CA, mark filed (CO8, CO9) -------------------------
+// --- How the filing gets done: path, CA, mark filed ----------------------------------------
 
 function HowToFile({ page, onUpdated }) {
   const item = page.filing;
@@ -338,7 +345,7 @@ function MarkFiledForm({ page, onUpdated }) {
 }
 
 /**
- * DO8: what the acknowledgement file showed when it was read (locally, with OCR).
+ * What the acknowledgement file showed when it was read (locally, with OCR).
  * Verified: the form, period, number and date match this filing. Otherwise the list
  * says what did not match; the filing stays "Filed".
  */
@@ -422,7 +429,7 @@ function Filed({ page, onUpdated }) {
   );
 }
 
-// --- Documents to have ready (CO7) ------------------------------------------------------
+// --- Documents to have ready ---------------------------------------------------------------
 
 function Checklist({ page, onUpdated }) {
   const item = page.filing;
@@ -723,7 +730,7 @@ function AddDocument({ item, entryKey, links, onAdded, onCancel }) {
   );
 }
 
-// --- How similar businesses file it (CO13) ----------------------------------------------
+// --- How similar businesses file it --------------------------------------------------------
 
 function PeerInsights({ item }) {
   const peers = usePeerInsights(item.id);
@@ -772,7 +779,7 @@ function PeerPath({ title, figures }) {
   );
 }
 
-// --- Documents the CA asked for (CW4) -------------------------------------------------
+// --- Documents the CA asked for ------------------------------------------------------------
 
 function CaRequests({ page }) {
   const item = page.filing;
@@ -883,7 +890,7 @@ function AnswerRequest({ request, what, onAnswered }) {
   );
 }
 
-// --- What the form is and how to file it (CO6) -----------------------------------------
+// --- What the form is and how to file it ---------------------------------------------------
 
 function Guide({ page }) {
   const [tab, setTab] = useState("instructions");

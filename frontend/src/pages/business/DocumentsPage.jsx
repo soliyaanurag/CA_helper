@@ -2,22 +2,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 
-import { errorMessage } from "@/api/client";
-import { useFilings } from "@/api/compliance";
 import {
-  DOCUMENTS_KEY,
-  UPLOAD_TYPES,
   deleteDocument,
+  DOCUMENTS_KEY,
   downloadDocument,
+  errorMessage,
+  UPLOAD_TYPES,
   uploadDocument,
   useDocuments,
-} from "@/api/documents";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { formatDateTime, todayIso } from "@/lib/dates";
-import { DOCUMENT_TYPE_LABELS, filingFormLabel, label } from "@/lib/labels";
+  useFilings,
+} from "@/api";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@/components/ui";
+import { DOCUMENT_TYPE_LABELS, filingFormLabel, formatDateTime, label, todayIso } from "@/lib";
 
 const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -328,7 +333,7 @@ function DocumentRow({ document }) {
       <td className="py-2 pr-4 break-all">{document.original_filename}</td>
       <td className="py-2 pr-4">
         {label(DOCUMENT_TYPE_LABELS, document.doc_type)}
-        {/* DO9: the file was read (OCR) and looks like another type. */}
+        {/* The file was read (OCR) and looks like another type. */}
         {document.type_warning && (
           <span className="block text-xs text-amber-700">
             Looks like: {label(DOCUMENT_TYPE_LABELS, document.type_warning)}

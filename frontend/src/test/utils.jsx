@@ -1,13 +1,14 @@
-// Shared helpers for tests that render the whole app (routes + auth + API client).
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { vi } from "vitest";
 
-import { AuthProvider } from "@/context/AuthProvider";
-import { saveSession } from "@/lib/session";
+import { AuthProvider } from "@/auth";
+import { saveSession } from "@/lib";
 import { appRoutes } from "@/routes";
+
+// Shared helpers for tests that render the whole app (routes + auth + API client).
 
 /**
  * Replace fetch with a fake backend: routes maps "METHOD /path" to [status, body]

@@ -13,13 +13,18 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import Business, ComplianceItem, PenaltyRule, User
-from app.models.base import today_in_india
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType
+from app import alerts as alerts_service
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    PenaltyRule,
+    today_in_india,
+    User,
+    UserRole,
+)
 from app.seed import PENALTY_COLUMNS, PENALTY_RULES, seed_penalty_rules
-from app.services import alerts_service
 
 BASE = "/api/v1/alerts"
 
@@ -146,16 +151,6 @@ def test_late_fee_is_days_times_the_daily_fee_up_to_the_cap(business_with_filing
     assert ten_days["notes"] == ["The interest rate is not confirmed yet."]
     capped = estimate(business_with_filings, item, today=date(2026, 8, 13))
     assert capped["late_fee"] == Decimal("150.00")
-
-
-def test_a_nil_return_uses_its_own_daily_fee(business_with_filings, rules, database):
-    rules["gstr_1"].late_fee_per_day = Decimal("10")
-    rules["gstr_1"].nil_return_late_fee_per_day = Decimal("4")
-    item = filing(database, "gstr_1", "Q1 2026-27")
-    item.is_nil_return = True
-    database.session.commit()
-
-    assert estimate(business_with_filings, item)["late_fee"] == Decimal("40.00")
 
 
 def test_a_flat_fee_is_charged_once_however_late(business_with_filings, rules, database):

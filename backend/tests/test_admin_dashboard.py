@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.enums import UserRole
+from app.models import UserRole
 
 URL = "/api/v1/admin/dashboard"
 

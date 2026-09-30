@@ -6,8 +6,8 @@ document is saved in one of three ways, like the files people upload:
     photo  a PNG picture of the page (Tesseract reads it)
     scan   a PDF that holds only such a picture, like a scanned page (Tesseract reads it)
 
-Run from the repo root (it overwrites eval/ocr/samples/ and eval/ocr/labels.csv):
-    conda run -n ca-helper python eval/ocr/make_samples.py
+Run it in the backend container (it overwrites eval/ocr/samples/ and eval/ocr/labels.csv):
+    docker compose exec backend python ../eval/ocr/make_samples.py
 """
 
 import csv

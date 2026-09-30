@@ -24,7 +24,7 @@ eval/ocr/
 | `expected_value` | `AA270826012345X` | normalised: dates YYYY-MM-DD, forms and types as our codes (`gstr_3b`, `acknowledgement`), month and quarter as numbers, the financial year as written (an ITR shows the assessment year) |
 | `created_by` | `claude` | who created the sample |
 
-Script: `evaluate.py` reads each file with `app/utils/ocr.py` and finds the fields with
-`app/utils/document_text.py` (the same code as an upload). Metric: field-level accuracy (exact match; `form`,
+Script: `evaluate.py` reads each file with `app/ocr.py` and finds the fields with
+`app/ocr.py` (the same code as an upload). Metric: field-level accuracy (exact match; `form`,
 `month`, `quarter` and `financial_year` count when they are among those found), per field, file format and
 document type, plus the list of misses. Each sample is under 1 MB.

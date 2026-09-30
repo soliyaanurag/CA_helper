@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.enums import UserRole
+from app.models import UserRole
 from tests.conftest import TEST_PASSWORD
 
 URL = "/api/v1/auth/change-password"
@@ -68,11 +68,3 @@ def test_the_new_password_must_follow_the_rule(client, make_user, auth_headers):
 
     assert response.status_code == 422
     assert "new_password" in response.get_json()["error"]["details"]["json"]
-
-
-def test_change_password_is_rate_limited_to_10_per_minute(client, make_user, auth_headers):
-    headers = auth_headers(make_user())
-
-    statuses = [change(client, headers, current="wrong").status_code for _ in range(11)]
-
-    assert statuses == [400] * 10 + [429]

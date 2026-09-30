@@ -1,4 +1,4 @@
-"""The regulatory monitor (RE1-RE6): news scan, extraction, admin approval, who is told.
+"""The regulatory monitor (RE1-RE6): news scan, extraction, who is told, the updates page.
 
 The network is never used: _download is replaced by a fake web (FakeWeb below), and
 Gemini by a fake reply. Uses the `business_with_filings` fixture (a QRMP business in
@@ -12,22 +12,28 @@ import pytest
 from click.testing import CliRunner
 from sqlalchemy import select
 
+from app import (
+    ca_workspace as ca_workspace_service,
+    compliance as compliance_service,
+    regulatory as regulatory_service,
+    utils as gemini_client,
+)
 from app.models import (
+    GstScheme,
+    ItrForm,
+    MsmeTier,
     NewsArticle,
     NewsSource,
+    NewsSourceKind,
     Notification,
     RegulatoryChange,
     RegulatoryChangeMatch,
     RegulatoryProfile,
     User,
+    UserRole,
+    utcnow,
 )
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.onboarding import GstScheme, ItrForm, MsmeTier
-from app.models.regulatory import NewsSourceKind
 from app.seed import NEWS_SOURCES, seed_news_sources
-from app.services import ca_workspace_service, compliance_service, regulatory_service
-from app.utils import gemini_client
 from tests.test_ca_workspace_clients import engage, filing, make_ca
 
 BASE = "/api/v1/admin/regulatory"
@@ -244,7 +250,7 @@ def test_an_html_page_gives_one_article_per_long_link(app, database, web):
 # --- RE3: extraction ----------------------------------------------------------------
 
 
-def test_gemini_extracts_the_change_as_pending(app, database, web, feed_source, gemini_reply):
+def test_gemini_extracts_the_change(app, database, web, feed_source, gemini_reply):
     web[FEED_URL] = (200, rss(EXTENSION, UNRELATED))
     gemini_reply(GOOD_REPLY)
 
@@ -252,8 +258,8 @@ def test_gemini_extracts_the_change_as_pending(app, database, web, feed_source, 
 
     assert counts["changes"] == 1  # the unrelated article never reaches Gemini
     change = only_change(database)
-    assert change.status.value == "pending"
-    assert change.change_type.value == "due_date_extension"
+    assert change.notified_at is not None  # sent at once (here nobody is affected)
+    assert change.change_type == "due_date_extension"
     assert change.form_codes == ["gstr_3b"]
     assert change.dates == {
         "old_due_date": "2026-10-20",
@@ -281,7 +287,7 @@ def test_unknown_values_from_gemini_are_dropped(app, database, web, feed_source,
     scan(app)
 
     change = only_change(database)
-    assert change.change_type.value == "other"
+    assert change.change_type == "other"
     assert change.form_codes == ["gstr_3b"]
     assert change.affected_categories["states"] == ["Maharashtra"]
     assert "new_due_date" not in change.dates
@@ -297,14 +303,14 @@ def test_an_article_gemini_calls_irrelevant_gives_no_change(
 
 
 def test_without_gemini_a_keyword_change_is_saved(app, database, web, feed_source):
-    web[FEED_URL] = (200, rss(EXTENSION))  # TestingConfig has no Gemini key
+    web[FEED_URL] = (200, rss(EXTENSION))  # TEST_CONFIG has no Gemini key
 
     scan(app)
 
     change = only_change(database)
     assert change.summary == EXTENSION[0]
     assert change.form_codes == ["gstr_3b"]
-    assert change.change_type.value == "due_date_extension"
+    assert change.change_type == "due_date_extension"
     assert change.affected_categories == {"extracted_by": "keywords"}
 
 
@@ -316,22 +322,29 @@ def test_a_request_for_an_extension_is_not_called_an_extension(app, database, we
 
     scan(app)
 
-    assert only_change(database).change_type.value == "other"
+    assert only_change(database).change_type == "other"
 
 
-# --- RE4 + RE5: approval and who is told -------------------------------------------------
+# --- RE4 + RE5: who is told, and the updates page ------------------------------------------
 
 
 @pytest.fixture()
-def pending(app, database, web, feed_source, gemini_reply):
-    web[FEED_URL] = (200, rss(EXTENSION))
-    gemini_reply(GOOD_REPLY)
-    scan(app)
-    return only_change(database)
+def found(app, database, web, feed_source, gemini_reply):
+    """Scan a feed with one change Gemini extracts. Create the business first to have it told."""
+
+    def _found(reply=GOOD_REPLY):
+        web[FEED_URL] = (200, rss(EXTENSION))
+        gemini_reply(reply)
+        scan(app)
+        return only_change(database)
+
+    return _found
 
 
-def test_admin_sees_pending_changes_with_their_article(client, pending, admin):
-    rows = client.get(f"{BASE}/changes", query_string={"status": "pending"}, headers=admin)
+def test_admin_sees_the_changes_with_their_article(client, found, admin):
+    found()
+
+    rows = client.get(f"{BASE}/changes", headers=admin)
 
     row = rows.get_json()[0]
     assert row["summary"] == GOOD_REPLY["summary"]
@@ -340,19 +353,20 @@ def test_admin_sees_pending_changes_with_their_article(client, pending, admin):
     assert row["match_count"] == 0
 
 
-def test_approval_tells_the_business_and_its_ca(
-    client, database, business, pending, admin, make_user, mailbox
+def test_a_change_from_gemini_tells_the_business_and_its_ca_at_once(
+    client, database, business, found, admin, make_user, mailbox
 ):
     ca_user, profile = make_ca(make_user, database)
     engage(database, business, profile, [filing(database, form_code="gstr_3b")])
 
-    response = client.post(f"{BASE}/changes/{pending.id}/approve", headers=admin)
+    change = found()
 
-    assert response.status_code == 200
-    assert response.get_json()["status"] == "approved"
-    assert response.get_json()["match_count"] == 1
+    rows = client.get(f"{BASE}/changes", headers=admin).get_json()
+    assert rows[0]["match_count"] == 1
+    assert rows[0]["notified_at"] is not None
     match = database.session.scalars(select(RegulatoryChangeMatch)).one()
     assert match.business_id == business.id
+    assert match.change_id == change.id
     assert match.notified_at is not None
 
     owner = database.session.get(User, business.user_id)
@@ -361,16 +375,17 @@ def test_approval_tells_the_business_and_its_ca(
     ).one()
     assert owner_entry.title == "Regulatory update: GSTR-3B"
     assert "New due date: 2026-10-31." in owner_entry.body
+    assert owner_entry.link == "/business/updates"
     assert len(mailbox) == 1  # the owner's email (sent after the commit)
 
     ca_entry = database.session.scalars(
         select(Notification).where(Notification.user_id == ca_user.id)
     ).one()
-    assert ca_entry.link == f"/ca/clients/{business.id}"
+    assert ca_entry.link == "/ca/updates"
 
 
-def test_approval_raises_the_clients_urgency(client, app, database, business, pending, admin):
-    client.post(f"{BASE}/changes/{pending.id}/approve", headers=admin)
+def test_a_change_raises_the_clients_urgency(app, database, business, found):
+    found()
 
     with app.app_context():
         points = ca_workspace_service.regulatory_points(business.id)
@@ -378,8 +393,8 @@ def test_approval_raises_the_clients_urgency(client, app, database, business, pe
     assert points == [{"reason": "Regulatory update (GSTR-3B)", "points": 15}]
 
 
-def test_old_changes_no_longer_raise_urgency(client, app, database, business, pending, admin):
-    client.post(f"{BASE}/changes/{pending.id}/approve", headers=admin)
+def test_old_changes_no_longer_raise_urgency(app, database, business, found):
+    found()
 
     with app.app_context():
         later = regulatory_service.active_changes_for(business.id, today=date(2027, 1, 1))
@@ -387,39 +402,63 @@ def test_old_changes_no_longer_raise_urgency(client, app, database, business, pe
     assert later == []
 
 
-def test_a_change_for_another_scheme_or_state_tells_nobody(
-    client, database, business, pending, admin
-):
-    pending.affected_categories = {"extracted_by": "ai", "states": ["Gujarat"]}
-    database.session.commit()
+def test_a_change_for_another_scheme_or_state_tells_nobody(client, database, business, found, admin):
+    found({**GOOD_REPLY, "states": ["Gujarat"]})
 
-    response = client.post(f"{BASE}/changes/{pending.id}/approve", headers=admin)
-
-    assert response.get_json()["match_count"] == 0
+    assert client.get(f"{BASE}/changes", headers=admin).get_json()[0]["match_count"] == 0
     assert database.session.scalars(select(Notification)).all() == []
 
 
-def test_a_filed_filing_is_not_affected(client, database, business, pending, admin):
+def test_a_filed_filing_is_not_affected(client, database, business, found, admin):
     for item in compliance_service.list_filings(business):
-        if item.form_code.value == "gstr_3b":
+        if item.form_code == "gstr_3b":
             item.status = "filed"
     database.session.commit()
 
-    response = client.post(f"{BASE}/changes/{pending.id}/approve", headers=admin)
+    found()
 
-    assert response.get_json()["match_count"] == 0
+    assert client.get(f"{BASE}/changes", headers=admin).get_json()[0]["match_count"] == 0
 
 
-def test_rejection_tells_nobody_and_a_change_is_reviewed_once(
-    client, database, business, pending, admin
-):
-    rejected = client.post(f"{BASE}/changes/{pending.id}/reject", headers=admin)
-    again = client.post(f"{BASE}/changes/{pending.id}/approve", headers=admin)
+def test_a_change_found_by_keywords_tells_nobody(app, database, web, feed_source, business):
+    web[FEED_URL] = (200, rss(EXTENSION))  # TEST_CONFIG has no Gemini key
 
-    assert rejected.get_json()["status"] == "rejected"
-    assert again.status_code == 409
-    assert again.get_json()["error"]["code"] == "CHANGE_NOT_PENDING"
+    scan(app)
+
+    assert only_change(database).notified_at is None
+    assert database.session.scalars(select(RegulatoryChangeMatch)).all() == []
     assert database.session.scalars(select(Notification)).all() == []
+
+
+UPDATES = "/api/v1/regulatory/updates"
+
+
+def test_updates_show_the_changes_about_my_forms(
+    client, app, database, web, feed_source, business, make_user, auth_headers
+):
+    ca_user, profile = make_ca(make_user, database)
+    engage(database, business, profile, [filing(database, form_code="gstr_3b")])
+    lonely_ca, _ = make_ca(make_user, database)
+    web[FEED_URL] = (200, rss(EXTENSION))
+    scan(app)  # no Gemini: found by keywords only
+
+    owner = database.session.get(User, business.user_id)
+    mine = client.get(UPDATES, headers=auth_headers(owner)).get_json()
+    for_ca = client.get(UPDATES, headers=auth_headers(ca_user)).get_json()
+    for_lonely_ca = client.get(UPDATES, headers=auth_headers(lonely_ca)).get_json()
+
+    assert [row["article_title"] for row in mine] == [EXTENSION[0]]
+    assert mine[0]["affected_categories"]["extracted_by"] == "keywords"
+    assert mine[0]["article_url"] == "https://news.example.com/a/1"
+    assert [row["id"] for row in for_ca] == [mine[0]["id"]]
+    assert for_lonely_ca == []  # no clients, so no forms
+
+
+def test_updates_are_for_businesses_and_cas(client, make_user, auth_headers):
+    headers = auth_headers(make_user(role=UserRole.ADMIN))
+
+    assert client.get(UPDATES, headers=headers).status_code == 403
+    assert client.get(UPDATES).status_code == 401
 
 
 # --- Access and the manual trigger (RE6) ---------------------------------------------
@@ -449,7 +488,7 @@ def test_scan_command(app, database, web, feed_source):
 
     assert result.exit_code == 0, result.output
     assert "new articles: 1" in result.output
-    assert "new changes to review: 1" in result.output
+    assert "new changes: 1" in result.output
 
 
 def test_worker_runs_the_news_scan_every_morning(app):

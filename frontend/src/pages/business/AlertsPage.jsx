@@ -1,6 +1,0 @@
-import { NotificationSettings } from "@/components/NotificationSettings";
-
-// /business/alerts: which notifications are also emailed.
-export function AlertsPage() {
-  return <NotificationSettings />;
-}

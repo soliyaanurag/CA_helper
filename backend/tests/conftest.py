@@ -1,30 +1,27 @@
 """Shared pytest fixtures for all backend tests (pytest loads this file automatically).
 
 Fixtures:
-    app       Flask app built with TestingConfig (one per test session)
+    app       Flask app built with TEST_CONFIG (one per test session)
     client    Flask test client for calling the API
     database  test database with every table created (once per session). Every
               row is deleted after each test, so tests never see each other's
               data. Request it in any test that touches the DB.
-    make_user    factory: make_user(role=UserRole.CA, is_active=False) -> User (needs `database`);
+    make_user    factory: make_user(role=UserRole.CA, full_name="Asha") -> User (needs `database`);
                  the user's email is verified unless you pass email_verified_at=None
     auth_headers auth_headers(user) -> {"Authorization": "Bearer <access token>"}
     mailbox      emails "sent" during the test (list of EmailMessage); emptied before each test
-    upload_dir   the temporary folder uploaded files are written to (autouse)
     legal_rules  the seeded rule thresholds and obligation templates (app/seed.py), committed
     business_with_filings
                  a registered QRMP business (no TDS) with this year's filings, created on
                  27 Sep 2026; its owner is `database.session.get(User, business.user_id)`
 
-Rate-limit counters are cleared before every test (autouse), so login tests
-never hit the limit because of earlier tests.
-
 The test database (TEST_DATABASE_URL, default `ca_helper_test`) is created
-automatically if it does not exist. It needs `make infra` to be running.
+automatically if it does not exist, in the `db` container of docker-compose.yml.
 """
 
+import os
 import re
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -32,19 +29,37 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 
 from app import create_app
-from app.extensions import db as _db
-from app.extensions import limiter
-from app.models import Business, RegulatoryProfile, User
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType, GstScheme
+from app.auth import issue_access_token
+from app.compliance import create_filings
+from app.models import (
+    Business,
+    db as _db,
+    EntityType,
+    GstScheme,
+    RegulatoryProfile,
+    User,
+    UserRole,
+    utcnow,
+)
 from app.seed import seed_obligation_templates, seed_rule_thresholds
-from app.services.auth_service import issue_access_token
-from app.services.compliance_service import create_filings
-from app.utils.email import outbox
-from app.utils.passwords import hash_password
+from app.utils import hash_password, outbox
 
 TEST_PASSWORD = "Correct-Horse-9"
+
+# Settings the tests replace, so a developer's .env cannot change test behaviour.
+TEST_CONFIG = {
+    "TESTING": True,
+    "SECRET_KEY": "test-secret-key",
+    "JWT_SECRET_KEY": "test-jwt-secret-key-that-is-long-enough",
+    "JWT_ACCESS_TOKEN_EXPIRES": timedelta(minutes=60),
+    "SQLALCHEMY_DATABASE_URI": os.environ.get("TEST_DATABASE_URL"),
+    "FIELD_ENCRYPTION_KEY": "Z5radg25qAqquvqRiPO960hRLtJmVhE0P3dYa_T1Mk8=",
+    # Tests read emails from app.utils.outbox; nothing reaches Mailpit.
+    "MAIL_SUPPRESS_SEND": True,
+    "LOG_LEVEL": "INFO",
+    # Tests never call the real Gemini: without a key the client refuses (tests fake it).
+    "GEMINI_API_KEY": None,
+}
 
 
 def emailed_code(message) -> str:
@@ -54,7 +69,7 @@ def emailed_code(message) -> str:
 
 @pytest.fixture(scope="session")
 def app():
-    app = create_app("testing")
+    app = create_app(TEST_CONFIG)
     with app.app_context():
         yield app
 
@@ -83,13 +98,15 @@ def _create_database_if_missing(url: str) -> None:
 def _schema(app):
     url = app.config["SQLALCHEMY_DATABASE_URI"]
     if not url:
-        pytest.fail("TEST_DATABASE_URL is not set. Copy it from .env.example into .env.")
+        pytest.fail("TEST_DATABASE_URL is not set (docker-compose.yml sets it).")
+    if url == os.environ.get("DATABASE_URL"):
+        pytest.fail("TEST_DATABASE_URL is the app's database: the tests would wipe it.")
     try:
         _create_database_if_missing(url)
     except OperationalError as exc:
         safe_url = make_url(url).render_as_string(hide_password=True)
         pytest.fail(
-            f"Cannot reach the test database at {safe_url}. Is `make infra` running?\n{exc}"
+            f"Cannot reach the test database at {safe_url}. Is `docker compose up` running?\n{exc}"
         )
 
     # kb_chunks.embedding needs the pgvector extension (the migration creates it too).
@@ -113,26 +130,8 @@ def database(_schema):
 
 
 @pytest.fixture(autouse=True)
-def _reset_rate_limits(app):
-    limiter.reset()
-
-
-@pytest.fixture(autouse=True)
-def upload_dir(app, tmp_path):
-    """Uploaded files go to a temporary folder in tests, never backend/instance/uploads.
-
-    Set by hand, not with monkeypatch: an autouse monkeypatch would be undone after the
-    `database` fixture's cleanup, which breaks tests that patch the database.
-    """
-    saved = app.config["UPLOAD_DIR"]
-    app.config["UPLOAD_DIR"] = str(tmp_path / "uploads")
-    yield tmp_path / "uploads"
-    app.config["UPLOAD_DIR"] = saved
-
-
-@pytest.fixture(autouse=True)
 def mailbox():
-    """TestingConfig suppresses sending; app.utils.email.outbox collects the messages."""
+    """TEST_CONFIG suppresses sending; app.utils.outbox collects the messages."""
     outbox.clear()
     return outbox
 
@@ -175,7 +174,7 @@ def auth_headers(app):
 
 @pytest.fixture()
 def legal_rules(database):
-    """The rule thresholds and obligation templates from app/seed.py, as after `make seed`."""
+    """The rule thresholds and obligation templates from app/seed.py, as after `flask seed`."""
     seed_rule_thresholds()
     seed_obligation_templates()
     database.session.commit()

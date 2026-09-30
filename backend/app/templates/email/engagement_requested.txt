@@ -1,8 +1,0 @@
-Hello {{ ca_name }},
-
-{{ business_name }} has sent you a request for {{ filing_count }} filing{{ "s" if filing_count != 1 }}.
-
-Open "My engagements" in CA Helper to accept it at your listed prices, send a
-quote with a reason, or decline it. Please answer within 48 hours.
-
-CA Helper

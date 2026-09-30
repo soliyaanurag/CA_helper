@@ -1,30 +1,14 @@
-"""The app factory wires up the blueprints, OpenAPI docs and the JSON error format."""
+"""The app factory wires up the blueprints and the JSON error format."""
 
 from app import create_app
-from app.errors import ApiError
+from app.utils import ApiError
+from tests.conftest import TEST_CONFIG
 
 EXPECTED_BLUEPRINTS = {"health", "auth", "compliance", "ca_workspace", "admin"}
 
 
 def test_every_blueprint_is_registered(app):
     assert set(app.blueprints) >= EXPECTED_BLUEPRINTS
-
-
-def test_openapi_spec_lists_health_and_every_tag(client):
-    response = client.get("/api/openapi.json")
-
-    assert response.status_code == 200
-    spec = response.get_json()
-    assert spec["info"]["title"] == "CA Helper API"
-    assert "/api/health" in spec["paths"]
-    assert {tag["name"] for tag in spec["tags"]} >= EXPECTED_BLUEPRINTS
-
-
-def test_swagger_ui_is_served(client):
-    response = client.get("/api/docs")
-
-    assert response.status_code == 200
-    assert b"swagger-ui" in response.data
 
 
 def test_unknown_url_returns_standard_error(client):
@@ -54,7 +38,7 @@ def test_api_error_returns_standard_error(app):
 
 
 def test_unhandled_error_returns_standard_500_error():
-    app = create_app("testing")
+    app = create_app(TEST_CONFIG)
     app.config["PROPAGATE_EXCEPTIONS"] = False  # behave like production: no traceback
 
     @app.get("/api/v1/boom")
@@ -70,9 +54,8 @@ def test_unhandled_error_returns_standard_500_error():
     assert "boom" not in error["message"]  # no exception text leaks to the client
 
 
-def test_api_root_redirects_to_the_docs(client):
+def test_api_root_redirects_to_the_health_check(client):
     response = client.get("/")
 
     assert response.status_code == 302
-    assert response.headers["Location"] == "/api/docs"
-    assert "/" not in client.get("/api/openapi.json").get_json()["paths"]
+    assert response.headers["Location"] == "/api/health"

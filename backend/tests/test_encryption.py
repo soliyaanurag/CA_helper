@@ -1,13 +1,11 @@
-"""app/utils/encryption.py: EncryptedString keeps PAN, GSTIN, TAN and phone unreadable at rest."""
+"""models.EncryptedString keeps PAN, GSTIN, TAN and phone unreadable at rest."""
 
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select, text
 
-from app.models import Business
-from app.models.onboarding import EntityType
-from app.utils.encryption import decrypt, encrypt
+from app.models import Business, decrypt, encrypt, EntityType
 
 PAN = "ABCPE1234F"
 GSTIN = "27ABCPE1234F1Z5"

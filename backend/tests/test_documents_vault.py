@@ -11,23 +11,24 @@ from decimal import Decimal
 
 import pytest
 
+from app import compliance as compliance_service, documents as documents_service
 from app.models import (
     Business,
     CaProfile,
     CatalogService,
+    CaVerificationStatus,
     ComplianceItem,
     ComplianceItemDocument,
+    ComplianceStatus,
     Document,
     Engagement,
     EngagementItem,
+    EngagementStatus,
+    EntityType,
     User,
+    UserRole,
 )
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus, EngagementStatus
-from app.models.onboarding import EntityType
 from app.seed import seed_service_catalog
-from app.services import compliance_service, documents_service
 
 DOCS = "/api/v1/documents"
 ITEMS = "/api/v1/compliance/items"
@@ -256,7 +257,7 @@ def test_a_business_sees_only_its_own_documents(client, owner, database, make_us
 # --- Download (DO4) --------------------------------------------------------------------
 
 
-def test_the_owner_downloads_the_decrypted_file(client, owner, upload_dir):
+def test_the_owner_downloads_the_decrypted_file(client, owner, database):
     document = upload(client, owner, name="sales.pdf").get_json()
 
     response = client.get(f"{DOCS}/{document['id']}/file", headers=owner)
@@ -265,8 +266,8 @@ def test_the_owner_downloads_the_decrypted_file(client, owner, upload_dir):
     assert response.data == PDF
     assert response.mimetype == "application/pdf"
     assert "sales.pdf" in response.headers["Content-Disposition"]
-    stored = next(upload_dir.iterdir()).read_bytes()
-    assert PDF not in stored  # encrypted at rest
+    stored = database.session.get(Document, document["id"]).content
+    assert PDF not in stored  # encrypted in the database
 
 
 def test_unknown_or_deleted_document_is_404(client, owner):
@@ -478,14 +479,13 @@ def test_a_business_can_add_documents_while_its_ca_works(client, owner, database
 # --- Delete (DO5) ----------------------------------------------------------------------
 
 
-def test_delete_is_soft_and_removes_open_links(client, owner, database):
+def test_delete_removes_the_document_and_its_links(client, owner, database):
     document = upload(client, owner).get_json()
     link(client, owner, document["id"], filing(database).id)
 
     assert client.delete(f"{DOCS}/{document['id']}", headers=owner).status_code == 204
 
-    row = database.session.get(Document, document["id"])
-    assert row.deleted_at is not None and row.is_active is False
+    assert database.session.get(Document, document["id"]) is None
     assert database.session.query(ComplianceItemDocument).count() == 0
     assert client.get(DOCS, headers=owner).get_json()["items"] == []
 
@@ -502,7 +502,7 @@ def test_proof_of_a_filed_filing_cannot_be_deleted(client, owner, database):
     assert response.status_code == 409
     assert response.get_json()["error"]["code"] == "DOCUMENT_IN_USE"
     assert "GSTR-1 (Q2 2026-27)" in response.get_json()["error"]["message"]
-    assert database.session.get(Document, document["id"]).deleted_at is None
+    assert database.session.get(Document, document["id"]) is not None
 
 
 def test_an_acknowledgement_cannot_be_deleted_from_the_vault(client, owner, database):

@@ -189,7 +189,7 @@ describe("business profile page", () => {
       profile: { ...SAVED.profile, gst_scheme: "regular_monthly" },
       changes: {
         profile: [{ line: "gst_scheme", old: "regular_qrmp", new: "regular_monthly" }],
-        filings: { added: 16, restored: 0, removed: 0, moved: 8, kept_with_ca: 0 },
+        filings: { added: 16, removed: 0, kept_with_ca: 0 },
       },
     };
     const fetchMock = fakeApi({
@@ -226,7 +226,7 @@ describe("business profile page", () => {
   });
 });
 
-describe("fill in from a document (ON13)", () => {
+describe("fill in from a document", () => {
   it("puts the values found in a GST certificate into the form", async () => {
     loginAs("business");
     const fetchMock = fakeApi({

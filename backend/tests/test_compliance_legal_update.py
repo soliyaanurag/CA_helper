@@ -5,13 +5,24 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem, ObligationTemplate, RegulatoryProfile, User
-from app.models.base import utcnow
-from app.models.compliance import ComplianceStatus
-from app.models.enums import FormCode, UserRole
-from app.models.onboarding import EntityType
+from app import (
+    alerts as alerts_service,
+    compliance as compliance_service,
+    onboarding as onboarding_service,
+)
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    FormCode,
+    ObligationTemplate,
+    RegulatoryProfile,
+    User,
+    UserRole,
+    utcnow,
+)
 from app.seed import run_all_seeds
-from app.services import alerts_service, compliance_service, onboarding_service
 
 TODAY = date(2026, 9, 28)
 
@@ -146,7 +157,7 @@ def test_seed_moves_not_started_filings_to_the_current_rule(database, make_user,
     assert database.session.get(ComplianceItem, filed.id).due_date == date(2026, 1, 1)
 
 
-def test_resync_reports_what_moved(database, make_user, legal_rules):
+def test_resync_moves_the_due_date_back_to_the_rule(database, make_user, legal_rules):
     llp = make_business(database, make_user, EntityType.LLP)
     itr_of(database, llp).due_date = date(2027, 8, 31)
     database.session.commit()
@@ -154,7 +165,7 @@ def test_resync_reports_what_moved(database, make_user, legal_rules):
     counts = onboarding_service.resync_all_filings(TODAY)
 
     assert counts["businesses"] == 1
-    assert counts["moved"] == 1
+    assert itr_of(database, llp).due_date == date(2027, 7, 31)
     assert counts["added"] == counts["removed"] == 0
 
 

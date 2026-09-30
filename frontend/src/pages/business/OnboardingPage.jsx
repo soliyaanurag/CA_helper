@@ -5,31 +5,42 @@ import { useForm, useWatch } from "react-hook-form";
 import { Link } from "react-router";
 import { z } from "zod";
 
-import { errorMessage } from "@/api/client";
-import { FILINGS_KEY } from "@/api/compliance";
 import {
+  errorMessage,
+  FILINGS_KEY,
   MY_BUSINESS_KEY,
   readRegistrationDocument,
   registerBusiness,
+  saveNicCode,
+  suggestNicCodes,
   updateBusiness,
   useGstStates,
   useMyBusiness,
-} from "@/api/onboarding";
-import { FormField } from "@/components/FormField";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { gstinError } from "@/lib/gstin";
-import { NicCodeCard } from "@/pages/business/NicCodeCard";
+  useNicSearch,
+} from "@/api";
+import { FormField } from "@/components/shared";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@/components/ui";
 import {
   ENTITY_TYPE_LABELS,
+  formatRupees,
   GST_SCHEME_LABELS,
+  gstinError,
   ITR_FORM_LABELS,
-  MSME_TIER_LABELS,
   label,
-} from "@/lib/labels";
-import { formatRupees } from "@/lib/money";
+  MSME_TIER_LABELS,
+} from "@/lib";
+
+// --- OnboardingPage ----------------------------------------------------------------------------
 
 /**
  * /business/onboarding: the business profile.
@@ -99,7 +110,7 @@ export function OnboardingPage() {
 const AMOUNT = /^[0-9]+(\.[0-9]{1,2})?$/; // rupees, e.g. 4500000 or 4500000.50
 const GSTIN_FORMAT = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 
-// The same rules as BusinessInputSchema in backend/app/schemas/onboarding.py.
+// The same rules as the checks in backend/app/onboarding.py.
 // `states` is [{name, code}]: the state must be one of them, and a GSTIN must fit it.
 function makeSchema(states) {
   const codeOf = Object.fromEntries(states.map((state) => [state.name, state.code]));
@@ -439,7 +450,7 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
   );
 }
 
-// The form fields ON13 can fill, with the names people see.
+// The form fields "Fill in from a document" can fill, with the names people see.
 const FILLABLE = {
   legal_name: "business name",
   entity_type: "type of business",
@@ -449,7 +460,7 @@ const FILLABLE = {
 };
 
 /**
- * ON13: "Fill in from a document". The server reads a GST certificate or PAN card with
+ * "Fill in from a document": The server reads a GST certificate or PAN card with
  * OCR (locally; the file is not stored) and the found values go into the form. The user
  * checks them before registering.
  */
@@ -660,10 +671,7 @@ function WhatChanged({ changes }) {
   const filings = changes.filings;
   const filingLines = [];
   if (filings.added) filingLines.push(`${plural(filings.added, "filing")} added`);
-  if (filings.restored) filingLines.push(`${plural(filings.restored, "filing")} back again`);
   if (filings.removed) filingLines.push(`${plural(filings.removed, "filing")} no longer needed`);
-  if (filings.moved)
-    filingLines.push(`${plural(filings.moved, "filing")} with a new period or due date`);
   if (filings.kept_with_ca) {
     filingLines.push(
       `${plural(filings.kept_with_ca, "filing")} kept although no longer needed, because a CA has it`,
@@ -696,5 +704,189 @@ function WhatChanged({ changes }) {
         </CardContent>
       )}
     </Card>
+  );
+}
+
+// --- NicCodeCard -------------------------------------------------------------------------------
+
+/**
+ * "Business activity (NIC code)" on the Business profile page.
+ *
+ * 1. "Suggest codes" asks the backend for up to 3 real codes that fit the description
+ *    (Gemini's picks, or keyword matches when AI is not available).
+ * 2. Or the user searches the official list.
+ * 3. The user ticks one and presses Confirm; only then is it saved.
+ */
+export function NicCodeCard({ nicCode }) {
+  const queryClient = useQueryClient();
+  const [suggestion, setSuggestion] = useState(null); // {picks, shortlist, ai_used}
+  const [search, setSearch] = useState("");
+  const [chosen, setChosen] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const results = useNicSearch(search);
+
+  async function onSuggest() {
+    setError(null);
+    setSaved(false);
+    setBusy(true);
+    try {
+      const answer = await suggestNicCodes();
+      setSuggestion(answer);
+      if (answer.picks.length > 0) {
+        setChosen(answer.picks[0].code);
+      }
+    } catch (problem) {
+      setError(errorMessage(problem));
+    }
+    setBusy(false);
+  }
+
+  async function onConfirm() {
+    setError(null);
+    setBusy(true);
+    try {
+      const code = await saveNicCode(chosen);
+      // Show the new code on the page without loading the whole business again.
+      const cached = queryClient.getQueryData(MY_BUSINESS_KEY);
+      if (cached) {
+        queryClient.setQueryData(MY_BUSINESS_KEY, { ...cached, nic_code: code });
+      }
+      setSuggestion(null);
+      setSearch("");
+      setChosen("");
+      setSaved(true);
+    } catch (problem) {
+      setError(errorMessage(problem));
+    }
+    setBusy(false);
+  }
+
+  let searchRows = [];
+  if (results.data) {
+    searchRows = results.data;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Business activity (NIC code)</CardTitle>
+        <CardDescription>
+          The official code for what your business does. Forms like Udyam and GST registration ask
+          for it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm">
+          {nicCode ? (
+            <>
+              Your code: <span className="font-semibold">{nicCode.code}</span> ·{" "}
+              {nicCode.description}
+            </>
+          ) : (
+            "Not chosen yet."
+          )}
+        </p>
+        {saved && (
+          <p role="status" className="text-sm text-green-700">
+            Saved.
+          </p>
+        )}
+
+        <Button type="button" variant="outline" size="sm" onClick={onSuggest} disabled={busy}>
+          {busy && !suggestion ? "Finding codes..." : "Suggest codes"}
+        </Button>
+
+        {suggestion && suggestion.picks.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No code matches your description. Search the list below.
+          </p>
+        )}
+        {suggestion && suggestion.picks.length > 0 && (
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Suggested codes</legend>
+            {!suggestion.ai_used && (
+              <p className="text-xs text-muted-foreground">
+                AI suggestions are not available right now; these are keyword matches.
+              </p>
+            )}
+            {suggestion.picks.map((pick) => (
+              <CodeOption
+                key={pick.code}
+                idPrefix="pick-"
+                nic={pick}
+                chosen={chosen}
+                onChoose={setChosen}
+                note={pick.reason}
+                badge={pick.source === "ai" ? "AI suggestion, please check" : "Keyword match"}
+              />
+            ))}
+          </fieldset>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="nic-search">None of these? Search the list</Label>
+          <Input
+            id="nic-search"
+            placeholder="e.g. bakery, tailoring or 10712"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {searchRows.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="sr-only">Search results</legend>
+              {searchRows.map((nic) => (
+                <CodeOption
+                  key={nic.code}
+                  idPrefix="found-"
+                  nic={nic}
+                  chosen={chosen}
+                  onChoose={setChosen}
+                />
+              ))}
+            </fieldset>
+          )}
+          {search.trim().length >= 2 && results.data && searchRows.length === 0 && (
+            <p className="text-sm text-muted-foreground">No code found.</p>
+          )}
+        </div>
+
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <Button type="button" onClick={onConfirm} disabled={busy || chosen === ""}>
+          Confirm
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// One code as a radio button, with an optional reason and label.
+// `idPrefix` keeps ids unique when a code is both suggested and found by the search.
+function CodeOption({ idPrefix, nic, chosen, onChoose, note, badge }) {
+  const id = idPrefix + nic.code;
+  return (
+    <label htmlFor={id} className="flex items-start gap-2 rounded-lg border p-2 text-sm">
+      <input
+        id={id}
+        type="radio"
+        name="nic-code"
+        value={nic.code}
+        checked={chosen === nic.code}
+        onChange={() => onChoose(nic.code)}
+        className="mt-1"
+      />
+      <span className="space-y-1">
+        <span className="block">
+          <span className="font-semibold">{nic.code}</span> · {nic.description}
+        </span>
+        {note && <span className="block text-xs text-muted-foreground">{note}</span>}
+        {badge && <Badge variant="secondary">{badge}</Badge>}
+      </span>
+    </label>
   );
 }

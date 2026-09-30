@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.enums import FormCode, UserRole
+from app.models import FormCode, UserRole
 
 URL = "/api/v1/compliance/forms/"
 

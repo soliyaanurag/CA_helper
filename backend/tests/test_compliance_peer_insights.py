@@ -7,12 +7,18 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from app.models import Business, ComplianceItem, ObligationTemplate, RegulatoryProfile
-from app.models.base import utcnow
-from app.models.compliance import ComplianceStatus, FilingPath
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType
-from app.services import compliance_service, onboarding_service
+from app import compliance as compliance_service, onboarding as onboarding_service
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    FilingPath,
+    ObligationTemplate,
+    RegulatoryProfile,
+    UserRole,
+    utcnow,
+)
 
 DUE = date(2026, 7, 20)
 _counter = iter(range(1, 10_000))

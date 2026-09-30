@@ -492,7 +492,7 @@ describe("how similar businesses file it", () => {
   });
 });
 
-describe("acknowledgement verification (DO8)", () => {
+describe("acknowledgement verification", () => {
   function filedPage(status, verification) {
     return page({
       filing: {

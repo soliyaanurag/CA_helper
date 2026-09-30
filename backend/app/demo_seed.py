@@ -1,7 +1,7 @@
-"""Demo data for a 10-minute walk through every flow: `flask seed-demo` (make seed-demo).
+"""Demo data for a 10-minute walk through every flow: `flask seed-demo`.
 
 Everything here is fictional (names, PAN, GSTIN, phone numbers, files). Run it after
-`make seed` (it runs the normal seed first). It adds, once:
+`flask seed` (it runs the normal seed first). It adds, once:
 
 - 14 businesses, all logging in with DEMO_BUSINESS_PASSWORD:
   10 micro proprietorships on regular GST (monthly or quarterly), so the peer insights
@@ -32,34 +32,38 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from werkzeug.datastructures import FileStorage
 
-from app.extensions import db
+from app import alerts, compliance, documents, onboarding
+from app.auth import normalize_email
 from app.models import (
     Business,
     CaProfile,
     CaService,
     CatalogService,
+    CaVerificationStatus,
     ComplianceItemDocument,
+    ComplianceStatus,
+    db,
     DocumentRequest,
+    DocumentRequestStatus,
+    DocumentType,
     Engagement,
     EngagementItem,
+    EngagementStatus,
+    EntityType,
+    FilingPath,
+    FormCode,
+    NotificationType,
     ProBonoRequest,
+    ProBonoRequestStatus,
     Rating,
     RegulatoryProfile,
+    today_in_india,
     User,
+    UserRole,
+    utcnow,
 )
-from app.models.alerts import NotificationType
-from app.models.base import today_in_india, utcnow
-from app.models.ca_workspace import DocumentRequestStatus
-from app.models.compliance import ComplianceStatus, FilingPath
-from app.models.documents import DocumentType
-from app.models.enums import FormCode, UserRole
-from app.models.marketplace import CaVerificationStatus, EngagementStatus, ProBonoRequestStatus
-from app.models.onboarding import EntityType
 from app.seed import SAMPLE_CAS
-from app.services import alerts_service, compliance_service, documents_service, onboarding_service
-from app.services.auth_service import normalize_email
-from app.utils.gstin import gstin_check_character, state_code
-from app.utils.passwords import hash_password
+from app.utils import gstin_check_character, hash_password, state_code
 
 log = logging.getLogger(__name__)
 INDIA = ZoneInfo("Asia/Kolkata")
@@ -131,18 +135,18 @@ def _pdf(text: str) -> bytes:
 
 
 def _upload(owner: User, uploader: User, name: str, doc_type: DocumentType, fy=None, period=None):
-    """Store a generated PDF in the owner's vault. Does not commit."""
+    """Store a generated PDF in the owner's vault."""
     upload = FileStorage(
         io.BytesIO(_pdf(name.rsplit(".", 1)[0])), name, content_type="application/pdf"
     )
-    document = documents_service.add_document(owner.id, uploader.id, upload, doc_type)
+    document = documents.add_document(owner.id, uploader.id, upload, doc_type)
     document.fy = fy
     document.period_label = period
     return document
 
 
 def _link(filing, document, key: str, user: User) -> None:
-    """Link a file to a filing's checklist entry and tick it. Does not commit."""
+    """Link a file to a filing's checklist entry and tick it."""
     db.session.add(
         ComplianceItemDocument(
             compliance_item_id=filing.id,
@@ -152,7 +156,7 @@ def _link(filing, document, key: str, user: User) -> None:
         )
     )
     if key != "general":
-        compliance_service.tick_checklist_entry(filing, key)
+        compliance.tick_checklist_entry(filing, key)
 
 
 def _at(day, hour=11):
@@ -196,10 +200,10 @@ def _add_business(index: int, row, user: User, today) -> Business:
     profile = RegulatoryProfile(
         business_id=business.id,
         computed_at=utcnow(),
-        **onboarding_service.compute_profile(business, today),
+        **onboarding.compute_profile(business, today),
     )
     db.session.add(profile)
-    compliance_service.create_filings(business.id, profile, today)
+    compliance.create_filings(business.id, profile, today)
     db.session.flush()
     return business
 
@@ -207,13 +211,13 @@ def _add_business(index: int, row, user: User, today) -> Business:
 def _service_for(filing) -> CatalogService:
     return db.session.scalar(
         select(CatalogService)
-        .where(CatalogService.form_code == filing.form_code, CatalogService.is_active)
+        .where(CatalogService.form_code == filing.form_code)
         .order_by(CatalogService.sort_order)
     )
 
 
 def _engage(business, ca: CaProfile, filings, status, now, **fields) -> Engagement:
-    """An engagement of `ca` on `filings` in `status`. Does not commit."""
+    """An engagement of `ca` on `filings` in `status`."""
     engagement = Engagement(business_id=business.id, ca_profile_id=ca.id, status=status, **fields)
     engagement.requested_at = fields.get("requested_at", now - timedelta(days=3))
     db.session.add(engagement)
@@ -224,7 +228,6 @@ def _engage(business, ca: CaProfile, filings, status, now, **fields) -> Engageme
             select(CaService.price).where(
                 CaService.ca_profile_id == ca.id,
                 CaService.service_id == service.id,
-                CaService.is_active,
             )
         )
         price = own or Decimal("750")
@@ -240,7 +243,7 @@ def _engage(business, ca: CaProfile, filings, status, now, **fields) -> Engageme
             )
         )
     if status == EngagementStatus.ACTIVE:
-        compliance_service.mark_filings_with_ca([filing.id for filing in filings])
+        compliance.mark_filings_with_ca([filing.id for filing in filings])
     return engagement
 
 
@@ -248,7 +251,7 @@ def _file_past_filings(index, business, owner, cas, today, now):
     """File most of the filings due before today: by the business itself or through a CA
     (one completed, rated engagement per CA-filed batch), some late, the newest left
     overdue for every third business. Returns the filings left overdue."""
-    past = [f for f in compliance_service.list_filings(business) if f.due_date < today]
+    past = [f for f in compliance.list_filings(business) if f.due_date < today]
     via_ca = []
     overdue = []
     for number, filing in enumerate(past):
@@ -300,7 +303,7 @@ def _upcoming(business, form_code=None):
     today = today_in_india()
     return [
         f
-        for f in compliance_service.list_filings(business)
+        for f in compliance.list_filings(business)
         if f.due_date >= today and (form_code is None or f.form_code == form_code)
     ]
 
@@ -309,7 +312,7 @@ def _demo_owner(today) -> tuple[User | None, str | None]:
     """The demo business user, if it exists and has no business yet."""
     email = normalize_email(os.getenv("DEMO_BUSINESS_EMAIL", ""))
     user = db.session.scalar(select(User).where(User.email == email)) if email else None
-    if user is None or onboarding_service.business_of_user(user) is not None:
+    if user is None or onboarding.business_of_user(user) is not None:
         return None, None
     return user, email
 
@@ -374,7 +377,7 @@ def seed_demo_data() -> str:
         )
     if demo_ca is None or None in sample_cas:
         return (
-            "Run `make seed` with DEMO_CA_EMAIL set first (the demo CA and sample CAs are needed)."
+            "Run `flask seed` with DEMO_CA_EMAIL set first (the demo CA and sample CAs are needed)."
         )
 
     today = today_in_india()
@@ -486,8 +489,8 @@ def seed_demo_data() -> str:
         asha_owner, asha_owner, "gst-registration-certificate.pdf", DocumentType.GST_CERTIFICATE
     )
     _upload(asha_owner, asha_owner, "pan-card.pdf", DocumentType.PAN_CARD)
-    for filing in compliance_service.list_filings(asha)[:2]:
-        if filing.status in compliance_service.DONE_STATUSES:
+    for filing in compliance.list_filings(asha)[:2]:
+        if filing.status in compliance.DONE_STATUSES:
             ack = _upload(
                 asha_owner,
                 asha_owner,
@@ -536,26 +539,26 @@ def seed_demo_data() -> str:
     # Upcoming filings with some documents ticked (docs pending) or all (ready).
     for index in (1, 9):
         filing = _upcoming(businesses[index], FormCode.GSTR_3B)[0]
-        keys = [e["key"] for e in compliance_service.checklist_with_ticks(filing) if e["required"]]
+        keys = [e["key"] for e in compliance.checklist_with_ticks(filing) if e["required"]]
         for key in keys if index == 9 else keys[:1]:
-            compliance_service.tick_checklist_entry(filing, key)
+            compliance.tick_checklist_entry(filing, key)
 
     # 5. Tray notifications, pro-bono, a CA waiting for verification.
-    alerts_service.notify(
+    alerts.notify(
         asha_owner,
         NotificationType.DEADLINE_REMINDER,
         f"GSTR-1 ({gstr_1.period_label}) is due soon",
         f"Due on {gstr_1.due_date:%d %b %Y}.",
         f"/business/compliance/{gstr_1.id}",
     )
-    alerts_service.notify(
+    alerts.notify(
         asha_owner,
         NotificationType.DOCUMENT_REQUEST,
         f"Your CA asked for a document for GSTR-3B ({gstr_3b.period_label})",
         "Please download GSTR-2B for the period from the GST portal and upload it.",
         f"/business/compliance/{gstr_3b.id}",
     )
-    alerts_service.notify(
+    alerts.notify(
         demo_ca_user,
         NotificationType.DOCUMENT_REQUEST,
         f"{asha.legal_name} sent the document you asked for",

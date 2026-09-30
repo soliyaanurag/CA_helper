@@ -8,11 +8,9 @@ import json
 import pytest
 from sqlalchemy import func, select
 
-from app.models import NicCode, User
-from app.models.enums import UserRole
+from app import onboarding as onboarding_service, utils as gemini_client
+from app.models import NicCode, User, UserRole
 from app.seed import seed_nic_codes
-from app.services import onboarding_service
-from app.utils import gemini_client
 
 SUGGEST_URL = "/api/v1/onboarding/nic-suggestions"
 SEARCH_URL = "/api/v1/onboarding/nic-codes"
@@ -193,7 +191,7 @@ def test_a_reply_that_is_not_json_falls_back_to_keywords(
 
 
 def test_without_gemini_the_keyword_matches_are_returned(client, bakery, nic_codes, auth_headers):
-    business, owner = bakery  # TestingConfig has no GEMINI_API_KEY
+    business, owner = bakery  # TEST_CONFIG has no GEMINI_API_KEY
 
     body = client.post(SUGGEST_URL, headers=auth_headers(owner)).get_json()
 
@@ -265,13 +263,3 @@ def test_ca_and_admin_cannot_use_the_nic_endpoints(client, make_user, auth_heade
         search = client.get(SEARCH_URL, query_string={"q": "bread"}, headers=headers)
         assert search.status_code == 403
         assert client.put(SAVE_URL, json={"code": "10711"}, headers=headers).status_code == 403
-
-
-def test_suggestions_are_rate_limited(client, bakery, nic_codes, auth_headers):
-    business, owner = bakery
-    headers = auth_headers(owner)
-
-    for _ in range(10):
-        assert client.post(SUGGEST_URL, headers=headers).status_code == 200
-
-    assert client.post(SUGGEST_URL, headers=headers).status_code == 429

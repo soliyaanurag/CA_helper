@@ -4,9 +4,7 @@ import io
 
 import pytest
 
-from app.models import AdminAuditLog, CaProfile, Document
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus
+from app.models import CaProfile, CaVerificationStatus, Document, UserRole
 
 PROFILE_URL = "/api/v1/marketplace/ca-profile"
 CERT_URL = PROFILE_URL + "/certificate"
@@ -81,7 +79,7 @@ def test_a_new_certificate_sends_a_verified_ca_back_to_pending(client, ca, admin
     upload(client, headers)
 
     assert status_of(database, profile_id) == CaVerificationStatus.PENDING
-    assert database.session.query(Document).filter(Document.deleted_at.is_(None)).count() == 1
+    assert database.session.query(Document).count() == 1  # the old certificate is deleted
 
 
 def test_the_pro_bono_pledge_is_saved_and_kept_when_not_sent(client, ca):
@@ -113,7 +111,7 @@ def test_verifying_needs_the_certificate(client, ca, admin_headers):
     assert response.get_json()["error"]["code"] == "CERTIFICATE_MISSING"
 
 
-def test_an_admin_verifies_a_ca_who_is_emailed_and_logged(
+def test_an_admin_verifies_a_ca_who_is_emailed(
     client, ca, admin_headers, database, mailbox
 ):
     _, headers, profile_id = ca
@@ -124,8 +122,6 @@ def test_an_admin_verifies_a_ca_who_is_emailed_and_logged(
     assert response.get_json()["verification_status"] == "verified"
     assert response.get_json()["verified_at"] is not None
     assert mailbox[-1]["Subject"] == "Your CA Helper profile is verified"
-    log = database.session.query(AdminAuditLog).one()
-    assert (log.action, str(log.target_id)) == ("ca_profile.verify", profile_id)
 
 
 def test_rejecting_needs_a_reason_the_ca_then_sees(client, ca, admin_headers, mailbox):

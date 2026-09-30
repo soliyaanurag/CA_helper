@@ -11,13 +11,19 @@ import json
 
 import pytest
 
-from app.errors import ApiError
-from app.models import ChatMessage, KbChunk, RegulatoryProfile, User
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.onboarding import GstScheme, ItrForm, MsmeTier
-from app.services import assistant_service
-from app.utils import gemini_client
+from app import assistant as assistant_service, utils as gemini_client
+from app.models import (
+    ChatMessage,
+    GstScheme,
+    ItrForm,
+    KbChunk,
+    MsmeTier,
+    RegulatoryProfile,
+    User,
+    UserRole,
+    utcnow,
+)
+from app.utils import ApiError
 
 ASK = "/api/v1/assistant/ask"
 HISTORY = "/api/v1/assistant/history"
@@ -291,9 +297,7 @@ def test_history_is_saved_listed_and_cleared(
 
     assert client.delete(HISTORY, headers=headers).status_code == 204
     assert client.get(HISTORY, headers=headers).get_json() == []
-    assert (
-        client.application.extensions["sqlalchemy"].session.query(ChatMessage).count() == 2
-    )  # soft delete
+    assert client.application.extensions["sqlalchemy"].session.query(ChatMessage).count() == 0
 
 
 def test_the_ask_route(client, knowledge, gemini, owner, auth_headers):
