@@ -32,7 +32,7 @@ from decimal import Decimal
 
 import click
 from flask import Flask
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.config import REPO_ROOT
 from app.extensions import db
@@ -789,3 +789,15 @@ def register_commands(app: Flask) -> None:
 
         click.echo(f"Seeded: {', '.join(run_all_seeds())}")
         click.echo(seed_demo_data())
+
+    @app.cli.command("reset-db")
+    @click.confirmation_option(prompt="Delete every table and all data in DATABASE_URL?")
+    def reset_db_command() -> None:
+        """Drop every table, create them again from the models, then run the seed."""
+        # Dropping the whole schema also removes tables that no longer have a model.
+        with db.engine.begin() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        db.create_all()
+        click.echo(f"Seeded: {', '.join(run_all_seeds())}")

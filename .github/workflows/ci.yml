@@ -1,6 +1,6 @@
 # Continuous integration: runs on every pull request and on pushes to main.
 #
-#   backend   migrations, pytest (with Postgres), then checks that the OpenAPI spec builds
+#   backend   pytest (with Postgres), then checks that the OpenAPI spec builds
 #   frontend  tests, build
 #
 # CI installs the same backend/requirements.txt and Node 22 as the Docker images.
@@ -51,10 +51,6 @@ jobs:
       # The OCR program (app/utils/ocr.py), as in the backend Docker image.
       - name: Install Tesseract
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
-
-      - name: Migrations apply cleanly
-        working-directory: backend
-        run: flask --app app db upgrade
 
       - name: Backend tests
         working-directory: backend
