@@ -1,7 +1,7 @@
 """Shared pytest fixtures for all backend tests (pytest loads this file automatically).
 
 Fixtures:
-    app       Flask app built with TestingConfig (one per test session)
+    app       Flask app built with TEST_CONFIG (one per test session)
     client    Flask test client for calling the API
     database  test database with every table created (once per session). Every
               row is deleted after each test, so tests never see each other's
@@ -17,11 +17,12 @@ Fixtures:
                  27 Sep 2026; its owner is `database.session.get(User, business.user_id)`
 
 The test database (TEST_DATABASE_URL, default `ca_helper_test`) is created
-automatically if it does not exist. It needs `make infra` to be running.
+automatically if it does not exist, in the `db` container of docker-compose.yml.
 """
 
+import os
 import re
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -42,6 +43,21 @@ from app.utils.passwords import hash_password
 
 TEST_PASSWORD = "Correct-Horse-9"
 
+# Settings the tests replace, so a developer's .env cannot change test behaviour.
+TEST_CONFIG = {
+    "TESTING": True,
+    "SECRET_KEY": "test-secret-key",
+    "JWT_SECRET_KEY": "test-jwt-secret-key-that-is-long-enough",
+    "JWT_ACCESS_TOKEN_EXPIRES": timedelta(minutes=60),
+    "SQLALCHEMY_DATABASE_URI": os.environ.get("TEST_DATABASE_URL"),
+    "FIELD_ENCRYPTION_KEY": "Z5radg25qAqquvqRiPO960hRLtJmVhE0P3dYa_T1Mk8=",
+    # Tests read emails from app.utils.email.outbox; nothing reaches Mailpit.
+    "MAIL_SUPPRESS_SEND": True,
+    "LOG_LEVEL": "INFO",
+    # Tests never call the real Gemini: without a key the client refuses (tests fake it).
+    "GEMINI_API_KEY": None,
+}
+
 
 def emailed_code(message) -> str:
     """The 6-digit code in an email sent by auth_service."""
@@ -50,7 +66,7 @@ def emailed_code(message) -> str:
 
 @pytest.fixture(scope="session")
 def app():
-    app = create_app("testing")
+    app = create_app(TEST_CONFIG)
     with app.app_context():
         yield app
 
@@ -79,13 +95,15 @@ def _create_database_if_missing(url: str) -> None:
 def _schema(app):
     url = app.config["SQLALCHEMY_DATABASE_URI"]
     if not url:
-        pytest.fail("TEST_DATABASE_URL is not set. Copy it from .env.example into .env.")
+        pytest.fail("TEST_DATABASE_URL is not set (docker-compose.yml sets it).")
+    if url == os.environ.get("DATABASE_URL"):
+        pytest.fail("TEST_DATABASE_URL is the app's database: the tests would wipe it.")
     try:
         _create_database_if_missing(url)
     except OperationalError as exc:
         safe_url = make_url(url).render_as_string(hide_password=True)
         pytest.fail(
-            f"Cannot reach the test database at {safe_url}. Is `make infra` running?\n{exc}"
+            f"Cannot reach the test database at {safe_url}. Is `docker compose up` running?\n{exc}"
         )
 
     # kb_chunks.embedding needs the pgvector extension (the migration creates it too).
@@ -123,7 +141,7 @@ def upload_dir(app, tmp_path):
 
 @pytest.fixture(autouse=True)
 def mailbox():
-    """TestingConfig suppresses sending; app.utils.email.outbox collects the messages."""
+    """TEST_CONFIG suppresses sending; app.utils.email.outbox collects the messages."""
     outbox.clear()
     return outbox
 

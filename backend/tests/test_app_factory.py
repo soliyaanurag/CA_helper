@@ -2,6 +2,7 @@
 
 from app import create_app
 from app.errors import ApiError
+from tests.conftest import TEST_CONFIG
 
 EXPECTED_BLUEPRINTS = {"health", "auth", "compliance", "ca_workspace", "admin"}
 
@@ -54,7 +55,7 @@ def test_api_error_returns_standard_error(app):
 
 
 def test_unhandled_error_returns_standard_500_error():
-    app = create_app("testing")
+    app = create_app(TEST_CONFIG)
     app.config["PROPAGATE_EXCEPTIONS"] = False  # behave like production: no traceback
 
     @app.get("/api/v1/boom")

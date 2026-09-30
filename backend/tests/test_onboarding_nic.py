@@ -193,7 +193,7 @@ def test_a_reply_that_is_not_json_falls_back_to_keywords(
 
 
 def test_without_gemini_the_keyword_matches_are_returned(client, bakery, nic_codes, auth_headers):
-    business, owner = bakery  # TestingConfig has no GEMINI_API_KEY
+    business, owner = bakery  # TEST_CONFIG has no GEMINI_API_KEY
 
     body = client.post(SUGGEST_URL, headers=auth_headers(owner)).get_json()
 

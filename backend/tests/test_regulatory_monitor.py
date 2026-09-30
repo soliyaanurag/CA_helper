@@ -297,7 +297,7 @@ def test_an_article_gemini_calls_irrelevant_gives_no_change(
 
 
 def test_without_gemini_a_keyword_change_is_saved(app, database, web, feed_source):
-    web[FEED_URL] = (200, rss(EXTENSION))  # TestingConfig has no Gemini key
+    web[FEED_URL] = (200, rss(EXTENSION))  # TEST_CONFIG has no Gemini key
 
     scan(app)
 
@@ -414,7 +414,7 @@ def test_a_filed_filing_is_not_affected(client, database, business, found, admin
 
 
 def test_a_change_found_by_keywords_tells_nobody(app, database, web, feed_source, business):
-    web[FEED_URL] = (200, rss(EXTENSION))  # TestingConfig has no Gemini key
+    web[FEED_URL] = (200, rss(EXTENSION))  # TEST_CONFIG has no Gemini key
 
     scan(app)
 

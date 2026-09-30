@@ -15,7 +15,7 @@ PORT = 8000
 
 
 def main() -> None:
-    app = create_app()  # config from APP_ENV (development)
+    app = create_app()
     # With auto-reload the script runs twice (a watcher and the server); print once.
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
         base = f"http://localhost:{PORT}"

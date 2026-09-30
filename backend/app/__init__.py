@@ -2,9 +2,9 @@
 
 `create_app()` is the Flask application factory. Every entrypoint uses it:
 
-- the dev server:   `python main.py` (make dev-backend)
-- the `flask` CLI:   `flask --app app db upgrade | seed | openapi write`
-- the worker:        `python worker.py` (make dev-worker)
+- the dev server:   `python main.py` (the backend service of docker-compose.yml)
+- the `flask` CLI:   `flask --app app db upgrade | seed | seed-demo | reset-db`
+- the worker:        `python worker.py` (the worker service)
 - the tests:         `backend/tests/conftest.py`
 
 Folders: models/ (tables), schemas/ (request/response shapes), routes/ (HTTP
@@ -15,7 +15,7 @@ import logging
 
 from flask import Flask, redirect
 
-from app.config import get_config
+from app.config import Config
 from app.errors import register_error_handlers
 from app.extensions import api, db, jwt, migrate
 from app.routes import register_routes
@@ -23,20 +23,16 @@ from app.seed import register_commands
 from app.utils.jwt_handlers import register_jwt_callbacks
 
 
-def create_app(config_name: str | None = None) -> Flask:
-    """Build and configure a Flask app.
-
-    `config_name` is "development" or "testing".
-    If it is None, the APP_ENV environment variable decides.
-    """
-    config = get_config(config_name)
+def create_app(test_config: dict | None = None) -> Flask:
+    """Build and configure a Flask app. The tests pass `test_config` to replace settings."""
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    if test_config:
+        app.config.update(test_config)
     # Plain log lines on the terminal: time, level, logger name, message.
     logging.basicConfig(
-        level=config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+        level=app.config["LOG_LEVEL"], format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
-
-    app = Flask(__name__)
-    app.config.from_object(config)
 
     # Bind the extension objects (created once in extensions.py) to this app.
     db.init_app(app)
