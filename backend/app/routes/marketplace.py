@@ -101,7 +101,7 @@ def upload_certificate(files):
 @blp.arguments(CaListArgsSchema, location="query")
 @blp.response(200, CaListPageSchema)
 def list_cas(filters):
-    return marketplace_service.list_verified_cas(**filters, user=current_user())
+    return marketplace_service.list_verified_cas(**filters)
 
 
 # A business opens one CA's page: details plus every service they offer with its price.

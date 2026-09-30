@@ -103,20 +103,6 @@ class CaListArgsSchema(PageArgsSchema):
     service = fields.String(validate=validate.Length(max=50))
 
 
-class MyPriceSchema(Schema):
-    """The CA's price for one of the business's filing forms."""
-
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    price = fields.Decimal(as_string=True, places=2, required=True)
-
-
-class MatchReasonSchema(Schema):
-    """One reason a CA suits the business, e.g. "In your city (Pune)", and its points."""
-
-    reason = fields.String(required=True)
-    points = fields.Integer(required=True)
-
-
 class RatingSchema(Schema):
     """One rating: 1 to 5 stars and an optional review. Never shows who wrote it."""
 
@@ -138,14 +124,6 @@ class CaListItemSchema(Schema):
     about = fields.String(required=True)
     # The CA's price for the `service` filter; null when no service is chosen.
     price = fields.Decimal(as_string=True, places=2, allow_none=True)
-    # For a registered business: the CA's price for each of its open filing forms (empty:
-    # they offer none), and whether the CA's city is in its address (null otherwise).
-    my_prices = fields.List(fields.Nested(MyPriceSchema), required=True)
-    same_city = fields.Boolean(allow_none=True)
-    # MA8, for a registered business: why this CA suits it and the sum of the points
-    # (the list is sorted by it); null and [] otherwise.
-    match_score = fields.Integer(allow_none=True)
-    match_reasons = fields.List(fields.Nested(MatchReasonSchema), required=True)
     # The average of the CA's ratings (one decimal), null before the first rating.
     rating_average = fields.Float(allow_none=True)
     rating_count = fields.Integer(required=True)

@@ -127,6 +127,13 @@ Checks (all inside the containers):
 - Snapshot: only section 4 differences: `/admin/audit-log` gone (404), `is_active` gone from `/admin/users` items.
 - Checks: backend 608 passed; frontend 240; build OK; walk 0 failures.
 
+### 2.5c Matching score (done)
+- Removed: POINTS_* weights, `_my_prices`, `_match_reasons`, `_ranking_key`, `_form_names`, the `user` argument of
+  `list_verified_cas` and the list keys `my_prices`, `same_city`, `match_score`, `match_reasons` (and their schemas).
+- Find a CA order: best rating first (unrated = 0), then most experience, then name; paginated after sorting.
+- Snapshot: only the four removed keys on `/marketplace/cas` (+ the known 2.5b diffs).
+- Checks: backend 604 passed; frontend 240; build OK; walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -187,3 +194,4 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_marketplace_ca_list.py::test_lists_only_verified_cas_with_live_accounts | renamed test_lists_only_verified_cas; deactivated case removed | admin: suspend removed |
 | test_marketplace_ca_detail.py::test_unlisted_cas_are_not_found[deactivated] | parameter removed | admin: suspend removed |
 | test_marketplace_services.py::test_range_counts_only_listed_cas_and_current_prices | deactivated-user case removed | admin: suspend removed |
+| test_marketplace_engagements.py: test_cas_offering_my_filings_come_first_with_their_prices, test_the_match_score_adds_up_its_reasons, test_the_best_match_comes_first_not_the_most_experienced, test_a_fee_at_or_below_the_typical_fee_earns_points, test_a_good_rating_and_free_slots_earn_points (+ helpers `_reasons`, `_ca_named`) | deleted; replaced by test_the_best_rated_come_first_then_experience_then_name | marketplace: matching score removed, list order rating/experience/name |
