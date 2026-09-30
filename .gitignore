@@ -27,6 +27,8 @@ __pycache__/
 htmlcov/
 *.egg-info/
 .venv/
+# Old local link to the conda env (no longer used)
+.conda-env
 
 # ---------------------------------------------------------------------------
 # Node / frontend
