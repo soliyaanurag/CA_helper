@@ -32,6 +32,7 @@ from decimal import Decimal
 
 import click
 from flask import Flask
+from flask_migrate import upgrade
 from sqlalchemy import select, text
 
 from app import onboarding
@@ -786,11 +787,10 @@ def register_commands(app: Flask) -> None:
     @app.cli.command("reset-db")
     @click.confirmation_option(prompt="Delete every table and all data in DATABASE_URL?")
     def reset_db_command() -> None:
-        """Drop every table, create them again from the models, then run the seed."""
+        """Drop every table, create them again with the migrations, then run the seed."""
         # Dropping the whole schema also removes tables that no longer have a model.
         with db.engine.begin() as conn:
             conn.execute(text("DROP SCHEMA public CASCADE"))
             conn.execute(text("CREATE SCHEMA public"))
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        db.create_all()
+        upgrade()  # flask db upgrade: the migrations in backend/migrations/versions/
         click.echo(f"Seeded: {', '.join(run_all_seeds())}")

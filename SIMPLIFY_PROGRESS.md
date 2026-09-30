@@ -479,6 +479,24 @@ Done:
 
 Results: backend 598 passed; frontend 235 passed; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+## Step 8: one fresh migration
+
+Done:
+- `backend/migrations/versions/` held no migrations (only `.gitkeep`, now removed). On an empty database
+  (`ca_helper_migrate`, dropped afterwards): `flask --app app db migrate -m "initial schema"` ->
+  `2026_09_30_1631-2c4a62de73e3_initial_schema.py`. Checked and edited by hand: `import pgvector.sqlalchemy` at the
+  top, `op.execute("CREATE EXTENSION IF NOT EXISTS vector")` first in `upgrade()`, `sa.Text()` instead of
+  `app.models.EncryptedString()` for pan, phone, gstin and tan, the "auto generated" comments removed. The
+  hand-written CHECK constraints, the GIN index on ca_profiles.specializations and the vector(768) column are in it.
+- On a new empty database: `flask db upgrade` ran it, `flask db check` said "No new upgrade operations detected",
+  and `flask seed` + `flask seed-demo` worked on the result.
+- `flask reset-db` now rebuilds the schema with the migrations (`flask_migrate.upgrade()`) instead of `create_all()`,
+  so a reset database is at the migration head and `flask db upgrade` keeps working on it (checked: `db current` =
+  2c4a62de73e3 (head), `db check` clean). The tests still build their own database with `create_all()`.
+- CI: the "Migrations apply cleanly" step is back (`flask db upgrade` + `flask db check` on the CI Postgres).
+
+Results: backend 598 passed; frontend 235 passed; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
