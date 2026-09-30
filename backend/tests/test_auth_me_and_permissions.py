@@ -1,5 +1,7 @@
 """GET /api/v1/auth/me, JWT error responses, and the roles_required decorator."""
 
+import re
+import uuid
 from datetime import timedelta
 
 from flask_jwt_extended import create_access_token
@@ -82,3 +84,24 @@ def test_role_is_checked_against_the_database_not_the_token(
     response = client.get("/api/v1/admin/dashboard", headers=headers)
 
     assert response.status_code == 403
+
+
+PUBLIC = {
+    "/api/health",
+    "/api/v1/auth/signup",
+    "/api/v1/auth/verify-email",
+    "/api/v1/auth/verify-email/resend",
+    "/api/v1/auth/login",
+    "/api/v1/auth/forgot-password",
+    "/api/v1/auth/reset-password",
+}
+
+
+def test_every_other_api_route_needs_a_login(app, client):
+    for rule in app.url_map.iter_rules():
+        if not rule.rule.startswith("/api/") or rule.rule in PUBLIC:
+            continue
+        url = re.sub(r"<[^>]+>", str(uuid.uuid4()), rule.rule)
+        for method in rule.methods - {"HEAD", "OPTIONS"}:
+            response = client.open(url, method=method)
+            assert response.status_code == 401, f"{method} {rule.rule} is not protected"
