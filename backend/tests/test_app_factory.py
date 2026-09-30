@@ -1,4 +1,4 @@
-"""The app factory wires up the blueprints, OpenAPI docs and the JSON error format."""
+"""The app factory wires up the blueprints and the JSON error format."""
 
 from app import create_app
 from app.utils import ApiError
@@ -54,9 +54,8 @@ def test_unhandled_error_returns_standard_500_error():
     assert "boom" not in error["message"]  # no exception text leaks to the client
 
 
-def test_api_root_redirects_to_the_docs(client):
+def test_api_root_redirects_to_the_health_check(client):
     response = client.get("/")
 
     assert response.status_code == 302
-    assert response.headers["Location"] == "/api/docs"
-    assert "/" not in client.get("/api/openapi.json").get_json()["paths"]
+    assert response.headers["Location"] == "/api/health"

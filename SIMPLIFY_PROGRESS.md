@@ -369,6 +369,29 @@ test fails because behaviour changed, or when adapting it would remove an assert
 
 **Step 4 done.**
 
+## Step 5: final backend cleanup (flask-smorest and marshmallow removed)
+
+Done:
+- `flask-smorest` and `marshmallow` removed from `backend/requirements.txt` (the image is rebuilt; `pip list` shows neither, nor webargs/apispec).
+- `app/__init__.py`: the OpenAPI settings, `CaHelperApi` and the `api` object are gone. `/api/health` is a plain Flask
+  Blueprint named `health` (same JSON, same 503 when the database is down, same `app` logger). Every blueprint is
+  registered with `app.register_blueprint`. `GET /` redirects to `/api/health` (Q4 answer).
+- `utils.register_error_handlers` now also answers every `HTTPException` in the standard shape
+  (`default_code(status)` + the werkzeug description): 404, 405, 413 and 500. An unexpected exception arrives as
+  InternalServerError, whose text is generic, so the exception text never leaks (test_unhandled_error... still passes).
+  Checked by hand: `DELETE /api/health` -> 405 METHOD_NOT_ALLOWED; the snapshot's 404s are unchanged.
+- `ErrorSchema`, `PageArgsSchema`, `PageSchema` and the marshmallow imports removed from `utils.py`.
+- CI: the "OpenAPI spec builds" step removed. `.gitignore`: the `/openapi.json` line removed. `main.py` no longer
+  prints the Swagger URL.
+- grep: nothing imports `app.services`, `app.routes`, `app.schemas`, `app.models.<x>` or `app.utils.<x>`. Comments
+  that still named the old files (app/utils/encryption.py, email.py, gemini_client.py, storage.py, ocr.py) now name
+  the new places (in `__init__.py`, `requirements.txt`, `documents.py` and four test docstrings; comments only).
+
+Results: backend 598 passed; frontend 240 passed; `npm run build` OK; snapshot 102 differences, all known section 4
+items, 0 unexplained; demo_walk.py (with the real Scan now) 0 failures.
+
+Uncertain: nothing new. The docs still mention Swagger; they are cleaned in step 7 (Q4 answer).
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -462,3 +485,4 @@ test fails because behaviour changed, or when adapting it would remove an assert
 | test_marketplace_engagements.py (access-check tests) | `ca_has_active_access` -> `ca_can_see_business`, `ca_can_access_document` -> `ca_can_open_document`, `active_engagement_item_ids` -> `active_filing_ids` | marketplace: access checks are two plain functions plus active_filing_ids |
 | test_marketplace_engagements.py::test_open_items_cover_requests_but_not_ended_ones | rewritten as test_requested_filings_are_not_active_work (the `open_engagement_item_ids` checks removed) | marketplace: access checks are two plain functions plus active_filing_ids |
 | test_worker.py::test_jobs_run_inside_app_context | adapted: internal rename (calls `run_job` in a thread instead of `AppScheduler`; same assertion); new test_the_worker_has_its_four_jobs checks the 4 ids and schedules | Q5 answer (not section 4) |
+| test_app_factory.py::test_api_root_redirects_to_the_docs | renamed test_api_root_redirects_to_the_health_check; expects Location `/api/health`; the "`/` is not in the OpenAPI paths" check removed (there is no OpenAPI spec any more) | flask-smorest removed (sections 1 and 6), Q4 answer (redirect to /api/health) |

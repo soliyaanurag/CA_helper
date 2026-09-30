@@ -1,4 +1,4 @@
-"""app/utils/email.py: templates, the test outbox and the SMTP path."""
+"""utils.send_email: templates, the test outbox and the SMTP path."""
 
 import logging
 import smtplib

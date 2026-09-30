@@ -1,4 +1,4 @@
-"""app/utils/storage.py: only real PDF, JPG and PNG files under the size limit are accepted."""
+"""utils.check_file: only real PDF, JPG and PNG files under the size limit are accepted."""
 
 import pytest
 

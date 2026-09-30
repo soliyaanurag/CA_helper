@@ -56,10 +56,6 @@ jobs:
         working-directory: backend
         run: pytest
 
-      - name: OpenAPI spec builds
-        working-directory: backend
-        run: flask --app app openapi write --format=json ../openapi.json
-
   frontend:
     name: Frontend
     runs-on: ubuntu-24.04

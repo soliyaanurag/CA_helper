@@ -20,7 +20,6 @@ def main() -> None:
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
         base = f"http://localhost:{PORT}"
         print(f"API:     {base}/api/v1/...")
-        print(f"Swagger: {base}/api/docs")
         print(f"Health:  {base}/api/health")
     app.run(host=HOST, port=PORT, debug=True)
 

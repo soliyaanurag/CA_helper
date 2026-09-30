@@ -1,4 +1,4 @@
-"""app/utils/encryption.py: EncryptedString keeps PAN, GSTIN, TAN and phone unreadable at rest."""
+"""models.EncryptedString keeps PAN, GSTIN, TAN and phone unreadable at rest."""
 
 from decimal import Decimal
 

@@ -1,4 +1,4 @@
-"""app/utils/gemini_client.py (ON11): personal data is removed before anything reaches Gemini.
+"""The Gemini functions in app/utils.py: personal data is removed before anything reaches Gemini.
 
 The real Gemini is never called: _send_to_gemini is replaced by a fake.
 """

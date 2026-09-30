@@ -54,7 +54,7 @@ TEST_CONFIG = {
     "JWT_ACCESS_TOKEN_EXPIRES": timedelta(minutes=60),
     "SQLALCHEMY_DATABASE_URI": os.environ.get("TEST_DATABASE_URL"),
     "FIELD_ENCRYPTION_KEY": "Z5radg25qAqquvqRiPO960hRLtJmVhE0P3dYa_T1Mk8=",
-    # Tests read emails from app.utils.email.outbox; nothing reaches Mailpit.
+    # Tests read emails from app.utils.outbox; nothing reaches Mailpit.
     "MAIL_SUPPRESS_SEND": True,
     "LOG_LEVEL": "INFO",
     # Tests never call the real Gemini: without a key the client refuses (tests fake it).
@@ -131,7 +131,7 @@ def database(_schema):
 
 @pytest.fixture(autouse=True)
 def mailbox():
-    """TEST_CONFIG suppresses sending; app.utils.email.outbox collects the messages."""
+    """TEST_CONFIG suppresses sending; app.utils.outbox collects the messages."""
     outbox.clear()
     return outbox
 

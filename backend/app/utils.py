@@ -15,14 +15,13 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-import marshmallow as ma
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from flask import Flask, current_app, request
 from flask_jwt_extended import get_current_user, verify_jwt_in_request
 from jinja2 import Template
-from marshmallow import fields, Schema, validate
 from sqlalchemy import select
+from werkzeug.exceptions import HTTPException
 
 from app.models import Business, db, User, UserRole
 
@@ -64,24 +63,19 @@ def default_code(status: int) -> str:
         return "ERROR"
 
 
-class ErrorDetailSchema(ma.Schema):
-    code = ma.fields.String(required=True, metadata={"description": "Stable error code"})
-    message = ma.fields.String(required=True, metadata={"description": "Human-readable text"})
-    details = ma.fields.Dict(metadata={"description": "Extra data, e.g. field errors"})
-
-
-class ErrorSchema(ma.Schema):
-    """Documents the error payload in the OpenAPI spec."""
-
-    error = ma.fields.Nested(ErrorDetailSchema, required=True)
-
-
 def register_error_handlers(app: Flask) -> None:
-    """Register handlers for our own exception types (HTTP errors are handled by CaHelperApi)."""
+    """Answer every error in the standard JSON shape."""
 
     @app.errorhandler(ApiError)
     def handle_api_error(error: ApiError):
         return error_body(error.code, error.message, error.details), error.status
+
+    # 404, 405, 413, ... and 500 (an unexpected exception arrives as InternalServerError,
+    # whose text is generic, so the exception's own text never reaches the client).
+    @app.errorhandler(HTTPException)
+    def handle_http_error(error: HTTPException):
+        status = error.code or 500
+        return error_body(default_code(status), error.description or HTTPStatus(status).phrase), status
 
 
 # The message of a required field that was not sent.
@@ -152,19 +146,6 @@ def money(value) -> str | None:
 
 PAGE_SIZE_DEFAULT = 20
 PAGE_SIZE_MAX = 100
-
-
-class PageArgsSchema(Schema):
-    page = fields.Integer(load_default=1, validate=validate.Range(min=1))
-    page_size = fields.Integer(
-        load_default=PAGE_SIZE_DEFAULT, validate=validate.Range(1, PAGE_SIZE_MAX)
-    )
-
-
-class PageSchema(Schema):
-    page = fields.Integer(required=True)
-    page_size = fields.Integer(required=True)
-    total = fields.Integer(required=True, metadata={"description": "Items across all pages"})
 
 
 # --- passwords ---------------------------------------------------------------------------
@@ -488,7 +469,7 @@ def check_file(data: bytes, mime_type: str) -> None:
         raise ApiError(400, "FILE_TOO_LARGE", f"The file is larger than {max_mb} MB.")
 
 
-# --- gemini_client -----------------------------------------------------------------------
+# --- Gemini -----------------------------------------------------------------------------
 
 
 log = logging.getLogger(__name__)

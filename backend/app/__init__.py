@@ -14,16 +14,12 @@ file per feature (auth.py, compliance.py, ...), seed.py and demo_seed.py.
 import logging
 import os
 from datetime import timedelta
-from http import HTTPStatus
 
-from flask import Flask, jsonify, redirect
+from flask import Blueprint, Flask, jsonify, redirect
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
-from flask_smorest import Api, Blueprint
-from marshmallow import Schema, fields
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from werkzeug.exceptions import HTTPException
 
 from app import (
     admin,
@@ -39,7 +35,7 @@ from app import (
 )
 from app.models import User, db
 from app.seed import register_commands
-from app.utils import ErrorSchema, default_code, error_body, register_error_handlers
+from app.utils import error_body, register_error_handlers
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +49,7 @@ class Config:
     # Access tokens only (no refresh token); lifetime in minutes.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.environ.get("JWT_ACCESS_TOKEN_MINUTES", "60")))
 
-    # Fernet key for the encrypted columns and files (app/utils/encryption.py).
+    # Fernet key for the encrypted columns and files (EncryptedString in app/models.py).
     FIELD_ENCRYPTION_KEY = os.environ.get("FIELD_ENCRYPTION_KEY")
 
     # The largest file anyone may upload (files are stored encrypted in the database).
@@ -64,14 +60,14 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
-    # Email (app/utils/email.py): Mailpit in development.
+    # Email (utils.send_email): Mailpit in development.
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "localhost")
     MAIL_PORT = int(os.environ.get("MAIL_PORT", "1025"))
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "CA Helper <no-reply@ca-helper.local>")
-    # True: nothing is sent; messages are kept in app.utils.email.outbox (tests).
+    # True: nothing is sent; messages are kept in app.utils.outbox (tests).
     MAIL_SUPPRESS_SEND = False
 
-    # Gemini (app/utils/gemini_client.py). No key: the AI features use their fallback.
+    # Gemini (the Gemini functions in app/utils.py). No key: the AI features use their fallback.
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or None
     GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
     GEMINI_EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
@@ -80,55 +76,12 @@ class Config:
     # DEBUG | INFO | WARNING | ERROR
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").strip().upper()
 
-    # OpenAPI docs (flask-smorest)
-    API_TITLE = "CA Helper API"
-    API_VERSION = "v1"
-    OPENAPI_VERSION = "3.0.3"
-    OPENAPI_URL_PREFIX = "/api"
-    OPENAPI_JSON_PATH = "openapi.json"  # served at /api/openapi.json
-    OPENAPI_SWAGGER_UI_PATH = "/docs"  # Swagger UI at /api/docs
-    OPENAPI_SWAGGER_UI_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/"
-    API_SPEC_OPTIONS = {
-        "info": {"description": "CA Helper (ComplianceConnect) REST API."},
-        # Adds the "Authorize" button in Swagger UI for JWT access tokens.
-        "components": {
-            "securitySchemes": {
-                "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
-            }
-        },
-        # Every endpoint needs a token unless it opts out with @blp.doc(security=[])
-        # (health, login). Enforcement is done by app/utils/decorators.py.
-        "security": [{"bearerAuth": []}],
-    }
 
 
 # --- Extensions -----------------------------------------------------------------------
 
 
-class CaHelperApi(Api):
-    """flask-smorest Api that formats every HTTP error in our standard shape."""
-
-    ERROR_SCHEMA = ErrorSchema
-
-    def handle_http_exception(self, error: HTTPException):
-        status = error.code or 500
-        data = getattr(error, "data", None) or {}  # set by flask_smorest.abort(...)
-        if "message" in data:
-            message = data["message"]
-        elif status == 422:
-            message = "Some fields are invalid."
-        else:
-            message = error.description or HTTPStatus(status).phrase
-        # Validation errors from flask-smorest/webargs arrive as "errors" or "messages".
-        details = data.get("errors") or data.get("messages")
-        headers = data.get("headers", {})
-        return error_body(default_code(status), message, details), status, headers
-
-
 migrate = Migrate()
-# flask-smorest Api: blueprints, marshmallow schemas, OpenAPI spec, Swagger UI,
-# and our JSON error format.
-api = CaHelperApi()
 jwt = JWTManager()
 
 
@@ -174,18 +127,10 @@ def expired_token(_header: dict, _payload: dict):
 
 # --- GET /api/health: is the API up and can it reach the database? -------------------
 
-health_blp = Blueprint("health", __name__, url_prefix="/api", description="Service health check")
+health_bp = Blueprint("health", __name__, url_prefix="/api")
 
 
-class HealthSchema(Schema):
-    status = fields.String(required=True, metadata={"description": "ok | degraded"})
-    database = fields.String(required=True, metadata={"description": "ok | unavailable"})
-
-
-@health_blp.route("/health")
-@health_blp.doc(security=[])  # public: no token needed
-@health_blp.response(200, HealthSchema)
-@health_blp.alt_response(503, schema=HealthSchema, description="The database is unreachable")
+@health_bp.get("/health")
 def health():
     try:
         db.session.execute(text("SELECT 1"))
@@ -197,14 +142,13 @@ def health():
         db.session.rollback()
         database = "unavailable"
     if database == "ok":
-        return {"status": "ok", "database": database}
-    return {"status": "degraded", "database": database}, 503
+        return jsonify({"status": "ok", "database": database})
+    return jsonify({"status": "degraded", "database": database}), 503
 
 
 # --- The app factory ----------------------------------------------------------------------
 
-# Every feature route lives under this prefix; /api/health, /api/docs and
-# /api/openapi.json stay unversioned.
+# Every feature route lives under this prefix; /api/health stays unversioned.
 API_PREFIX = "/api/v1"
 BLUEPRINTS = [
     auth.bp,
@@ -234,19 +178,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
-    api.init_app(app)
 
-    api.register_blueprint(health_blp)
-    for blp in BLUEPRINTS:
-        # Until every feature is plain Flask, flask-smorest registers its own blueprints.
-        if isinstance(blp, Blueprint):
-            api.register_blueprint(blp, url_prefix=API_PREFIX)
-        else:
-            app.register_blueprint(blp, url_prefix=API_PREFIX)
+    app.register_blueprint(health_bp)
+    for bp in BLUEPRINTS:
+        app.register_blueprint(bp, url_prefix=API_PREFIX)
 
-    # The API has no pages of its own, so its bare root opens the API docs instead of
-    # a 404. A plain Flask route, so it stays out of the OpenAPI spec.
-    app.add_url_rule("/", "root", lambda: redirect("/api/docs"))
+    # The API has no pages of its own, so its bare root shows the health check instead
+    # of a 404.
+    app.add_url_rule("/", "root", lambda: redirect("/api/health"))
 
     register_error_handlers(app)
     register_commands(app)

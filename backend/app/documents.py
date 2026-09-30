@@ -89,7 +89,7 @@ def on_document_uploaded(document: Document, data: bytes) -> None:
     """Read every new file locally and keep what it shows. Does not commit.
 
     `ocr_fields` gets only non-personal facts (acknowledgement number, filing date, forms,
-    periods, a type guess; app/utils/ocr.py). The text itself and any PAN,
+    periods, a type guess; app/ocr.py). The text itself and any PAN,
     GSTIN or name are never stored, and the file never leaves the server .
     OCR never makes an upload fail: an unreadable file is saved with ocr_status "failed".
     """
