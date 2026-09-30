@@ -16,7 +16,6 @@ app/services/onboarding_service.py and returns its result as JSON.
 from flask_smorest import Blueprint
 
 from app.errors import ErrorSchema
-from app.extensions import limiter
 from app.models.enums import UserRole
 from app.schemas.onboarding import (
     AutofillSchema,
@@ -70,11 +69,9 @@ def update_my_business(data):
 # Suggest up to 3 NIC activity codes for the business's description (nothing is saved).
 # Limited per minute because each call can use the Gemini quota.
 @blp.route("/onboarding/nic-suggestions", methods=["POST"])
-@limiter.limit("10 per minute")
 @roles_required(UserRole.BUSINESS)
 @blp.response(200, NicSuggestionSchema)
 @blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND (register first)")
-@blp.alt_response(429, schema=ErrorSchema, description="TOO_MANY_REQUESTS (rate limit per IP)")
 def suggest_nic_codes():
     return onboarding_service.suggest_nic_codes(current_business())
 
@@ -109,7 +106,6 @@ def list_states():
 
 # ON13: read a GST certificate or PAN card (locally, not stored) to fill the form.
 @blp.route("/onboarding/autofill", methods=["POST"])
-@limiter.limit("10 per minute")
 @roles_required(UserRole.BUSINESS)
 @blp.arguments(RegistrationUploadSchema, location="files")
 @blp.response(200, AutofillSchema)

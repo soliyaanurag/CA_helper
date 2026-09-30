@@ -20,7 +20,7 @@ mark_filed_by_ca(business, ca_user, item_id, ...)   the CA filed it (CW5; no com
 checklist_keys(form_code) -> list                   a form's checklist keys (used by documents)
 tick_checklist_entry(filing, key)                   tick an entry a document answers (documents)
 filings_by_acknowledgement(doc_ids) -> dict         filings whose acknowledgement these are
-get_filings_by_ids(ids, lock) -> dict               filings by id (used by marketplace)
+get_filings_by_ids(ids) -> dict                     filings by id (used by marketplace)
 mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
 mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
 list_unfiled_filings_due_by(day) -> list            not-filed filings due by a date (used by alerts)
@@ -689,17 +689,11 @@ def filings_by_acknowledgement(document_ids) -> dict:
 # --- Used by the marketplace module (engagements) ------------------------------------
 
 
-def get_filings_by_ids(filing_ids, lock: bool = False) -> dict:
-    """{id: ComplianceItem} for the live filings among `filing_ids`. Does not commit.
-
-    lock=True locks the rows until the caller commits (SELECT ... FOR UPDATE), so two
-    requests at the same moment cannot both reserve the same filing.
-    """
+def get_filings_by_ids(filing_ids) -> dict:
+    """{id: ComplianceItem} for the live filings among `filing_ids`. Does not commit."""
     stmt = select(ComplianceItem).where(
         ComplianceItem.id.in_(filing_ids), ComplianceItem.deleted_at.is_(None)
     )
-    if lock:
-        stmt = stmt.with_for_update()
     filings = {}
     for filing in db.session.scalars(stmt):
         filings[filing.id] = filing

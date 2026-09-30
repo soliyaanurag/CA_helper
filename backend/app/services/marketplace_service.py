@@ -895,7 +895,7 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
         chosen[item["compliance_item_id"]] = item["service_id"]
 
     # Lock the filings first, so a second request at the same moment waits for this one.
-    filings = compliance_service.get_filings_by_ids(list(chosen), lock=True)
+    filings = compliance_service.get_filings_by_ids(list(chosen))
     busy = _busy_filing_ids(list(chosen))
 
     # {service id: (CatalogService, the CA's price)}
@@ -1748,8 +1748,7 @@ def accept_pro_bono_request(user: User, request_id) -> dict:
     if pro_bono_used_this_month(ca.id) >= ca.pro_bono_slots_per_month:
         raise ApiError(409, "NO_PRO_BONO_SLOTS", "You have no free pro-bono slots left this month.")
 
-    # Lock the request, so two CAs cannot take it at the same moment.
-    request = db.session.get(ProBonoRequest, request_id, with_for_update=True)
+    request = db.session.get(ProBonoRequest, request_id)
     if request is None:
         raise ApiError(404, "PRO_BONO_REQUEST_NOT_FOUND", "This request was not found.")
     if request.status != ProBonoRequestStatus.QUEUED:
@@ -1757,7 +1756,7 @@ def accept_pro_bono_request(user: User, request_id) -> dict:
 
     business = onboarding_service.get_business(request.business_id)
     _check_room(ca, business.id)
-    filings = compliance_service.get_filings_by_ids(request.compliance_item_ids, lock=True)
+    filings = compliance_service.get_filings_by_ids(request.compliance_item_ids)
     busy = _busy_filing_ids(request.compliance_item_ids)
     for filing_id in request.compliance_item_ids:
         filing = filings.get(filing_id)

@@ -23,7 +23,6 @@ import logging
 import secrets
 import uuid
 from datetime import timedelta
-from functools import cache
 
 from flask_jwt_extended import create_access_token
 from sqlalchemy import select
@@ -65,6 +64,13 @@ def _is_live(user: User | None) -> bool:
 def _live_user_by_email(email: str) -> User | None:
     user = db.session.scalar(select(User).where(User.email == normalize_email(email)))
     return user if _is_live(user) else None
+
+
+def _user_by_email_or_404(email: str) -> User:
+    user = _live_user_by_email(email)
+    if user is None:
+        raise ApiError(404, "USER_NOT_FOUND", "No account uses this email.")
+    return user
 
 
 # --- One-time codes (helpers; none of them commits) ------------------------------
@@ -173,13 +179,12 @@ def verify_email(email: str, code: str) -> None:
 def resend_verification_code(email: str) -> None:
     """Email a new verification code to an unverified account.
 
-    Does nothing (and raises nothing) for an unknown, inactive or already verified
-    email, or when a code was sent less than OTP_RESEND_WAIT ago, so the answer
-    never reveals which emails have accounts.
+    404 USER_NOT_FOUND for an unknown email, 409 EMAIL_ALREADY_VERIFIED. Does nothing when
+    a code was sent less than OTP_RESEND_WAIT ago.
     """
-    user = _live_user_by_email(email)
-    if user is None or user.email_verified_at is not None:
-        return
+    user = _user_by_email_or_404(email)
+    if user.email_verified_at is not None:
+        raise ApiError(409, "EMAIL_ALREADY_VERIFIED", "This email is already verified. Log in.")
     if _sent_recently(user, OtpPurpose.VERIFY_EMAIL):
         return
     code = _add_code(user, OtpPurpose.VERIFY_EMAIL)
@@ -188,16 +193,6 @@ def resend_verification_code(email: str) -> None:
 
 
 # --- Login ------------------------------------------------------------------------
-
-
-@cache
-def _dummy_hash() -> str:
-    """A real argon2 hash of a random value, computed once.
-
-    Checked when the email is unknown, so an unknown email takes as long as a
-    wrong password and the response time does not reveal which emails exist.
-    """
-    return hash_password(uuid.uuid4().hex)
 
 
 def authenticate(email: str, password: str) -> User:
@@ -210,10 +205,7 @@ def authenticate(email: str, password: str) -> User:
     Rehashes the password if argon2's parameters changed since it was stored.
     """
     user = db.session.scalar(select(User).where(User.email == normalize_email(email)))
-    if user is None:
-        verify_password(_dummy_hash(), password)
-        raise ApiError(401, "INVALID_CREDENTIALS", "Wrong email or password.")
-    if not verify_password(user.password_hash, password):
+    if user is None or not verify_password(user.password_hash, password):
         raise ApiError(401, "INVALID_CREDENTIALS", "Wrong email or password.")
     if not _is_live(user):
         raise ApiError(
@@ -261,12 +253,11 @@ def _email_password_changed(user: User) -> None:
 def request_password_reset(email: str) -> None:
     """Email a password reset code to an active account.
 
-    Does nothing (and raises nothing) for an unknown or inactive email, or when a
-    reset code was sent less than OTP_RESEND_WAIT ago, so the answer never
-    reveals which emails have accounts. Works for unverified accounts too.
+    404 USER_NOT_FOUND for an unknown email. Does nothing when a reset code was sent less
+    than OTP_RESEND_WAIT ago. Works for unverified accounts too.
     """
-    user = _live_user_by_email(email)
-    if user is None or _sent_recently(user, OtpPurpose.RESET_PASSWORD):
+    user = _user_by_email_or_404(email)
+    if _sent_recently(user, OtpPurpose.RESET_PASSWORD):
         return
     code = _add_code(user, OtpPurpose.RESET_PASSWORD)
     db.session.commit()

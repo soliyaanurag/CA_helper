@@ -115,11 +115,6 @@ def test_login_is_refused_until_the_email_is_verified(client, database):
     assert response.get_json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
 
 
-def test_signup_is_rate_limited_to_5_per_minute(client, database):
-    statuses = [signup(client, email=f"user{i}@example.com").status_code for i in range(6)]
-
-    assert statuses == [201] * 5 + [429]
-
 
 def test_signup_needs_the_terms_accepted_and_records_when(client, database):
     refused = signup(client, terms_accepted=False)

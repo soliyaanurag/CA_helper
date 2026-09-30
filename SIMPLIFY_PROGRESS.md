@@ -65,3 +65,39 @@ Checks (all inside the containers):
 - backend 644 passed; frontend 240 passed (36 files); `npm run build` OK.
 - Snapshot compare: no differences.
 - Tests changed: none.
+
+## Step 2: Cross-cutting removals (in progress)
+
+### 2.1 Migrations (done, commit ba2ecae)
+- `backend/migrations/versions/*` deleted; `flask reset-db` added (asks for confirmation; drops the `public` schema,
+  creates the vector extension and every table from the models, runs the seed). CI "Migrations apply cleanly"
+  step removed. Backend 644 passed.
+
+### 2.2 Rate limiting, row locking, anti-enumeration (done)
+- Flask-Limiter removed (requirements, extensions, config, every `@limiter.limit`, the conftest reset fixture).
+- `with_for_update` removed: `compliance.get_filings_by_ids(ids)` has no `lock` argument now; accepting a pro-bono
+  request no longer locks the row.
+- Login no longer checks a dummy hash for an unknown email (same 401 INVALID_CREDENTIALS).
+- resend-code and forgot-password: unknown email -> 404 USER_NOT_FOUND; resend for a verified email -> 409
+  EMAIL_ALREADY_VERIFIED (existing codes). The frontend pages already show the server's message; no change needed.
+- Checks: backend 637 passed; frontend 240 passed; build OK; snapshot no differences; demo walk 0 failures.
+
+### Q3 (step 2.2): permission to delete/rewrite security tests
+**Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
+timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
+audit log, the matching score, per-type email settings and regulatory approval. Everything else follows rule 5.
+
+## Changed or deleted tests (with their section 4 item)
+
+| Test | Change | Section 4 item |
+|---|---|---|
+| conftest.py `_reset_rate_limits` fixture | deleted | Cross-cutting: rate limiting removed |
+| test_auth_change_password.py::test_change_password_is_rate_limited_to_10_per_minute | deleted | Cross-cutting: rate limiting removed |
+| test_auth_login.py::test_login_is_rate_limited_to_10_per_minute | deleted | Cross-cutting: rate limiting removed |
+| test_auth_password_reset.py::test_forgot_password_is_rate_limited_to_3_per_minute | deleted | Cross-cutting: rate limiting removed |
+| test_auth_signup.py::test_signup_is_rate_limited_to_5_per_minute | deleted | Cross-cutting: rate limiting removed |
+| test_auth_verify_email.py::test_resend_is_rate_limited_to_3_per_minute | deleted | Cross-cutting: rate limiting removed |
+| test_onboarding_nic.py::test_suggestions_are_rate_limited | deleted | Cross-cutting: rate limiting removed |
+| test_auth_login.py::test_unknown_email_still_checks_a_password_hash | deleted | auth: dummy-hash timing trick removed |
+| test_auth_password_reset.py::test_forgot_password_never_reveals_whether_an_account_exists | rewritten as test_forgot_password_for_an_unknown_email_is_404 (404 USER_NOT_FOUND) | auth: "always 204" answers removed |
+| test_auth_verify_email.py::test_resend_never_reveals_whether_an_account_exists | rewritten as test_resend_for_an_unknown_or_verified_email_is_an_error (404 USER_NOT_FOUND / 409 EMAIL_ALREADY_VERIFIED) | auth: "always 204" answers removed |

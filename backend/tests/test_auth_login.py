@@ -56,18 +56,6 @@ def test_wrong_password_and_unknown_email_get_the_same_error(client, make_user):
     assert wrong_password_error["message"] == unknown_email_error["message"]
 
 
-def test_unknown_email_still_checks_a_password_hash(client, database, monkeypatch):
-    # Guards the timing protection: an unknown email must cost one argon2 verify too.
-    checked = []
-    real_verify = auth_service.verify_password
-    monkeypatch.setattr(
-        auth_service, "verify_password", lambda h, p: checked.append(h) or real_verify(h, p)
-    )
-
-    login(client, "nobody@example.com")
-
-    assert checked == [auth_service._dummy_hash()]
-
 
 def test_inactive_user_is_rejected(client, make_user):
     make_user(email="gone@example.com", is_active=False)
@@ -130,14 +118,6 @@ def test_invalid_body_is_a_validation_error(client, database):
     assert response.status_code == 422
     assert set(response.get_json()["error"]["details"]["json"]) == {"email", "password"}
 
-
-def test_login_is_rate_limited_to_10_per_minute(client, database):
-    statuses = [login(client, "nobody@example.com").status_code for _ in range(11)]
-
-    assert statuses[:10] == [401] * 10
-    assert statuses[10] == 429
-    response = login(client, "nobody@example.com")
-    assert response.get_json()["error"]["code"] == "TOO_MANY_REQUESTS"
 
 
 def test_login_says_whether_the_terms_were_accepted(client, make_user):

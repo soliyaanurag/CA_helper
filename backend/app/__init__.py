@@ -17,7 +17,7 @@ from flask import Flask, redirect
 
 from app.config import get_config
 from app.errors import register_error_handlers
-from app.extensions import api, db, jwt, limiter, migrate
+from app.extensions import api, db, jwt, migrate
 from app.routes import register_routes
 from app.seed import register_commands
 from app.utils.jwt_handlers import register_jwt_callbacks
@@ -43,7 +43,6 @@ def create_app(config_name: str | None = None) -> Flask:
     migrate.init_app(app, db)
     jwt.init_app(app)
     register_jwt_callbacks(jwt)
-    limiter.init_app(app)
     api.init_app(app)
 
     # /api/health, then every feature blueprint under /api/v1 (app/routes/__init__.py).

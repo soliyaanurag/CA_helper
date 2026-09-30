@@ -45,13 +45,14 @@ def test_forgot_password_emails_a_code_that_resets_the_password(client, owner, m
     assert mailbox[-1]["Subject"] == "Your CA Helper password was changed"
 
 
-def test_forgot_password_never_reveals_whether_an_account_exists(client, make_user, mailbox):
+def test_forgot_password_for_an_unknown_email_is_404(client, make_user, mailbox):
     make_user(email="gone@example.com", is_active=False)
 
     unknown = forgot(client, email="nobody@example.com")
     inactive = forgot(client, email="gone@example.com")
 
-    assert unknown.status_code == inactive.status_code == 204
+    assert unknown.status_code == inactive.status_code == 404
+    assert unknown.get_json()["error"]["code"] == "USER_NOT_FOUND"
     assert mailbox == []
 
 
@@ -125,9 +126,3 @@ def test_resetting_the_password_also_verifies_the_email(client, make_user, mailb
     reset(client, emailed_code(mailbox[0]))
 
     assert login(client, NEW_PASSWORD).status_code == 200
-
-
-def test_forgot_password_is_rate_limited_to_3_per_minute(client, database):
-    statuses = [forgot(client).status_code for _ in range(4)]
-
-    assert statuses == [204, 204, 204, 429]

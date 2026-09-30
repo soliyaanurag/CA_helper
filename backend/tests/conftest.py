@@ -16,9 +16,6 @@ Fixtures:
                  a registered QRMP business (no TDS) with this year's filings, created on
                  27 Sep 2026; its owner is `database.session.get(User, business.user_id)`
 
-Rate-limit counters are cleared before every test (autouse), so login tests
-never hit the limit because of earlier tests.
-
 The test database (TEST_DATABASE_URL, default `ca_helper_test`) is created
 automatically if it does not exist. It needs `make infra` to be running.
 """
@@ -33,7 +30,6 @@ from sqlalchemy.exc import OperationalError
 
 from app import create_app
 from app.extensions import db as _db
-from app.extensions import limiter
 from app.models import Business, RegulatoryProfile, User
 from app.models.base import utcnow
 from app.models.enums import UserRole
@@ -110,11 +106,6 @@ def database(_schema):
     for table in reversed(_schema.metadata.sorted_tables):
         _schema.session.execute(table.delete())
     _schema.session.commit()
-
-
-@pytest.fixture(autouse=True)
-def _reset_rate_limits(app):
-    limiter.reset()
 
 
 @pytest.fixture(autouse=True)

@@ -6,8 +6,6 @@ They are created once here, without an app, and bound to the app inside
 """
 
 from flask_jwt_extended import JWTManager
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
@@ -41,5 +39,3 @@ migrate = Migrate()
 api = CaHelperApi()
 
 jwt = JWTManager()
-# No global limit. Individual routes (login, OTP) add @limiter.limit(...).
-limiter = Limiter(key_func=get_remote_address)

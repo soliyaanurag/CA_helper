@@ -265,13 +265,3 @@ def test_ca_and_admin_cannot_use_the_nic_endpoints(client, make_user, auth_heade
         search = client.get(SEARCH_URL, query_string={"q": "bread"}, headers=headers)
         assert search.status_code == 403
         assert client.put(SAVE_URL, json={"code": "10711"}, headers=headers).status_code == 403
-
-
-def test_suggestions_are_rate_limited(client, bakery, nic_codes, auth_headers):
-    business, owner = bakery
-    headers = auth_headers(owner)
-
-    for _ in range(10):
-        assert client.post(SUGGEST_URL, headers=headers).status_code == 200
-
-    assert client.post(SUGGEST_URL, headers=headers).status_code == 429

@@ -135,17 +135,14 @@ def test_resend_sends_at_most_one_code_a_minute(client, signed_up, mailbox):
     assert len(mailbox) == 1  # only the signup email
 
 
-def test_resend_never_reveals_whether_an_account_exists(client, make_user, mailbox):
+def test_resend_for_an_unknown_or_verified_email_is_an_error(client, make_user, mailbox):
     make_user(email="verified@example.com")  # already verified
 
     unknown = client.post(RESEND_URL, json={"email": "nobody@example.com"})
     verified = client.post(RESEND_URL, json={"email": "verified@example.com"})
 
-    assert unknown.status_code == verified.status_code == 204
+    assert unknown.status_code == 404
+    assert unknown.get_json()["error"]["code"] == "USER_NOT_FOUND"
+    assert verified.status_code == 409
+    assert verified.get_json()["error"]["code"] == "EMAIL_ALREADY_VERIFIED"
     assert mailbox == []
-
-
-def test_resend_is_rate_limited_to_3_per_minute(client, database):
-    statuses = [client.post(RESEND_URL, json={"email": EMAIL}).status_code for _ in range(4)]
-
-    assert statuses == [204, 204, 204, 429]

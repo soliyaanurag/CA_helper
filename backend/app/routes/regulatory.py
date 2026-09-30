@@ -16,7 +16,6 @@ import click
 from flask_smorest import Blueprint
 
 from app.errors import ErrorSchema
-from app.extensions import limiter
 from app.models.enums import UserRole
 from app.schemas.regulatory import (
     ChangeListArgsSchema,
@@ -93,10 +92,8 @@ def set_source_enabled(data, source_id):
 # Run the news scan now (for demos). It downloads every enabled source, so it is slow
 # and limited per minute.
 @blp.route("/admin/regulatory/scan", methods=["POST"])
-@limiter.limit("2 per minute")
 @roles_required(UserRole.ADMIN)
 @blp.response(200, ScanResultSchema)
-@blp.alt_response(429, schema=ErrorSchema, description="TOO_MANY_REQUESTS (rate limit per IP)")
 def scan_now():
     return regulatory_service.scan_news()
 

@@ -55,10 +55,6 @@ class BaseConfig:
     GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
     GEMINI_TIMEOUT_SECONDS = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "20"))
 
-    # --- Rate limiting (Flask-Limiter): counters kept in memory, per process ---
-    RATELIMIT_STORAGE_URI = "memory://"
-    RATELIMIT_HEADERS_ENABLED = True
-
     # --- Logging: DEBUG | INFO | WARNING | ERROR ---
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 
@@ -98,8 +94,6 @@ class TestingConfig(BaseConfig):
     SECRET_KEY = "test-secret-key"
     JWT_SECRET_KEY = "test-jwt-secret-key-that-is-long-enough"
     SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL")
-    # Rate limiting stays ON so the login limit is tested; tests/conftest.py
-    # clears the in-memory counters before every test.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=60)
     # A fixed test-only key, so a developer's .env cannot change test behaviour.
     FIELD_ENCRYPTION_KEY = "Z5radg25qAqquvqRiPO960hRLtJmVhE0P3dYa_T1Mk8="
