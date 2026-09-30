@@ -526,6 +526,21 @@ penalty exposure). What only a browser shows (layout, clicks, the new Settings a
 admin regulatory page without Approve/Reject) is covered by the frontend tests with fake API answers, and should be
 clicked through once in the browser (README "Demo script").
 
+## Follow-up on PR #36 (asked by Anurag after review)
+
+- New test `test_auth_me_and_permissions.py::test_every_other_api_route_needs_a_login`: every `/api/` route except
+  the health check and the 6 public auth routes answers 401 without a token (85 route/method pairs). It passed at
+  once; no route was missing its login check. It replaces the guard of the deleted OpenAPI test.
+- **Behaviour change (approved by Anurag):** a regulatory tray notification now opens the Regulatory updates page:
+  `/business/updates` for the business owner (was `/business/compliance`) and `/ca/updates` for their CAs (was
+  `/ca/clients/<id>`; the title still starts with the client's name).
+- Comments and docstrings in backend/app: task ids, "rule N", DECISIONS.md and "Does not commit." removed or said
+  in plain words (comments only). One seed text changed too: the GSTR-3B (QRMP) template's `source_reference` said
+  "docs/DECISIONS.md 2026-09-29"; it now says "as the team decided on 2026-09-29". `source_reference` is not in any
+  API response or page; the next `flask seed` updates the stored text.
+- eval/README.md: assistant word search 16/21 (30 Sep, same on old and new code); the 18/21 run was before the
+  `content/` changes of 29-30 Sep (PR #34, e.g. 16 new FAQ pages).
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -630,3 +645,5 @@ clicked through once in the browser (README "Demo script").
 | RegulatoryAdminPage.test.jsx (all 4) | fixtures without status/reviewed_at and with notified_at; one GET without ?status; "approves a change" replaced by "says how many businesses a change was sent to" (and no Approve button); keyword badge text "Found by keywords: read the article" + "Not sent to anyone"; scan text "1 change(s) found." | regulatory: no admin approval; keyword-only changes marked |
 | business/AlertsPage.test.jsx (3 tests) | moved to pages/SettingsPage.test.jsx and rewritten for one switch (PUT body {email_notifications: false}; one checkbox; CA link /ca/settings) | alerts: notification_settings replaced by users.email_notifications and one switch |
 | business/RegulatoryUpdatesPage.test.jsx (new, 2 tests) | added | regulatory: new Regulatory updates page |
+| test_regulatory_monitor.py::test_a_change_from_gemini_tells_the_business_and_its_ca_at_once | CA link expected `/ca/updates` (was `/ca/clients/<id>`); new check that the owner's link is `/business/updates` | Follow-up (approved by Anurag): regulatory tray links open the Regulatory updates page |
+| test_auth_me_and_permissions.py (new) test_every_other_api_route_needs_a_login | added | Follow-up: replaces the login guard of the deleted OpenAPI test |
