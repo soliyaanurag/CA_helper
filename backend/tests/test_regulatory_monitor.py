@@ -375,12 +375,13 @@ def test_a_change_from_gemini_tells_the_business_and_its_ca_at_once(
     ).one()
     assert owner_entry.title == "Regulatory update: GSTR-3B"
     assert "New due date: 2026-10-31." in owner_entry.body
+    assert owner_entry.link == "/business/updates"
     assert len(mailbox) == 1  # the owner's email (sent after the commit)
 
     ca_entry = database.session.scalars(
         select(Notification).where(Notification.user_id == ca_user.id)
     ).one()
-    assert ca_entry.link == f"/ca/clients/{business.id}"
+    assert ca_entry.link == "/ca/updates"
 
 
 def test_a_change_raises_the_clients_urgency(app, database, business, found):

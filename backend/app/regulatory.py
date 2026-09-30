@@ -567,8 +567,7 @@ def forms_text(form_codes: list[str]) -> str:
 
 def _notify_affected(change: RegulatoryChange) -> list:
     """Tell every affected business and their active CAs (tray) and record the matches.
-    Returns the emails for the owners, [(user, title, body)], to send after the commit.
-    Does not commit."""
+    Returns the emails for the owners, [(user, title, body)], to send after the commit."""
     change.notified_at = utcnow()
 
     title = f"Regulatory update: {forms_text(change.form_codes)}"
@@ -587,7 +586,7 @@ def _notify_affected(change: RegulatoryChange) -> list:
         owner = auth.get_user(str(business["user_id"]))
         if owner is not None:
             alerts.notify(
-                owner, NotificationType.REGULATORY_UPDATE, title, body, link="/business/compliance"
+                owner, NotificationType.REGULATORY_UPDATE, title, body, link="/business/updates"
             )
             emails.append((owner, title, body))
         for ca_user in marketplace.active_cas_of_business(business["id"]).values():
@@ -596,7 +595,7 @@ def _notify_affected(change: RegulatoryChange) -> list:
                 NotificationType.REGULATORY_UPDATE,
                 f"{business['legal_name']}: {title}",
                 body,
-                link=f"/ca/clients/{business['id']}",
+                link="/ca/updates",
             )
     return emails
 
