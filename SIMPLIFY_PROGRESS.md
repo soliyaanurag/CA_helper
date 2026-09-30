@@ -214,7 +214,7 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 - Checks: backend 604 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures; worker jobs
   listed; `flask db` works.
 
-## Step 4: Per module, plain Flask (in progress)
+## Step 4: Per module, plain Flask (done)
 
 ### Q4 (step 4): Swagger UI / OpenAPI tests
 Plain Flask routes are not in the flask-smorest OpenAPI spec, and step 5 removes flask-smorest, the OpenAPI
@@ -348,6 +348,27 @@ working, stop and ask.
 - No test changed. Every feature module is now a plain Flask blueprint (`bp`).
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### Q5 (step 4, worker.py): the AppScheduler test
+worker.py's `AppScheduler` subclass wraps every job in a decorator inside `add_job` (section 2: no
+decorators-inside-decorators). The simpler worker passes `run_job(app, job)` with APScheduler's `args` instead:
+same 4 jobs, ids and triggers, each still run inside the app context. tests/test_worker.py imports `AppScheduler`
+and checks the app context through it, so it fails although the behaviour is kept. Not a section 4 item, so rule 5
+applies. Options: (a) keep the test's assertion but call `run_job` in a thread instead of `AppScheduler`;
+(b) keep the AppScheduler class.
+**Answer (Anurag):** (a), keeping every assertion (the job runs in the app context; build_scheduler registers the
+same 4 jobs with the same ids and schedules). **Standing rule:** when a test fails only because an internal name,
+class or function signature changed (same behaviour, same API responses), adapt the test without asking, keep
+every assertion (never weaken or remove one) and log it as "adapted: internal rename". Still stop and ask when a
+test fails because behaviour changed, or when adapting it would remove an assertion.
+
+### 4.11 worker.py (done)
+- The 4 jobs are added with `run_job(app, job)` (APScheduler `args`), which runs the job inside the app context;
+  the `AppScheduler` subclass is gone. Same ids, triggers and Indian timezone. Checked in the container: the
+  scheduler lists the 4 jobs and a job runs inside the app context.
+- Checks: backend 598 passed (+1 new test); frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
+**Step 4 done.**
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -440,3 +461,4 @@ working, stop and ask.
 | frontend OnboardingPage.test.jsx (edit test fixture) | `filings` without `restored`/`moved` | onboarding: update the frontend "What changed" box |
 | test_marketplace_engagements.py (access-check tests) | `ca_has_active_access` -> `ca_can_see_business`, `ca_can_access_document` -> `ca_can_open_document`, `active_engagement_item_ids` -> `active_filing_ids` | marketplace: access checks are two plain functions plus active_filing_ids |
 | test_marketplace_engagements.py::test_open_items_cover_requests_but_not_ended_ones | rewritten as test_requested_filings_are_not_active_work (the `open_engagement_item_ids` checks removed) | marketplace: access checks are two plain functions plus active_filing_ids |
+| test_worker.py::test_jobs_run_inside_app_context | adapted: internal rename (calls `run_job` in a thread instead of `AppScheduler`; same assertion); new test_the_worker_has_its_four_jobs checks the 4 ids and schedules | Q5 answer (not section 4) |
