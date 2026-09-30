@@ -150,6 +150,37 @@ def test_ingest_needs_gemini_and_then_changes_nothing(content, database):
     assert database.session.query(KbChunk).count() == 0
 
 
+def test_ingest_saves_each_batch_and_a_rerun_carries_on(content, gemini, database, monkeypatch):
+    monkeypatch.setattr(assistant_service, "INGEST_BATCH", 2)
+    monkeypatch.setattr(assistant_service, "INGEST_PAUSE_SECONDS", 0)
+    calls = []
+
+    def refuse_the_second_batch(texts, for_question):
+        calls.append(len(texts))
+        if len(calls) == 2:
+            raise RuntimeError("429 RESOURCE_EXHAUSTED")
+        return [fake_vector(text) for text in texts]
+
+    monkeypatch.setattr(gemini_client, "_send_embeddings", refuse_the_second_batch)
+    with pytest.raises(ApiError) as error:
+        assistant_service.ingest_knowledge()
+
+    assert error.value.code == "GEMINI_UNAVAILABLE"
+    assert calls == [2, 1]
+    assert database.session.query(KbChunk).count() == 2  # the first batch was kept
+
+    assert assistant_service.ingest_knowledge() == {"chunks": 3, "embedded": 1, "removed": 0}
+    assert database.session.query(KbChunk).count() == 3
+
+
+def test_the_ingest_command_says_why_it_stopped(app, content, database):
+    result = app.test_cli_runner().invoke(args=["assistant", "ingest"])
+
+    assert result.exit_code == 1
+    assert "Gemini refused" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_the_real_content_folder_builds(database):
     """The repo's own content/ (forms + official FAQs) cuts into chunks without errors."""
     chunks = assistant_service.build_chunks()

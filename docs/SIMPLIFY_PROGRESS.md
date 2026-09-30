@@ -1,6 +1,7 @@
 # Simplification progress
 
-Log of the run that follows `SIMPLIFICATION_PLAN.md`. Re-read both files before each step.
+Log of the run that followed `SIMPLIFICATION_PLAN.md` (deleted after the run; it is in the git history,
+e.g. `git show 7929cf3:SIMPLIFICATION_PLAN.md`).
 
 **Standing rule from Anurag (30 Sep 2026):** do not disrupt current functionality except where the plan
 (section 4) or the prompt explicitly says so.
