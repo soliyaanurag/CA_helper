@@ -7,7 +7,7 @@ import { useComplianceDashboard, useFilings } from "@/api/compliance";
 import { useMyEngagements } from "@/api/marketplace";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { daysLeftText, daysUntil, formatDate } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
 const DONE = ["filed", "filed_verified"];
@@ -67,7 +67,7 @@ function Numbers({ numbers }) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <NumberCard
         title="Next deadline"
-        value={next ? label(FORM_LABELS, next.form_code) : "None"}
+        value={next ? filingFormLabel(next.form_code, next.period_label) : "None"}
         note={
           next
             ? `${next.period_label} · ${formatDate(next.due_date)} · ${daysLeftText(next.due_date)}`
@@ -133,7 +133,7 @@ function ToDo({ filings, engagements }) {
   for (const request of requests.data ?? []) {
     tasks.push({
       key: request.id,
-      text: `${request.ca_name} asked for a document for ${label(FORM_LABELS, request.form_code)} ${request.period_label}: ${request.message}`,
+      text: `${request.ca_name} asked for a document for ${filingFormLabel(request.form_code, request.period_label)} ${request.period_label}: ${request.message}`,
       to: `/business/compliance/${request.compliance_item_id}`,
     });
   }
@@ -175,7 +175,7 @@ function ToDo({ filings, engagements }) {
   for (const item of undecided.slice(0, 5)) {
     tasks.push({
       key: item.id,
-      text: `Decide how to file ${label(FORM_LABELS, item.form_code)} ${item.period_label} (${daysLeftText(item.due_date).toLowerCase()}): yourself or with a CA`,
+      text: `Decide how to file ${filingFormLabel(item.form_code, item.period_label)} ${item.period_label} (${daysLeftText(item.due_date).toLowerCase()}): yourself or with a CA`,
       to: `/business/compliance/${item.id}`,
     });
   }

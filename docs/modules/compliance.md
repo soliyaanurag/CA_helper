@@ -20,9 +20,16 @@ admin's filing numbers (AD5) are below. `filed_verified` is set from the acknowl
   late (still unfiled, or filed after the due date) and `overdue_rate` (late / due, %). Used by `admin_service.get_stats`.
 - **Backend** (`services/compliance_service.py`, `routes/compliance.py`, `schemas/compliance.py`):
   - Filings: `financial_year_start()`, `fy_label()`, `periods_of_year()`, `due_date()` (reads the template's
-    `due_date_rule`), `sync_filings(business_id, profile, today, keep_ids)` (makes this year's filings match the
-    profile; used after registering and after every edit; does not commit), `create_filings()` (the same for a new
-    business), `list_filings(business, status, form_code, due_from, due_to)`.
+    `due_date_rule`; the ITR rule has `by_itr_form`: ITR-5 without an audit is due 31 July, `TODO_VERIFY`),
+    `sync_filings(business_id, profile, today, keep_ids)` (makes this year's filings match the profile and the
+    current templates; used after registering, after every edit and by `flask seed`; does not commit),
+    `create_filings()` (the same for a new business), `list_filings(business, status, form_code, due_from, due_to)`.
+  - **Renamed forms (display only):** `RENAMED_FORMS`, `form_name(form_code, fy)` and `filing_name(filing)`: from tax
+    year 2026-27 a 24Q is shown as "Form 138 (earlier 24Q)" and a 26Q as "Form 140 (earlier 26Q)" (Income-tax Act,
+    2025) in reminders, notifications, vault messages and the filing page's `form_name` ("TDS return, salary (Form
+    138, earlier 24Q)"). The code (`tds_24q`), content folder (`content/forms/24Q/`) and rules stay.
+    `frontend/src/lib/labels.js` has the same list and `filingFormLabel(formCode, periodLabel)` for every page that
+    shows a filing.
   - Dashboard (CO12): `get_dashboard(user, business, today)`: `registered`, `next_deadline` (the first not-filed
     filing due today or later), `due_this_month` (not filed, due from today to the end of the month), `overdue` (not
     filed, due date passed, whatever the status, so a late `with_ca` filing counts), `with_ca`. Before registration
@@ -132,6 +139,8 @@ Planned: admin editors at `/api/v1/admin/compliance/...`; the CA's side of a fil
   `SELECT ... FOR UPDATE` until the caller commits (does not commit). Used by marketplace (engagements).
 - `mark_filings_with_ca(filing_ids)`: status `with_ca`, filing path `ca` (does not commit). Called by marketplace
   when an engagement becomes `active` (the CA accepts, or the business accepts a quote).
+- `form_name(form_code, fy)` / `filing_name(filing)`: display names (renamed forms); used by alerts, documents,
+  ca_workspace in their messages.
 - `checklist_with_ticks(filing) -> list[dict]`, `checklist_progress(filing) -> {required_total, required_ready,
   missing}` and `mark_filed_by_ca(business, ca_user, item_id, acknowledgement_no, upload)` (a `with_ca` filing →
   `filed`, path `ca`, acknowledgement owned by the business owner; no commit; 409 `ALREADY_FILED`,
@@ -140,7 +149,7 @@ Planned: admin editors at `/api/v1/admin/compliance/...`; the CA's side of a fil
 - `checklist_keys(form_code) -> list[str]`, `tick_checklist_entry(filing, key)` (tick + status again, does not
   commit, 422 `UNKNOWN_CHECKLIST_KEY`) and `filings_by_acknowledgement(document_ids) -> {document id: filing}`.
   Used by documents (a linked file ticks its checklist entry; an acknowledgement cannot be deleted from the vault).
-- `due_date(template, period_end, quarter, audit) -> date`, `financial_year_start(day)`, `periods_of_year(frequency, fy_start)`.
+- `due_date(template, period_end, quarter, audit, itr_form=None) -> date`, `financial_year_start(day)`, `periods_of_year(frequency, fy_start)`.
 
 ## Depends on
 onboarding (the regulatory profile, passed in by `register_business()`), core-auth (`current_business()`, `current_business_or_none()`), documents (`documents_service.add_document / read_document / remove_document` for the acknowledgement), marketplace (`with_ca` status from engagements; the frontend reads `my-engagements`).
@@ -154,9 +163,9 @@ onboarding (the regulatory profile, passed in by `register_business()`), core-au
 - Period labels: `"Apr 2026"` (monthly), `"Q1 2026-27"` (quarterly), `"FY 2026-27"` (yearly)
 
 ## Known issues
-- A corrected due-date rule (`make seed`) reaches filings created earlier only when `sync_filings` runs for that
-  business again (after a profile edit). After the V1 change (ITR 31 August, GSTR-4 30 June), existing test
-  or demo businesses keep the old dates until then; new registrations get the new ones.
+- A corrected due-date rule reaches filings created earlier with `make seed` / `make sync`: its last step
+  (`onboarding_service.resync_all_filings`) runs `sync_filings` for every business with its saved profile. The
+  profile itself is not recomputed there (a changed threshold reaches it only on the next profile edit).
 - GSTR-3B under QRMP uses the 22nd for every state; some states have the 24th (a decision, `docs/TODO_VERIFY.md` "Simplifications"). GSTR-4's 30 June is still `TODO_VERIFY`.
 - Only the current financial year is created; nothing creates next year's filings yet (a worker job, X2/ON14).
 - The yearly ITR filing is the current year's (FY 2026-27, due in 2027); last year's return is not added.

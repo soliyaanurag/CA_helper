@@ -3,14 +3,14 @@ form: 24Q
 status: DONE
 ---
 
-# 24Q: what it is and why it matters
+# Form 138 (earlier 24Q): what it is and why it matters
 
 <!-- Reviewed on 29 Sep 2026 against the official pages listed at the bottom (V1). Content rule
      (content/README.md): no legal thresholds, rates or due dates here; the app shows them from the
      rule tables. -->
 
 ## What is it?
-24Q is the quarterly **TDS return for salaries**. When you deduct income tax from your employees' salaries (TDS), you deposit it with the government and then report, in this return, how much was deducted for each employee. Under the Income-tax Act, 2025 (from tax year 2026-27) the same return is called **Form 138**.
+24Q is the quarterly **TDS return for salaries**. When you deduct income tax from your employees' salaries (TDS), you deposit it with the government and then report, in this return, how much was deducted for each employee. Under the Income-tax Act, 2025 (from tax year 2026-27) the same return is called **Form 138**, and TDS on salaries is section 392 (section 192 of the 1961 Act). Returns for quarters up to March 2026 stay 24Q, including corrections filed later.
 
 ## Who has to file it?
 Employers who deduct TDS on salaries. The app shows it when your profile says you deduct TDS and pay salaries above the taxable limit. You need a TAN, registered on the income-tax e-filing portal.

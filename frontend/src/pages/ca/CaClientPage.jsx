@@ -19,11 +19,11 @@ import { Label } from "@/components/ui/label";
 import { daysLeftText, formatDate } from "@/lib/dates";
 import {
   ENTITY_TYPE_LABELS,
-  FORM_LABELS,
+  filingFormLabel,
   GST_SCHEME_LABELS,
   ITR_FORM_LABELS,
-  MSME_TIER_LABELS,
   label,
+  MSME_TIER_LABELS,
 } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
@@ -123,7 +123,7 @@ function FilingCard({ businessId, row, onChanged }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-3">
-          {label(FORM_LABELS, item.form_code)} · {item.period_label}
+          {filingFormLabel(item.form_code, item.period_label)} · {item.period_label}
           <StatusBadge status={item.status} />
         </CardTitle>
         <CardDescription>

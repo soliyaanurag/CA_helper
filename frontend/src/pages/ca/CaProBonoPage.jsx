@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, formatDateTime } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 
 // /ca/pro-bono: micro businesses waiting for free help. A verified CA with free slots
 // this month takes a request; it becomes an active engagement at ₹0.
@@ -112,7 +112,7 @@ function RequestCard({ request, canTake }) {
         <ul className="list-disc pl-5">
           {request.filings.map((filing) => (
             <li key={filing.id}>
-              {label(FORM_LABELS, filing.form_code)} {filing.period_label} · due{" "}
+              {filingFormLabel(filing.form_code, filing.period_label)} {filing.period_label} · due{" "}
               {formatDate(filing.due_date)}
             </li>
           ))}

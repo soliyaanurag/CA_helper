@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDateTime, todayIso } from "@/lib/dates";
-import { DOCUMENT_TYPE_LABELS, FORM_LABELS, label } from "@/lib/labels";
+import { DOCUMENT_TYPE_LABELS, filingFormLabel, label } from "@/lib/labels";
 
 const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -44,7 +44,7 @@ function formatSize(bytes) {
 
 // "GSTR-1 · Q2 2026-27"
 function filingName(filing) {
-  return `${label(FORM_LABELS, filing.form_code)} · ${filing.period_label}`;
+  return `${filingFormLabel(filing.form_code, filing.period_label)} · ${filing.period_label}`;
 }
 
 /**

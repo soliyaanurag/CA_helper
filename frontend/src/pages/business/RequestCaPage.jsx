@@ -11,7 +11,7 @@ import {
 } from "@/api/marketplace";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 import { formatRupees } from "@/lib/money";
 
 // /business/marketplace/:caId/request: the business ticks the filings it wants this
@@ -166,7 +166,7 @@ function RequestForm({ caId, filings }) {
             disabled={filing.blocked_reason !== null}
             onChange={() => toggle(filing)}
           />
-          {label(FORM_LABELS, filing.form_code)} {filing.period_label}
+          {filingFormLabel(filing.form_code, filing.period_label)} {filing.period_label}
           <span className="font-normal text-muted-foreground">
             · due {formatDate(filing.due_date)}
           </span>

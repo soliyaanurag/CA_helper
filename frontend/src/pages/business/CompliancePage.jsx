@@ -5,7 +5,7 @@ import { errorMessage } from "@/api/client";
 import { useFilings } from "@/api/compliance";
 import { StatusBadge } from "@/components/StatusBadge";
 import { daysLeftText, daysUntil, formatDate, monthLabel } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 
 // The filter chips: which forms each one keeps.
 const FORM_FILTERS = {
@@ -172,7 +172,7 @@ function FilingTable({ filings }) {
                   to={`/business/compliance/${item.id}`}
                   className="text-primary underline-offset-4 hover:underline"
                 >
-                  {label(FORM_LABELS, item.form_code)}
+                  {filingFormLabel(item.form_code, item.period_label)}
                 </Link>
               </td>
               <td className="py-2 pr-4">{item.period_label}</td>

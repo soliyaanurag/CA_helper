@@ -55,6 +55,8 @@ Planned: admin editors at `/api/v1/admin/onboarding/...`.
 
 ## Service functions other modules call
 - `compute_profile(business, today) -> dict`: the profile values with explanations (no database writes).
+- `resync_all_filings(today=None) -> dict`: every business's filings matched to the current obligation templates with
+  its saved profile (`sync_filings`, filings in open engagements kept; no commit). The last step of `flask seed`.
 - `get_my_business(business) -> {business, profile}`.
 - `get_business(business_id) -> Business | None`: one business by id (marketplace shows its name on engagements).
 - `get_msme_tier(business) -> str | None`: the profile's MSME tier, e.g. `"micro"` (marketplace pro-bono eligibility).

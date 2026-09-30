@@ -109,6 +109,28 @@ export const FORM_LABELS = {
   tds_26q: "TDS return 26Q (other payments)",
 };
 
+/**
+ * Forms renamed by law, shown under the new name from the first financial year given (the
+ * code stays). The Income-tax Act, 2025 renamed the quarterly TDS statements from tax year
+ * 2026-27: 24Q is Form 138 and 26Q is Form 140. Same list as RENAMED_FORMS in
+ * backend/app/services/compliance_service.py.
+ */
+export const RENAMED_FORMS = {
+  tds_24q: { fromFy: "2026-27", name: "Form 138 (earlier 24Q)" },
+  tds_26q: { fromFy: "2026-27", name: "Form 140 (earlier 26Q)" },
+};
+
+/**
+ * The name of one filing's form: FORM_LABELS, or the new name of a renamed form when the
+ * filing's period label ("Q2 2026-27") is in a financial year from the rename on.
+ */
+export function filingFormLabel(formCode, periodLabel) {
+  const renamed = RENAMED_FORMS[formCode];
+  const fy = /(\d{4}-\d{2})$/.exec(periodLabel ?? "")?.[1];
+  if (renamed && fy && fy >= renamed.fromFy) return renamed.name;
+  return label(FORM_LABELS, formCode);
+}
+
 /** Where a filing is in its lifecycle (compliance_items.status). */
 export const COMPLIANCE_STATUS_LABELS = {
   upcoming: "Upcoming",

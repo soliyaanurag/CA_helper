@@ -291,11 +291,10 @@ def create_document_request(user: User, business_id, item_id, checklist_key, mes
         message=message,
     )
     db.session.add(request)
-    form = compliance_service.FORM_FOLDERS[filing.form_code]
     alerts_service.notify(
         db.session.get(User, business.user_id),
         NotificationType.DOCUMENT_REQUEST,
-        f"Your CA asked for a document for {form} ({filing.period_label})",
+        f"Your CA asked for a document for {compliance_service.filing_name(filing)}",
         f"{user.full_name}: {message}",
         f"/business/compliance/{filing.id}",
         email=True,
@@ -356,8 +355,7 @@ def fulfil_document_request(business, user: User, request_id, document_id) -> di
         cas[request.engagement_id],
         NotificationType.DOCUMENT_REQUEST,
         f"{business.legal_name} sent the document you asked for",
-        f"For {compliance_service.FORM_FOLDERS[filing.form_code]} ({filing.period_label}): "
-        f"{request.message}",
+        f"For {compliance_service.filing_name(filing)}: {request.message}",
         f"/ca/clients/{business.id}",
         email=True,
     )
@@ -386,8 +384,7 @@ def mark_filed_for_client(
     alerts_service.notify(
         db.session.get(User, business.user_id),
         NotificationType.ENGAGEMENT_UPDATE,
-        f"Your CA filed {compliance_service.FORM_FOLDERS[filing.form_code]} "
-        f"({filing.period_label})",
+        f"Your CA filed {compliance_service.filing_name(filing)}",
         f"{user.full_name} marked it as filed"
         + (
             f" (acknowledgement number {filing.acknowledgement_no})."

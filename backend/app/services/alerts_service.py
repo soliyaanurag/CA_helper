@@ -225,7 +225,7 @@ def _day_text(day: date) -> str:
 
 
 def _reminder_title(filing, days_left: int) -> str:
-    name = f"{compliance_service.FORM_FOLDERS[filing.form_code]} ({filing.period_label})"
+    name = compliance_service.filing_name(filing)
     if days_left < 0:
         return f"{name} is overdue"
     if days_left == 0:

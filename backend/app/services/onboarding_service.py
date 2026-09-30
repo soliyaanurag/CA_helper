@@ -9,6 +9,7 @@ get_business(business_id) -> Business     one business by id (used by marketplac
 get_msme_tier(business) -> str | None     "micro", "small", ... (used by marketplace pro-bono)
 get_itr_form(business) -> str | None      its profile's ITR form, e.g. "itr_5" (used by marketplace)
 business_ids_in_segment(entity, tier)     live businesses of one type and MSME tier (peer insights)
+resync_all_filings(today) -> dict         every business's filings to the current rules (flask seed)
 suggest_nic_codes(business) -> dict       up to 3 real NIC codes for its description (ON10)
 search_nic_codes(query) -> list           manual search of the NIC list
 set_nic_code(business, code) -> NicCode   save the code the user confirmed
@@ -130,7 +131,8 @@ def compute_profile(business: Business, today: date) -> dict:
                 f"{_rupees(qrmp_limit)}."
             )
 
-    # 3. Presumptive scheme (section 44AD): individuals, proprietors and partnership firms.
+    # 3. Presumptive scheme (section 44AD; section 58 of the 2025 Act): individuals, proprietors
+    #    and partnership firms.
     presumptive_limit = _threshold("itr.presumptive_44ad.max_turnover", today)
     if entity in (EntityType.LLP, EntityType.PRIVATE_LIMITED):
         presumptive_eligible = False
@@ -143,7 +145,7 @@ def compute_profile(business: Business, today: date) -> dict:
         why["presumptive_eligible"] = f"Turnover is above {_rupees(presumptive_limit)}."
 
     # 4. Audits (either one moves the ITR due date later).
-    # 4a. Tax audit under section 44AB, from turnover.
+    # 4a. Tax audit under section 44AB (section 63 of the 2025 Act), from turnover.
     audit_limit = _threshold("itr.audit_44ab.min_turnover", today)
     if presumptive_eligible:
         audit_applicable = False
@@ -693,3 +695,30 @@ def read_registration_document(upload) -> dict:
         found["entity_type"] = EntityType(found["entity_type"])
     log.info("Auto-fill read %d field(s) from a document", len(found))
     return {"found": found}
+
+
+def resync_all_filings(today: date | None = None) -> dict:
+    """Match every live business's filings of this financial year to the current obligation
+    templates (sync_filings with its saved profile), so a corrected due-date rule reaches
+    filings created earlier: not-started filings get the new date; filed, "With CA" and
+    requested ones are kept. Does not commit (run by `flask seed`). Returns the summed counts.
+    """
+    from app.services import marketplace_service  # imported here: it imports this module
+
+    today = today or today_in_india()
+    totals = {"businesses": 0, "added": 0, "restored": 0, "removed": 0, "moved": 0}
+    stmt = (
+        select(Business, RegulatoryProfile)
+        .join(RegulatoryProfile, RegulatoryProfile.business_id == Business.id)
+        .where(Business.deleted_at.is_(None))
+    )
+    for business, profile in db.session.execute(stmt).all():
+        filing_ids = [filing.id for filing in compliance_service.list_filings(business)]
+        keep = marketplace_service.open_filing_ids(filing_ids)
+        counts = compliance_service.sync_filings(business.id, profile, today, keep)
+        totals["businesses"] += 1
+        for key in ("added", "restored", "removed", "moved"):
+            totals[key] += counts[key]
+    if totals["moved"] or totals["added"] or totals["removed"]:
+        log.info("Filings resynced to the rules: %s", totals)
+    return totals

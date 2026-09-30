@@ -25,6 +25,7 @@ mark_filings_with_ca(ids)                           set filings to "With CA" (us
 mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
 list_unfiled_filings_due_by(day) -> list            not-filed filings due by a date (used by alerts)
 peer_insights(business, item_id) -> dict            how similar businesses file this form (CO13)
+form_name(form_code, fy) / filing_name(filing)      display names (24Q is Form 138 from 2026-27)
 filing_stats(today) -> dict                         filings by status and the overdue rate (admin)
 
 How forms and due dates work: each row of `obligation_templates` says which
@@ -112,14 +113,20 @@ def _next_date_after(day: date, month: int, day_of_month: int) -> date:
 
 
 def due_date(
-    template: ObligationTemplate, period_end: date, quarter: int | None = None, audit: bool = False
+    template: ObligationTemplate,
+    period_end: date,
+    quarter: int | None = None,
+    audit: bool = False,
+    itr_form: str | None = None,
 ) -> date:
     """When the filing for the period ending on `period_end` is due, from the template's rule.
 
     monthly    {"day": 11}                    the 11th of the month after the period
     quarterly  {"quarters": [[7, 13], ...]}   [month, day] for Q1..Q4, after the quarter ends
     yearly     {"month": 7, "day": 31}        that date after the financial year ends;
-               "audit_month"/"audit_day"      used instead when the business has a tax audit
+               "audit_month"/"audit_day"      used instead when the business has an audit;
+               "by_itr_form": {"itr_5": [7, 31]}   used instead, without an audit, for a
+                                              business whose profile has that ITR form
     """
     rule = template.due_date_rule
     if template.frequency == Frequency.MONTHLY:
@@ -130,6 +137,9 @@ def due_date(
         return _next_date_after(period_end, month, day)
     if audit and "audit_month" in rule:
         return _next_date_after(period_end, rule["audit_month"], rule["audit_day"])
+    if itr_form in rule.get("by_itr_form", {}):
+        month, day = rule["by_itr_form"][itr_form]
+        return _next_date_after(period_end, month, day)
     return _next_date_after(period_end, rule["month"], rule["day"])
 
 
@@ -174,6 +184,7 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
     fy_start = financial_year_start(today)
     fy = fy_label(fy_start)
     audit = bool(profile.audit_applicable or profile.other_audit_applicable)
+    itr_form = profile.itr_form.value if profile.itr_form else None
     templates = db.session.scalars(
         select(ObligationTemplate).where(
             ObligationTemplate.effective_from <= today,
@@ -186,7 +197,7 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
     for template in templates:
         if _applies_to(template, profile):
             for label, start, end, quarter in periods_of_year(template.frequency, fy_start):
-                due = due_date(template, end, quarter, audit)
+                due = due_date(template, end, quarter, audit, itr_form)
                 wanted[(template.form_code, start)] = (template, label, start, end, due)
 
     this_year = db.session.scalars(
@@ -219,6 +230,8 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
             if not_started and (item.period_end, item.due_date) != (end, due):
                 reshape(item, template, label, end, due)
                 counts["moved"] += 1
+            elif item.template_id != template.id:
+                item.template_id = template.id  # a newer rule row; dates and status stay
         elif key in deleted:
             item = deleted[key]
             item.is_active = True
@@ -448,6 +461,15 @@ def _refresh_status(filing: ComplianceItem, today: date) -> None:
         filing.status = ComplianceStatus.DOCS_PENDING
 
 
+def _template_name(filing: ComplianceItem) -> str:
+    """The filing's form as its page names it, e.g. "GSTR-3B (quarterly, QRMP)"; a renamed
+    form under its new name (RENAMED_FORMS)."""
+    renamed = RENAMED_FORMS.get(filing.form_code)
+    if renamed is not None and filing.fy >= renamed[0]:
+        return renamed[2]
+    return db.session.get(ObligationTemplate, filing.template_id).name
+
+
 def get_filing(business, item_id) -> dict:
     """One filing with everything its page shows: dates, status, path, the form's
     explanation and instructions, the checklist with ticks, and the acknowledgement."""
@@ -465,7 +487,7 @@ def get_filing(business, item_id) -> dict:
         }
     return {
         "filing": filing,
-        "form_name": db.session.get(ObligationTemplate, filing.template_id).name,
+        "form_name": _template_name(filing),
         "content_status": content["status"],
         "explanation": content["explanation"],
         "instructions": content["instructions"],
@@ -753,6 +775,41 @@ def mark_overdue_filings(today: date | None = None) -> int:
     if len(late) > 0:
         log.info("Marked %d filing(s) overdue", len(late))
     return len(late)
+
+
+# --- Forms renamed by law (display names only) ------------------------------------------
+
+# From the first financial year given, a form is shown under its new name; its code, content
+# folder and rules stay. The Income-tax Act, 2025 and the Income-tax Rules, 2026 renamed the
+# quarterly TDS statements from tax year 2026-27: 24Q is Form 138 and 26Q is Form 140
+# (incometax.gov.in, Form 138 / Form 140 user manuals). frontend/src/lib/labels.js
+# (RENAMED_FORMS) has the same list.
+RENAMED_FORMS = {
+    FormCode.TDS_24Q: (
+        "2026-27",
+        "Form 138 (earlier 24Q)",
+        "TDS return, salary (Form 138, earlier 24Q)",
+    ),
+    FormCode.TDS_26Q: (
+        "2026-27",
+        "Form 140 (earlier 26Q)",
+        "TDS return, other payments (Form 140, earlier 26Q)",
+    ),
+}
+
+
+def form_name(form_code, fy: str) -> str:
+    """A form's short name for a filing of financial year `fy` ("2026-27"), e.g. "GSTR-3B",
+    or "Form 138 (earlier 24Q)" for a 24Q from tax year 2026-27 (the new name)."""
+    renamed = RENAMED_FORMS.get(form_code)
+    if renamed is not None and fy >= renamed[0]:
+        return renamed[1]
+    return FORM_FOLDERS[form_code]
+
+
+def filing_name(filing) -> str:
+    """e.g. "GSTR-3B (Q1 2026-27)" or "Form 138 (earlier 24Q) (Q2 2026-27)", for messages."""
+    return f"{form_name(filing.form_code, filing.fy)} ({filing.period_label})"
 
 
 # --- Peer insights (CO13) and the admin's numbers (AD5) --------------------------------

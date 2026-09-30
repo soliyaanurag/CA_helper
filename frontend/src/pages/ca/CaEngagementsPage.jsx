@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isPast } from "@/lib/dates";
-import { FORM_LABELS, label } from "@/lib/labels";
+import { filingFormLabel } from "@/lib/labels";
 
 // The groups on the page, in order, and which statuses belong to each.
 const GROUPS = [
@@ -175,7 +175,7 @@ function QuoteForm({ engagement, busy, onSend, onCancel }) {
       {engagement.items.map((item) => (
         <div key={item.id} className="flex flex-wrap items-center gap-2">
           <Label htmlFor={"quote-" + item.id} className="w-56">
-            {label(FORM_LABELS, item.form_code)} {item.period_label}
+            {filingFormLabel(item.form_code, item.period_label)} {item.period_label}
           </Label>
           <span>₹</span>
           <Input
