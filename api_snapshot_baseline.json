@@ -1,0 +1,3512 @@
+{
+ "endpoints": {
+  "admin GET /api/health": {
+   "shape": {
+    "$": "object",
+    "$.database": "string",
+    "$.status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/audit-log": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/audit-log?page=1": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/cas": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].about": "string",
+    "$[].capacity": "number",
+    "$[].city": "string",
+    "$[].cop_number": "string",
+    "$[].email": "string",
+    "$[].full_name": "string",
+    "$[].has_certificate": "bool",
+    "$[].id": "uuid",
+    "$[].languages": "list",
+    "$[].languages[]": "string",
+    "$[].membership_no": "string",
+    "$[].pro_bono_slots_per_month": "number",
+    "$[].rejection_reason": "null",
+    "$[].specializations": "list",
+    "$[].specializations[]": "string",
+    "$[].updated_at": "datetime",
+    "$[].user_id": "uuid",
+    "$[].verification_status": "string",
+    "$[].verified_at": "null",
+    "$[].years_experience": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/cas/<missing>": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    404
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/cas/<uuid:ca_id>": {
+   "shape": {
+    "$": "object",
+    "$.about": "string",
+    "$.capacity": "number",
+    "$.city": "string",
+    "$.cop_number": "string",
+    "$.email": "string",
+    "$.full_name": "string",
+    "$.has_certificate": "bool",
+    "$.id": "uuid",
+    "$.languages": "list",
+    "$.languages[]": "string",
+    "$.membership_no": "string",
+    "$.pro_bono_slots_per_month": "number",
+    "$.rejection_reason": "null",
+    "$.specializations": "list",
+    "$.specializations[]": "string",
+    "$.updated_at": "datetime",
+    "$.user_id": "uuid",
+    "$.verification_status": "string",
+    "$.verified_at": "null",
+    "$.years_experience": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/cas/<uuid:ca_id>/certificate": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    200,
+    404
+   ],
+   "type": [
+    "application/json",
+    "application/pdf"
+   ]
+  },
+  "admin GET /api/v1/admin/cas?status=pending": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].about": "string",
+    "$[].capacity": "number",
+    "$[].city": "string",
+    "$[].cop_number": "string",
+    "$[].email": "string",
+    "$[].full_name": "string",
+    "$[].has_certificate": "bool",
+    "$[].id": "uuid",
+    "$[].languages": "list",
+    "$[].languages[]": "string",
+    "$[].membership_no": "string",
+    "$[].pro_bono_slots_per_month": "number",
+    "$[].rejection_reason": "null",
+    "$[].specializations": "list",
+    "$[].specializations[]": "string",
+    "$[].updated_at": "datetime",
+    "$[].user_id": "uuid",
+    "$[].verification_status": "string",
+    "$[].verified_at": "null",
+    "$[].years_experience": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/cas?status=rejected": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/cas?status=verified": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].about": "string",
+    "$[].capacity": "number",
+    "$[].city": "string",
+    "$[].cop_number": "string",
+    "$[].email": "string",
+    "$[].full_name": "string",
+    "$[].has_certificate": "bool",
+    "$[].id": "uuid",
+    "$[].languages": "list",
+    "$[].languages[]": "string",
+    "$[].membership_no": "string",
+    "$[].pro_bono_slots_per_month": "number",
+    "$[].rejection_reason": "null",
+    "$[].specializations": "list",
+    "$[].specializations[]": "string",
+    "$[].updated_at": "datetime",
+    "$[].user_id": "uuid",
+    "$[].verification_status": "string",
+    "$[].verified_at": "null",
+    "$[].years_experience": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.message": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/regulatory/changes": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/regulatory/changes?status=all": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.details": "object",
+    "$.error.details.query": "object",
+    "$.error.details.query.status": "list",
+    "$.error.details.query.status[]": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    422
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/regulatory/changes?status=approved": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/regulatory/changes?status=pending": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/regulatory/changes?status=rejected": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/regulatory/sources": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].enabled": "bool",
+    "$[].id": "uuid",
+    "$[].kind": "string",
+    "$[].name": "string",
+    "$[].url": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/stats": {
+   "shape": {
+    "$": "object",
+    "$.businesses": "number",
+    "$.cas_by_status": "object",
+    "$.cas_by_status.pending": "number",
+    "$.cas_by_status.rejected": "number",
+    "$.cas_by_status.verified": "number",
+    "$.filings_by_status": "object",
+    "$.filings_by_status.docs_pending": "number",
+    "$.filings_by_status.filed": "number",
+    "$.filings_by_status.filed_verified": "number",
+    "$.filings_by_status.overdue": "number",
+    "$.filings_by_status.ready": "number",
+    "$.filings_by_status.upcoming": "number",
+    "$.filings_by_status.with_ca": "number",
+    "$.filings_due_so_far": "number",
+    "$.filings_late": "number",
+    "$.open_engagements": "number",
+    "$.overdue_rate": "number",
+    "$.users_by_role": "object",
+    "$.users_by_role.admin": "number",
+    "$.users_by_role.business": "number",
+    "$.users_by_role.ca": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/users": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].created_at": "datetime",
+    "$.items[].email": "string",
+    "$.items[].email_verified": "bool",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].is_active": "bool",
+    "$.items[].role": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/users?page=2": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].created_at": "datetime",
+    "$.items[].email": "string",
+    "$.items[].email_verified": "bool",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].is_active": "bool",
+    "$.items[].role": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/users?role=business": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].created_at": "datetime",
+    "$.items[].email": "string",
+    "$.items[].email_verified": "bool",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].is_active": "bool",
+    "$.items[].role": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/users?role=ca": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].created_at": "datetime",
+    "$.items[].email": "string",
+    "$.items[].email_verified": "bool",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].is_active": "bool",
+    "$.items[].role": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/admin/users?search=demo": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].created_at": "datetime",
+    "$.items[].email": "string",
+    "$.items[].email_verified": "bool",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].is_active": "bool",
+    "$.items[].role": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/alerts/notifications": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/alerts/notifications/unread-count": {
+   "shape": {
+    "$": "object",
+    "$.unread": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/alerts/penalties": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/alerts/settings": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/assistant/history": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/auth/me": {
+   "shape": {
+    "$": "object",
+    "$.email": "string",
+    "$.full_name": "string",
+    "$.id": "uuid",
+    "$.role": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/ca-workspace/batches": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/ca-workspace/clients": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/ca-workspace/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/ca-workspace/document-requests": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/compliance/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/compliance/items": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/documents": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/ca-engagements": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/ca-profile": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/ca-services": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/cas": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/my-engagements": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/pro-bono": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/pro-bono-queue": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/marketplace/services": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].ca_count": "number",
+    "$[].code": "string",
+    "$[].description": "string",
+    "$[].id": "uuid",
+    "$[].max_price": "money|null",
+    "$[].median_price": "money|null",
+    "$[].min_price": "money|null",
+    "$[].name": "string",
+    "$[].specialization": "string",
+    "$[].unit": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/onboarding/business": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/onboarding/nic-codes": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin GET /api/v1/onboarding/states": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "admin POST /api/v1/auth/login": {
+   "shape": {
+    "$": "object",
+    "$.access_token": "string",
+    "$.terms_accepted": "bool",
+    "$.user": "object",
+    "$.user.email": "string",
+    "$.user.full_name": "string",
+    "$.user.id": "uuid",
+    "$.user.role": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/health": {
+   "shape": {
+    "$": "object",
+    "$.database": "string",
+    "$.status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/audit-log": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/cas": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/regulatory/changes": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/regulatory/sources": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/stats": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/admin/users": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/alerts/notifications": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/alerts/notifications/unread-count": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/alerts/penalties": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/alerts/settings": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/assistant/history": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/auth/me": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/ca-workspace/batches": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/ca-workspace/clients": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/ca-workspace/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/ca-workspace/document-requests": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/compliance/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/compliance/items": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/documents": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/ca-engagements": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/ca-profile": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/ca-services": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/cas": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/my-engagements": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/pro-bono": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/pro-bono-queue": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/marketplace/services": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/onboarding/business": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/onboarding/nic-codes": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "anonymous GET /api/v1/onboarding/states": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    401
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/health": {
+   "shape": {
+    "$": "object",
+    "$.database": "string",
+    "$.status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/audit-log": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/cas": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/regulatory/changes": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/regulatory/sources": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/stats": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/admin/users": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/notifications": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].body": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].id": "uuid",
+    "$.items[].link": "string",
+    "$.items[].read_at": "null",
+    "$.items[].title": "string",
+    "$.items[].type": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/notifications/unread-count": {
+   "shape": {
+    "$": "object",
+    "$.unread": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/notifications?page_size=5": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].body": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].id": "uuid",
+    "$.items[].link": "string",
+    "$.items[].read_at": "null",
+    "$.items[].title": "string",
+    "$.items[].type": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/penalties": {
+   "shape": {
+    "$": "object",
+    "$.estimated_count": "number",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].compliance_item_id": "uuid",
+    "$.items[].days_late": "number",
+    "$.items[].due_date": "date",
+    "$.items[].form_code": "string",
+    "$.items[].interest": "null",
+    "$.items[].label": "string",
+    "$.items[].late_fee": "money",
+    "$.items[].notes": "list",
+    "$.items[].notes[]": "string",
+    "$.items[].period_label": "string",
+    "$.items[].status": "string",
+    "$.items[].total": "money",
+    "$.label": "string",
+    "$.overdue_count": "number",
+    "$.pending_count": "number",
+    "$.total_late_fees": "money"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/penalties/<uuid:item_id>": {
+   "shape": {
+    "$": "object",
+    "$.compliance_item_id": "uuid",
+    "$.days_late": "number",
+    "$.due_date": "date",
+    "$.form_code": "string",
+    "$.interest": "null",
+    "$.label": "string",
+    "$.late_fee": "money|null",
+    "$.notes": "list",
+    "$.notes[]": "string",
+    "$.period_label": "string",
+    "$.status": "string",
+    "$.total": "money|null"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/penalties/<uuid:item_id>?tax_due=25000": {
+   "shape": {
+    "$": "object",
+    "$.compliance_item_id": "uuid",
+    "$.days_late": "number",
+    "$.due_date": "date",
+    "$.form_code": "string",
+    "$.interest": "money|null",
+    "$.label": "string",
+    "$.late_fee": "money|null",
+    "$.notes": "list",
+    "$.period_label": "string",
+    "$.status": "string",
+    "$.total": "money|null"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/alerts/settings": {
+   "shape": {
+    "$": "object",
+    "$.always_emailed": "list",
+    "$.always_emailed[]": "string",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].email_enabled": "bool",
+    "$.items[].type": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/assistant/history": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/auth/me": {
+   "shape": {
+    "$": "object",
+    "$.email": "string",
+    "$.full_name": "string",
+    "$.id": "uuid",
+    "$.role": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/ca-workspace/batches": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/ca-workspace/clients": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/ca-workspace/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/ca-workspace/document-requests": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].ca_name": "string",
+    "$[].checklist_key": "string",
+    "$[].compliance_item_id": "uuid",
+    "$[].created_at": "datetime",
+    "$[].document_id": "null",
+    "$[].form_code": "string",
+    "$[].fulfilled_at": "null",
+    "$[].id": "uuid",
+    "$[].message": "string",
+    "$[].period_label": "string",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/ca-workspace/document-requests?compliance_item_id=<id>": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].ca_name": "string",
+    "$[].checklist_key": "string",
+    "$[].compliance_item_id": "uuid",
+    "$[].created_at": "datetime",
+    "$[].document_id": "null",
+    "$[].form_code": "string",
+    "$[].fulfilled_at": "null",
+    "$[].id": "uuid",
+    "$[].message": "string",
+    "$[].period_label": "string",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.due_this_month": "number",
+    "$.message": "string",
+    "$.next_deadline": "object",
+    "$.next_deadline.due_date": "date",
+    "$.next_deadline.filing_path": "string",
+    "$.next_deadline.form_code": "string",
+    "$.next_deadline.fy": "string",
+    "$.next_deadline.id": "uuid",
+    "$.next_deadline.period_end": "date",
+    "$.next_deadline.period_label": "string",
+    "$.next_deadline.period_start": "date",
+    "$.next_deadline.status": "string",
+    "$.overdue": "number",
+    "$.registered": "bool",
+    "$.with_ca": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/forms/<string:form_code>": {
+   "shape": {
+    "$": "object",
+    "$.checklist": "list",
+    "$.checklist[]": "object",
+    "$.checklist[].help": "null|string",
+    "$.checklist[].key": "string",
+    "$.checklist[].label": "string",
+    "$.checklist[].required": "bool",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string",
+    "$.explanation": "string",
+    "$.form_code": "string",
+    "$.instructions": "string",
+    "$.status": "string"
+   },
+   "status": [
+    200,
+    404
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filing_path": "null|string",
+    "$[].form_code": "string",
+    "$[].fy": "string",
+    "$[].id": "uuid",
+    "$[].period_end": "date",
+    "$[].period_label": "string",
+    "$[].period_start": "date",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items/<missing>": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    404
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items/<uuid:item_id>": {
+   "shape": {
+    "$": "object",
+    "$.acknowledgement": "null|object",
+    "$.acknowledgement.filename": "string",
+    "$.acknowledgement.uploaded_at": "datetime",
+    "$.acknowledgement.verification": "object",
+    "$.acknowledgement.verification.acknowledgement_no": "null",
+    "$.acknowledgement.verification.filing_date": "null",
+    "$.acknowledgement.verification.problems": "list",
+    "$.acknowledgement.verification.problems[]": "string",
+    "$.acknowledgement.verification.verified": "bool",
+    "$.checklist": "list",
+    "$.checklist[]": "object",
+    "$.checklist[].help": "null|string",
+    "$.checklist[].key": "string",
+    "$.checklist[].label": "string",
+    "$.checklist[].required": "bool",
+    "$.checklist[].ticked": "bool",
+    "$.content_status": "string",
+    "$.explanation": "string",
+    "$.filing": "object",
+    "$.filing.acknowledgement_no": "null|string",
+    "$.filing.due_date": "date",
+    "$.filing.filed_at": "datetime|null",
+    "$.filing.filing_path": "null|string",
+    "$.filing.form_code": "string",
+    "$.filing.fy": "string",
+    "$.filing.id": "uuid",
+    "$.filing.period_end": "date",
+    "$.filing.period_label": "string",
+    "$.filing.period_start": "date",
+    "$.filing.status": "string",
+    "$.form_name": "string",
+    "$.instructions": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items/<uuid:item_id>/acknowledgement": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    200,
+    404
+   ],
+   "type": [
+    "application/json",
+    "application/pdf"
+   ]
+  },
+  "business GET /api/v1/compliance/items/<uuid:item_id>/peer-insights": {
+   "shape": {
+    "$": "object",
+    "$.business_count": "number",
+    "$.ca": "null|object",
+    "$.ca.count": "number",
+    "$.ca.on_time_pct": "number",
+    "$.ca.share_pct": "number",
+    "$.entity_type": "string",
+    "$.filing_count": "number",
+    "$.form_code": "string",
+    "$.min_businesses": "number",
+    "$.msme_tier": "string",
+    "$.scope": "string",
+    "$.self": "null|object",
+    "$.self.count": "number",
+    "$.self.on_time_pct": "number",
+    "$.self.share_pct": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?due_from=2026-10-01&due_to=2026-12-31": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filing_path": "null|string",
+    "$[].form_code": "string",
+    "$[].fy": "string",
+    "$[].id": "uuid",
+    "$[].period_end": "date",
+    "$[].period_label": "string",
+    "$[].period_start": "date",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?form_code=gstr_3b": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filing_path": "null|string",
+    "$[].form_code": "string",
+    "$[].fy": "string",
+    "$[].id": "uuid",
+    "$[].period_end": "date",
+    "$[].period_label": "string",
+    "$[].period_start": "date",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?form_code=itr": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filing_path": "null",
+    "$[].form_code": "string",
+    "$[].fy": "string",
+    "$[].id": "uuid",
+    "$[].period_end": "date",
+    "$[].period_label": "string",
+    "$[].period_start": "date",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?status=bogus": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.details": "object",
+    "$.error.details.query": "object",
+    "$.error.details.query.status": "list",
+    "$.error.details.query.status[]": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    422
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?status=filed_verified": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filing_path": "string",
+    "$[].form_code": "string",
+    "$[].fy": "string",
+    "$[].id": "uuid",
+    "$[].period_end": "date",
+    "$[].period_label": "string",
+    "$[].period_start": "date",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?status=overdue": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/compliance/items?status=upcoming": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filing_path": "null",
+    "$[].form_code": "string",
+    "$[].fy": "string",
+    "$[].id": "uuid",
+    "$[].period_end": "date",
+    "$[].period_label": "string",
+    "$[].period_start": "date",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].acknowledgement_of": "list",
+    "$.items[].acknowledgement_of[]": "object",
+    "$.items[].acknowledgement_of[].compliance_item_id": "uuid",
+    "$.items[].acknowledgement_of[].form_code": "string",
+    "$.items[].acknowledgement_of[].period_label": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].doc_type": "string",
+    "$.items[].fy": "null|string",
+    "$.items[].id": "uuid",
+    "$.items[].links": "list",
+    "$.items[].links[]": "object",
+    "$.items[].links[].checklist_key": "string",
+    "$.items[].links[].compliance_item_id": "uuid",
+    "$.items[].links[].form_code": "string",
+    "$.items[].links[].id": "uuid",
+    "$.items[].links[].period_label": "string",
+    "$.items[].mime_type": "string",
+    "$.items[].ocr_status": "string",
+    "$.items[].original_filename": "string",
+    "$.items[].period_label": "null|string",
+    "$.items[].size_bytes": "number",
+    "$.items[].type_warning": "null",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents/<missing>/file": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    404
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents/<uuid:document_id>/file": {
+   "shape": {},
+   "status": [
+    200
+   ],
+   "type": [
+    "application/pdf"
+   ]
+  },
+  "business GET /api/v1/documents?compliance_item_id=<id>": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].acknowledgement_of": "list",
+    "$.items[].acknowledgement_of[]": "object",
+    "$.items[].acknowledgement_of[].compliance_item_id": "uuid",
+    "$.items[].acknowledgement_of[].form_code": "string",
+    "$.items[].acknowledgement_of[].period_label": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].doc_type": "string",
+    "$.items[].fy": "string",
+    "$.items[].id": "uuid",
+    "$.items[].links": "list",
+    "$.items[].links[]": "object",
+    "$.items[].links[].checklist_key": "string",
+    "$.items[].links[].compliance_item_id": "uuid",
+    "$.items[].links[].form_code": "string",
+    "$.items[].links[].id": "uuid",
+    "$.items[].links[].period_label": "string",
+    "$.items[].mime_type": "string",
+    "$.items[].ocr_status": "string",
+    "$.items[].original_filename": "string",
+    "$.items[].period_label": "string",
+    "$.items[].size_bytes": "number",
+    "$.items[].type_warning": "null",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents?doc_type=acknowledgement": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].acknowledgement_of": "list",
+    "$.items[].acknowledgement_of[]": "object",
+    "$.items[].acknowledgement_of[].compliance_item_id": "uuid",
+    "$.items[].acknowledgement_of[].form_code": "string",
+    "$.items[].acknowledgement_of[].period_label": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].doc_type": "string",
+    "$.items[].fy": "string",
+    "$.items[].id": "uuid",
+    "$.items[].links": "list",
+    "$.items[].mime_type": "string",
+    "$.items[].ocr_status": "string",
+    "$.items[].original_filename": "string",
+    "$.items[].period_label": "string",
+    "$.items[].size_bytes": "number",
+    "$.items[].type_warning": "null",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents?fy=2026-27": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].acknowledgement_of": "list",
+    "$.items[].acknowledgement_of[]": "object",
+    "$.items[].acknowledgement_of[].compliance_item_id": "uuid",
+    "$.items[].acknowledgement_of[].form_code": "string",
+    "$.items[].acknowledgement_of[].period_label": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].doc_type": "string",
+    "$.items[].fy": "string",
+    "$.items[].id": "uuid",
+    "$.items[].links": "list",
+    "$.items[].links[]": "object",
+    "$.items[].links[].checklist_key": "string",
+    "$.items[].links[].compliance_item_id": "uuid",
+    "$.items[].links[].form_code": "string",
+    "$.items[].links[].id": "uuid",
+    "$.items[].links[].period_label": "string",
+    "$.items[].mime_type": "string",
+    "$.items[].ocr_status": "string",
+    "$.items[].original_filename": "string",
+    "$.items[].period_label": "string",
+    "$.items[].size_bytes": "number",
+    "$.items[].type_warning": "null",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents?page_size=100": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].acknowledgement_of": "list",
+    "$.items[].acknowledgement_of[]": "object",
+    "$.items[].acknowledgement_of[].compliance_item_id": "uuid",
+    "$.items[].acknowledgement_of[].form_code": "string",
+    "$.items[].acknowledgement_of[].period_label": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].doc_type": "string",
+    "$.items[].fy": "null|string",
+    "$.items[].id": "uuid",
+    "$.items[].links": "list",
+    "$.items[].links[]": "object",
+    "$.items[].links[].checklist_key": "string",
+    "$.items[].links[].compliance_item_id": "uuid",
+    "$.items[].links[].form_code": "string",
+    "$.items[].links[].id": "uuid",
+    "$.items[].links[].period_label": "string",
+    "$.items[].mime_type": "string",
+    "$.items[].ocr_status": "string",
+    "$.items[].original_filename": "string",
+    "$.items[].period_label": "null|string",
+    "$.items[].size_bytes": "number",
+    "$.items[].type_warning": "null",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/documents?page_size=5": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].acknowledgement_of": "list",
+    "$.items[].acknowledgement_of[]": "object",
+    "$.items[].acknowledgement_of[].compliance_item_id": "uuid",
+    "$.items[].acknowledgement_of[].form_code": "string",
+    "$.items[].acknowledgement_of[].period_label": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].doc_type": "string",
+    "$.items[].fy": "null|string",
+    "$.items[].id": "uuid",
+    "$.items[].links": "list",
+    "$.items[].links[]": "object",
+    "$.items[].links[].checklist_key": "string",
+    "$.items[].links[].compliance_item_id": "uuid",
+    "$.items[].links[].form_code": "string",
+    "$.items[].links[].id": "uuid",
+    "$.items[].links[].period_label": "string",
+    "$.items[].mime_type": "string",
+    "$.items[].ocr_status": "string",
+    "$.items[].original_filename": "string",
+    "$.items[].period_label": "null|string",
+    "$.items[].size_bytes": "number",
+    "$.items[].type_warning": "null",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/ca-engagements": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/ca-profile": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/ca-services": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].about": "string",
+    "$.items[].city": "string",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].languages": "list",
+    "$.items[].languages[]": "string",
+    "$.items[].match_reasons": "list",
+    "$.items[].match_reasons[]": "object",
+    "$.items[].match_reasons[].points": "number",
+    "$.items[].match_reasons[].reason": "string",
+    "$.items[].match_score": "number",
+    "$.items[].membership_no": "string",
+    "$.items[].my_prices": "list",
+    "$.items[].my_prices[]": "object",
+    "$.items[].my_prices[].form_code": "string",
+    "$.items[].my_prices[].price": "money",
+    "$.items[].price": "null",
+    "$.items[].rating_average": "number",
+    "$.items[].rating_count": "number",
+    "$.items[].same_city": "bool",
+    "$.items[].specializations": "list",
+    "$.items[].specializations[]": "string",
+    "$.items[].years_experience": "number",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas/<missing>": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    404
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas/<uuid:ca_id>": {
+   "shape": {
+    "$": "object",
+    "$.about": "string",
+    "$.city": "string",
+    "$.full_name": "string",
+    "$.id": "uuid",
+    "$.languages": "list",
+    "$.languages[]": "string",
+    "$.membership_no": "string",
+    "$.rating_average": "number",
+    "$.rating_count": "number",
+    "$.reviews": "list",
+    "$.reviews[]": "object",
+    "$.reviews[].created_at": "datetime",
+    "$.reviews[].review": "null|string",
+    "$.reviews[].stars": "number",
+    "$.services": "list",
+    "$.services[]": "object",
+    "$.services[].ca_count": "number",
+    "$.services[].code": "string",
+    "$.services[].description": "string",
+    "$.services[].id": "uuid",
+    "$.services[].max_price": "money|null",
+    "$.services[].median_price": "money|null",
+    "$.services[].min_price": "money|null",
+    "$.services[].name": "string",
+    "$.services[].price": "money",
+    "$.services[].specialization": "string",
+    "$.services[].unit": "string",
+    "$.specializations": "list",
+    "$.specializations[]": "string",
+    "$.years_experience": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas/<uuid:ca_id>/requestable-filings": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].blocked_reason": "null|string",
+    "$[].due_date": "date",
+    "$[].form_code": "string",
+    "$[].id": "uuid",
+    "$[].options": "list",
+    "$[].options[]": "object",
+    "$[].options[].name": "string",
+    "$[].options[].price": "money",
+    "$[].options[].service_id": "uuid",
+    "$[].period_label": "string",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?city=Mumbai": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].about": "string",
+    "$.items[].city": "string",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].languages": "list",
+    "$.items[].languages[]": "string",
+    "$.items[].match_reasons": "list",
+    "$.items[].match_reasons[]": "object",
+    "$.items[].match_reasons[].points": "number",
+    "$.items[].match_reasons[].reason": "string",
+    "$.items[].match_score": "number",
+    "$.items[].membership_no": "string",
+    "$.items[].my_prices": "list",
+    "$.items[].price": "null",
+    "$.items[].rating_average": "number",
+    "$.items[].rating_count": "number",
+    "$.items[].same_city": "bool",
+    "$.items[].specializations": "list",
+    "$.items[].specializations[]": "string",
+    "$.items[].years_experience": "number",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?language=hindi": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].about": "string",
+    "$.items[].city": "string",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].languages": "list",
+    "$.items[].languages[]": "string",
+    "$.items[].match_reasons": "list",
+    "$.items[].match_reasons[]": "object",
+    "$.items[].match_reasons[].points": "number",
+    "$.items[].match_reasons[].reason": "string",
+    "$.items[].match_score": "number",
+    "$.items[].membership_no": "string",
+    "$.items[].my_prices": "list",
+    "$.items[].my_prices[]": "object",
+    "$.items[].my_prices[].form_code": "string",
+    "$.items[].my_prices[].price": "money",
+    "$.items[].price": "null",
+    "$.items[].rating_average": "number",
+    "$.items[].rating_count": "number",
+    "$.items[].same_city": "bool",
+    "$.items[].specializations": "list",
+    "$.items[].specializations[]": "string",
+    "$.items[].years_experience": "number",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?page=2": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?page_size=100": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].about": "string",
+    "$.items[].city": "string",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].languages": "list",
+    "$.items[].languages[]": "string",
+    "$.items[].match_reasons": "list",
+    "$.items[].match_reasons[]": "object",
+    "$.items[].match_reasons[].points": "number",
+    "$.items[].match_reasons[].reason": "string",
+    "$.items[].match_score": "number",
+    "$.items[].membership_no": "string",
+    "$.items[].my_prices": "list",
+    "$.items[].my_prices[]": "object",
+    "$.items[].my_prices[].form_code": "string",
+    "$.items[].my_prices[].price": "money",
+    "$.items[].price": "null",
+    "$.items[].rating_average": "number",
+    "$.items[].rating_count": "number",
+    "$.items[].same_city": "bool",
+    "$.items[].specializations": "list",
+    "$.items[].specializations[]": "string",
+    "$.items[].years_experience": "number",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?service=gstr_3b": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].about": "string",
+    "$.items[].city": "string",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].languages": "list",
+    "$.items[].languages[]": "string",
+    "$.items[].match_reasons": "list",
+    "$.items[].match_reasons[]": "object",
+    "$.items[].match_reasons[].points": "number",
+    "$.items[].match_reasons[].reason": "string",
+    "$.items[].match_score": "number",
+    "$.items[].membership_no": "string",
+    "$.items[].my_prices": "list",
+    "$.items[].my_prices[]": "object",
+    "$.items[].my_prices[].form_code": "string",
+    "$.items[].my_prices[].price": "money",
+    "$.items[].price": "money",
+    "$.items[].rating_average": "number",
+    "$.items[].rating_count": "number",
+    "$.items[].same_city": "bool",
+    "$.items[].specializations": "list",
+    "$.items[].specializations[]": "string",
+    "$.items[].years_experience": "number",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?service=gstr_3b&city=Mumbai&language=english&specialization=gstr_1": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/cas?specialization=itr": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].about": "string",
+    "$.items[].city": "string",
+    "$.items[].full_name": "string",
+    "$.items[].id": "uuid",
+    "$.items[].languages": "list",
+    "$.items[].languages[]": "string",
+    "$.items[].match_reasons": "list",
+    "$.items[].match_reasons[]": "object",
+    "$.items[].match_reasons[].points": "number",
+    "$.items[].match_reasons[].reason": "string",
+    "$.items[].match_score": "number",
+    "$.items[].membership_no": "string",
+    "$.items[].my_prices": "list",
+    "$.items[].my_prices[]": "object",
+    "$.items[].my_prices[].form_code": "string",
+    "$.items[].my_prices[].price": "money",
+    "$.items[].price": "null",
+    "$.items[].rating_average": "number",
+    "$.items[].rating_count": "number",
+    "$.items[].same_city": "bool",
+    "$.items[].specializations": "list",
+    "$.items[].specializations[]": "string",
+    "$.items[].years_experience": "number",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/my-engagements": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].activated_at": "datetime",
+    "$[].business_name": "string",
+    "$[].ca_name": "string",
+    "$[].ca_profile_id": "uuid",
+    "$[].completed_at": "datetime|null",
+    "$[].expires_at": "null",
+    "$[].id": "uuid",
+    "$[].is_pro_bono": "bool",
+    "$[].items": "list",
+    "$[].items[]": "object",
+    "$[].items[].agreed_price": "money",
+    "$[].items[].compliance_item_id": "uuid",
+    "$[].items[].due_date": "date",
+    "$[].items[].form_code": "string",
+    "$[].items[].id": "uuid",
+    "$[].items[].listed_price": "money",
+    "$[].items[].period_label": "string",
+    "$[].items[].quoted_price": "null",
+    "$[].items[].service_name": "string",
+    "$[].quote_reason": "null",
+    "$[].rating": "null|object",
+    "$[].rating.created_at": "datetime",
+    "$[].rating.review": "string",
+    "$[].rating.stars": "number",
+    "$[].requested_at": "datetime",
+    "$[].responded_at": "datetime",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/pro-bono": {
+   "shape": {
+    "$": "object",
+    "$.eligible": "bool",
+    "$.filings": "list",
+    "$.filings[]": "object",
+    "$.filings[].blocked_reason": "null|string",
+    "$.filings[].due_date": "date",
+    "$.filings[].form_code": "string",
+    "$.filings[].id": "uuid",
+    "$.filings[].period_label": "string",
+    "$.reason": "string",
+    "$.request": "null"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/pro-bono-queue": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/marketplace/services": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].ca_count": "number",
+    "$[].code": "string",
+    "$[].description": "string",
+    "$[].id": "uuid",
+    "$[].max_price": "money|null",
+    "$[].median_price": "money|null",
+    "$[].min_price": "money|null",
+    "$[].name": "string",
+    "$[].specialization": "string",
+    "$[].unit": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/onboarding/business": {
+   "shape": {
+    "$": "object",
+    "$.business": "object",
+    "$.business.accounts_audited_other_law": "bool",
+    "$.business.address": "string",
+    "$.business.annual_turnover": "money",
+    "$.business.cin_llpin": "null",
+    "$.business.deducts_tds": "bool",
+    "$.business.description": "string",
+    "$.business.entity_type": "string",
+    "$.business.gst_composition": "bool",
+    "$.business.gst_qrmp": "bool",
+    "$.business.gst_registered": "bool",
+    "$.business.gstin": "string",
+    "$.business.id": "uuid",
+    "$.business.investment_amount": "money",
+    "$.business.legal_name": "string",
+    "$.business.pan": "string",
+    "$.business.pays_salary_above_limit": "bool",
+    "$.business.phone": "string",
+    "$.business.state": "string",
+    "$.business.state_needs_review": "bool",
+    "$.business.tan": "null",
+    "$.business.udyam_number": "null",
+    "$.nic_code": "null",
+    "$.profile": "object",
+    "$.profile.audit_applicable": "bool",
+    "$.profile.computed_at": "datetime",
+    "$.profile.explanations": "object",
+    "$.profile.explanations.audit_applicable": "string",
+    "$.profile.explanations.files_24q": "string",
+    "$.profile.explanations.files_26q": "string",
+    "$.profile.explanations.gst_scheme": "string",
+    "$.profile.explanations.itr_form": "string",
+    "$.profile.explanations.msme_tier": "string",
+    "$.profile.explanations.other_audit_applicable": "string",
+    "$.profile.explanations.presumptive_eligible": "string",
+    "$.profile.explanations.roc_not_tracked": "string",
+    "$.profile.files_24q": "bool",
+    "$.profile.files_26q": "bool",
+    "$.profile.gst_registration_suggested": "bool",
+    "$.profile.gst_scheme": "string",
+    "$.profile.itr_form": "string",
+    "$.profile.msme_tier": "string",
+    "$.profile.other_audit_applicable": "bool",
+    "$.profile.presumptive_eligible": "bool",
+    "$.profile.roc_not_tracked": "bool",
+    "$.profile.rule_version": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/onboarding/nic-codes": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/onboarding/nic-codes?q=retail": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].code": "string",
+    "$[].description": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/onboarding/nic-codes?q=software": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].code": "string",
+    "$[].description": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business GET /api/v1/onboarding/states": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].code": "string",
+    "$[].name": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "business POST /api/v1/auth/login": {
+   "shape": {
+    "$": "object",
+    "$.access_token": "string",
+    "$.terms_accepted": "bool",
+    "$.user": "object",
+    "$.user.email": "string",
+    "$.user.full_name": "string",
+    "$.user.id": "uuid",
+    "$.user.role": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/health": {
+   "shape": {
+    "$": "object",
+    "$.database": "string",
+    "$.status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/audit-log": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/cas": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/regulatory/changes": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/regulatory/sources": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/stats": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/admin/users": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/alerts/notifications": {
+   "shape": {
+    "$": "object",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].body": "string",
+    "$.items[].created_at": "datetime",
+    "$.items[].id": "uuid",
+    "$.items[].link": "string",
+    "$.items[].read_at": "null",
+    "$.items[].title": "string",
+    "$.items[].type": "string",
+    "$.page": "number",
+    "$.page_size": "number",
+    "$.total": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/alerts/notifications/unread-count": {
+   "shape": {
+    "$": "object",
+    "$.unread": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/alerts/penalties": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/alerts/settings": {
+   "shape": {
+    "$": "object",
+    "$.always_emailed": "list",
+    "$.always_emailed[]": "string",
+    "$.items": "list",
+    "$.items[]": "object",
+    "$.items[].email_enabled": "bool",
+    "$.items[].type": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/assistant/history": {
+   "shape": {
+    "$": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/auth/me": {
+   "shape": {
+    "$": "object",
+    "$.email": "string",
+    "$.full_name": "string",
+    "$.id": "uuid",
+    "$.role": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/ca-workspace/batches": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].due_date": "date",
+    "$[].filings": "list",
+    "$[].filings[]": "object",
+    "$[].filings[].business_id": "uuid",
+    "$[].filings[].business_name": "string",
+    "$[].filings[].compliance_item_id": "uuid",
+    "$[].filings[].missing": "list",
+    "$[].filings[].missing[]": "string",
+    "$[].filings[].period_label": "string",
+    "$[].filings[].ready": "bool",
+    "$[].filings[].required_ready": "number",
+    "$[].filings[].required_total": "number",
+    "$[].filings[].status": "string",
+    "$[].form_code": "string",
+    "$[].ready_count": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/ca-workspace/clients": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].business_id": "uuid",
+    "$[].business_name": "string",
+    "$[].filing_count": "number",
+    "$[].missing_documents": "number",
+    "$[].next_deadline": "date",
+    "$[].open_filing_count": "number",
+    "$[].open_request_count": "number",
+    "$[].overdue_count": "number",
+    "$[].reasons": "list",
+    "$[].reasons[]": "object",
+    "$[].reasons[].points": "number",
+    "$[].reasons[].reason": "string",
+    "$[].score": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/ca-workspace/clients/<missing>": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    404
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/ca-workspace/clients/<uuid:business_id>": {
+   "shape": {
+    "$": "object",
+    "$.business": "object",
+    "$.business.accounts_audited_other_law": "bool",
+    "$.business.address": "string",
+    "$.business.annual_turnover": "money",
+    "$.business.cin_llpin": "null",
+    "$.business.deducts_tds": "bool",
+    "$.business.description": "string",
+    "$.business.entity_type": "string",
+    "$.business.gst_composition": "bool",
+    "$.business.gst_qrmp": "bool",
+    "$.business.gst_registered": "bool",
+    "$.business.gstin": "string",
+    "$.business.id": "uuid",
+    "$.business.investment_amount": "money",
+    "$.business.legal_name": "string",
+    "$.business.pan": "string",
+    "$.business.pays_salary_above_limit": "bool",
+    "$.business.phone": "string",
+    "$.business.state": "string",
+    "$.business.state_needs_review": "bool",
+    "$.business.tan": "null",
+    "$.business.udyam_number": "null",
+    "$.filings": "list",
+    "$.filings[]": "object",
+    "$.filings[].checklist": "list",
+    "$.filings[].checklist[]": "object",
+    "$.filings[].checklist[].help": "null|string",
+    "$.filings[].checklist[].key": "string",
+    "$.filings[].checklist[].label": "string",
+    "$.filings[].checklist[].required": "bool",
+    "$.filings[].checklist[].ticked": "bool",
+    "$.filings[].documents": "list",
+    "$.filings[].documents[]": "object",
+    "$.filings[].documents[].checklist_key": "string",
+    "$.filings[].documents[].created_at": "datetime",
+    "$.filings[].documents[].doc_type": "string",
+    "$.filings[].documents[].document_id": "uuid",
+    "$.filings[].documents[].original_filename": "string",
+    "$.filings[].documents[].size_bytes": "number",
+    "$.filings[].filing": "object",
+    "$.filings[].filing.acknowledgement_no": "null",
+    "$.filings[].filing.due_date": "date",
+    "$.filings[].filing.filed_at": "null",
+    "$.filings[].filing.filing_path": "string",
+    "$.filings[].filing.form_code": "string",
+    "$.filings[].filing.fy": "string",
+    "$.filings[].filing.id": "uuid",
+    "$.filings[].filing.period_end": "date",
+    "$.filings[].filing.period_label": "string",
+    "$.filings[].filing.period_start": "date",
+    "$.filings[].filing.status": "string",
+    "$.filings[].open_requests": "list",
+    "$.filings[].open_requests[]": "object",
+    "$.filings[].open_requests[].checklist_key": "string",
+    "$.filings[].open_requests[].compliance_item_id": "uuid",
+    "$.filings[].open_requests[].created_at": "datetime",
+    "$.filings[].open_requests[].document_id": "null",
+    "$.filings[].open_requests[].form_code": "string",
+    "$.filings[].open_requests[].fulfilled_at": "null",
+    "$.filings[].open_requests[].id": "uuid",
+    "$.filings[].open_requests[].message": "string",
+    "$.filings[].open_requests[].period_label": "string",
+    "$.filings[].open_requests[].status": "string",
+    "$.nic_code": "null",
+    "$.profile": "object",
+    "$.profile.audit_applicable": "bool",
+    "$.profile.computed_at": "datetime",
+    "$.profile.explanations": "object",
+    "$.profile.explanations.audit_applicable": "string",
+    "$.profile.explanations.files_24q": "string",
+    "$.profile.explanations.files_26q": "string",
+    "$.profile.explanations.gst_scheme": "string",
+    "$.profile.explanations.itr_form": "string",
+    "$.profile.explanations.msme_tier": "string",
+    "$.profile.explanations.other_audit_applicable": "string",
+    "$.profile.explanations.presumptive_eligible": "string",
+    "$.profile.explanations.roc_not_tracked": "string",
+    "$.profile.files_24q": "bool",
+    "$.profile.files_26q": "bool",
+    "$.profile.gst_registration_suggested": "bool",
+    "$.profile.gst_scheme": "string",
+    "$.profile.itr_form": "string",
+    "$.profile.msme_tier": "string",
+    "$.profile.other_audit_applicable": "bool",
+    "$.profile.presumptive_eligible": "bool",
+    "$.profile.roc_not_tracked": "bool",
+    "$.profile.rule_version": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/ca-workspace/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.message": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/ca-workspace/document-requests": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/compliance/dashboard": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/compliance/items": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/documents": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/documents/<uuid:document_id>/file": {
+   "shape": {},
+   "status": [
+    200
+   ],
+   "type": [
+    "application/pdf"
+   ]
+  },
+  "ca GET /api/v1/marketplace/ca-engagements": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].activated_at": "datetime|null",
+    "$[].business_name": "string",
+    "$[].ca_name": "string",
+    "$[].ca_profile_id": "uuid",
+    "$[].completed_at": "datetime|null",
+    "$[].expires_at": "datetime|null",
+    "$[].id": "uuid",
+    "$[].is_pro_bono": "bool",
+    "$[].items": "list",
+    "$[].items[]": "object",
+    "$[].items[].agreed_price": "money|null",
+    "$[].items[].compliance_item_id": "uuid",
+    "$[].items[].due_date": "date",
+    "$[].items[].form_code": "string",
+    "$[].items[].id": "uuid",
+    "$[].items[].listed_price": "money",
+    "$[].items[].period_label": "string",
+    "$[].items[].quoted_price": "money|null",
+    "$[].items[].service_name": "string",
+    "$[].quote_reason": "null|string",
+    "$[].rating": "null|object",
+    "$[].rating.created_at": "datetime",
+    "$[].rating.review": "string",
+    "$[].rating.stars": "number",
+    "$[].requested_at": "datetime",
+    "$[].responded_at": "datetime|null",
+    "$[].status": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/ca-profile": {
+   "shape": {
+    "$": "object",
+    "$.about": "string",
+    "$.capacity": "number",
+    "$.city": "string",
+    "$.cop_number": "string",
+    "$.has_certificate": "bool",
+    "$.id": "uuid",
+    "$.languages": "list",
+    "$.languages[]": "string",
+    "$.membership_no": "string",
+    "$.pro_bono_slots_per_month": "number",
+    "$.rejection_reason": "null",
+    "$.specializations": "list",
+    "$.specializations[]": "string",
+    "$.updated_at": "datetime",
+    "$.verification_status": "string",
+    "$.years_experience": "number"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/ca-services": {
+   "shape": {
+    "$": "object",
+    "$.items": "list"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/cas": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/my-engagements": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/pro-bono": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/pro-bono-queue": {
+   "shape": {
+    "$": "object",
+    "$.pledged": "number",
+    "$.requests": "list",
+    "$.requests[]": "object",
+    "$.requests[].business_name": "string",
+    "$.requests[].created_at": "datetime",
+    "$.requests[].filings": "list",
+    "$.requests[].filings[]": "object",
+    "$.requests[].filings[].blocked_reason": "null",
+    "$.requests[].filings[].due_date": "date",
+    "$.requests[].filings[].form_code": "string",
+    "$.requests[].filings[].id": "uuid",
+    "$.requests[].filings[].period_label": "string",
+    "$.requests[].id": "uuid",
+    "$.requests[].note": "string",
+    "$.requests[].status": "string",
+    "$.used_this_month": "number",
+    "$.verified": "bool"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/marketplace/services": {
+   "shape": {
+    "$": "list",
+    "$[]": "object",
+    "$[].ca_count": "number",
+    "$[].code": "string",
+    "$[].description": "string",
+    "$[].id": "uuid",
+    "$[].max_price": "money|null",
+    "$[].median_price": "money|null",
+    "$[].min_price": "money|null",
+    "$[].name": "string",
+    "$[].specialization": "string",
+    "$[].unit": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/onboarding/business": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/onboarding/nic-codes": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca GET /api/v1/onboarding/states": {
+   "shape": {
+    "$": "object",
+    "$.error": "object",
+    "$.error.code": "string",
+    "$.error.message": "string"
+   },
+   "status": [
+    403
+   ],
+   "type": [
+    "application/json"
+   ]
+  },
+  "ca POST /api/v1/auth/login": {
+   "shape": {
+    "$": "object",
+    "$.access_token": "string",
+    "$.terms_accepted": "bool",
+    "$.user": "object",
+    "$.user.email": "string",
+    "$.user.full_name": "string",
+    "$.user.id": "uuid",
+    "$.user.role": "string"
+   },
+   "status": [
+    200
+   ],
+   "type": [
+    "application/json"
+   ]
+  }
+ },
+ "get_rules": [
+  "/api/health",
+  "/api/v1/admin/audit-log",
+  "/api/v1/admin/cas",
+  "/api/v1/admin/cas/<uuid:ca_id>",
+  "/api/v1/admin/cas/<uuid:ca_id>/certificate",
+  "/api/v1/admin/dashboard",
+  "/api/v1/admin/regulatory/changes",
+  "/api/v1/admin/regulatory/sources",
+  "/api/v1/admin/stats",
+  "/api/v1/admin/users",
+  "/api/v1/alerts/notifications",
+  "/api/v1/alerts/notifications/unread-count",
+  "/api/v1/alerts/penalties",
+  "/api/v1/alerts/penalties/<uuid:item_id>",
+  "/api/v1/alerts/settings",
+  "/api/v1/assistant/history",
+  "/api/v1/auth/me",
+  "/api/v1/ca-workspace/batches",
+  "/api/v1/ca-workspace/clients",
+  "/api/v1/ca-workspace/clients/<uuid:business_id>",
+  "/api/v1/ca-workspace/dashboard",
+  "/api/v1/ca-workspace/document-requests",
+  "/api/v1/compliance/dashboard",
+  "/api/v1/compliance/forms/<string:form_code>",
+  "/api/v1/compliance/items",
+  "/api/v1/compliance/items/<uuid:item_id>",
+  "/api/v1/compliance/items/<uuid:item_id>/acknowledgement",
+  "/api/v1/compliance/items/<uuid:item_id>/peer-insights",
+  "/api/v1/documents",
+  "/api/v1/documents/<uuid:document_id>/file",
+  "/api/v1/marketplace/ca-engagements",
+  "/api/v1/marketplace/ca-profile",
+  "/api/v1/marketplace/ca-services",
+  "/api/v1/marketplace/cas",
+  "/api/v1/marketplace/cas/<uuid:ca_id>",
+  "/api/v1/marketplace/cas/<uuid:ca_id>/requestable-filings",
+  "/api/v1/marketplace/my-engagements",
+  "/api/v1/marketplace/pro-bono",
+  "/api/v1/marketplace/pro-bono-queue",
+  "/api/v1/marketplace/services",
+  "/api/v1/onboarding/business",
+  "/api/v1/onboarding/nic-codes",
+  "/api/v1/onboarding/states"
+ ],
+ "rules_not_called": []
+}
