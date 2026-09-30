@@ -124,7 +124,7 @@ def check_code(data: dict, errors: dict) -> str:
 
 
 def new_code(user: User, purpose: str) -> str:
-    """Add a new code for the user and return it (only its hash is stored). Does not commit."""
+    """Add a new code for the user and return it (only its hash is stored)."""
     code = f"{secrets.randbelow(1_000_000):06d}"
     db.session.add(
         EmailOtp(
@@ -147,7 +147,7 @@ def use_code(user: User | None, purpose: str, code: str) -> None:
     """Mark the user's newest code for `purpose` as used if `code` is that code.
 
     400 OTP_INVALID (no code, already used, wrong digits, unknown email) or
-    400 OTP_EXPIRED (older than CODE_LIFETIME). Does not commit.
+    400 OTP_EXPIRED (older than CODE_LIFETIME).
     """
     otp = None
     if user is not None:

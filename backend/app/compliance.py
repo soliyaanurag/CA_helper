@@ -194,7 +194,7 @@ def _status_for(due: date, today: date) -> ComplianceStatus:
 
 def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=()) -> dict:
     """Make the business's filings of the current financial year match its profile.
-    Does not commit. Returns {"added", "removed", "kept_with_ca"} counts.
+    Returns {"added", "removed", "kept_with_ca"} counts.
 
     - Every applicable form and period gets a filing, from 1 April: periods whose due
       date has passed start as "overdue" (the business may have filed them before it
@@ -272,15 +272,14 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
 
 
 def _delete_filing(filing) -> None:
-    """Delete a filing and the rows that point to it (its files stay in the vault).
-    Does not commit."""
+    """Delete a filing and the rows that point to it (its files stay in the vault)."""
     for model in (ChecklistTick, ComplianceItemDocument, ReminderLog, DocumentRequest, EngagementItem):
         db.session.execute(delete(model).where(model.compliance_item_id == filing.id))
     db.session.delete(filing)
 
 
 def create_filings(business_id, profile: RegulatoryProfile, today: date) -> int:
-    """Add the filings of a newly registered business (sync_filings). Does not commit.
+    """Add the filings of a newly registered business (sync_filings).
 
     Returns how many filings were added; running it again adds nothing.
     """
@@ -440,7 +439,7 @@ def _ticked_keys(filing: ComplianceItem) -> set:
 
 
 def _refresh_status(filing: ComplianceItem, today: date) -> None:
-    """Work out a not-started filing's status again. Does not commit.
+    """Work out a not-started filing's status again.
 
     Past its due date: overdue. Otherwise from the checklist: nothing ticked yet ->
     upcoming; some ticked but a required document missing -> docs pending; every
@@ -498,7 +497,7 @@ def filing_page(filing: ComplianceItem) -> dict:
 
 
 def _set_tick(filing: ComplianceItem, key: str, ticked: bool) -> None:
-    """Add or remove one tick, then work out the status again. Does not commit.
+    """Add or remove one tick, then work out the status again.
 
     422 UNKNOWN_CHECKLIST_KEY for a key that is not in the form's checklist.
     """
@@ -519,7 +518,7 @@ def _set_tick(filing: ComplianceItem, key: str, ticked: bool) -> None:
 
 def _record_filed(filing, owner_id, uploader: User, path, acknowledgement_no, upload) -> None:
     """Status "filed" with the optional ARN and acknowledgement file (owned by the business
-    owner, uploaded by `uploader`). Does not commit.
+    owner, uploaded by `uploader`).
 
     With a file, the acknowledgement is read locally (documents, OCR) and, when it
     shows this form, period, a number and a filing date, the filing becomes
@@ -597,7 +596,7 @@ def checklist_keys(form_code) -> list[str]:
 
 def tick_checklist_entry(filing: ComplianceItem, key: str) -> None:
     """Tick one checklist entry (a document was linked to it) and update the status.
-    Does not commit. 422 UNKNOWN_CHECKLIST_KEY for a key not in the form's checklist."""
+    422 UNKNOWN_CHECKLIST_KEY for a key not in the form's checklist."""
     _set_tick(filing, key, True)
 
 
@@ -619,7 +618,7 @@ def filings_by_acknowledgement(document_ids) -> dict:
 
 
 def get_filings_by_ids(filing_ids) -> dict:
-    """{id: ComplianceItem} for the live filings among `filing_ids`. Does not commit."""
+    """{id: ComplianceItem} for the live filings among `filing_ids`."""
     stmt = select(ComplianceItem).where(
         ComplianceItem.id.in_(filing_ids)
     )
@@ -630,7 +629,7 @@ def get_filings_by_ids(filing_ids) -> dict:
 
 
 def mark_filings_with_ca(filing_ids) -> None:
-    """A CA now handles these filings: status "With CA", path "ca". Does not commit."""
+    """A CA now handles these filings: status "With CA", path "ca"."""
     for filing in get_filings_by_ids(filing_ids).values():
         filing.status = ComplianceStatus.WITH_CA
         filing.filing_path = FilingPath.CA

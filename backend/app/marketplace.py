@@ -896,14 +896,14 @@ def check_not_expired(engagement: Engagement) -> None:
 
 
 def activate(engagement: Engagement, items: list[EngagementItem]) -> None:
-    """Start the work: status `active`, and the filings are "With CA". Does not commit."""
+    """Start the work: status `active`, and the filings are "With CA"."""
     engagement.status = EngagementStatus.ACTIVE
     engagement.activated_at = utcnow()
     compliance.mark_filings_with_ca([item.compliance_item_id for item in items])
 
 
 def notify_business(engagement: Engagement, title: str, text: str) -> None:
-    """A tray entry for the business owner: the CA's name followed by `text`. Does not commit."""
+    """A tray entry for the business owner: the CA's name followed by `text`."""
     business = onboarding.get_business(engagement.business_id)
     ca = db.session.get(CaProfile, engagement.ca_profile_id)
     alerts.notify(
@@ -1445,7 +1445,7 @@ def active_cas_of_business(business_id) -> dict:
 
 def complete_if_all_filed(engagement_id) -> bool:
     """Complete an ACTIVE engagement once every one of its filings is filed, and tell the
-    business. Returns True if it completed. Does not commit."""
+    business. Returns True if it completed."""
     engagement = db.session.get(Engagement, engagement_id)
     if engagement is None or engagement.status != EngagementStatus.ACTIVE:
         return False
@@ -1517,7 +1517,7 @@ def certificate_document_id(profile_id):
 
 def set_verification(profile_id, admin: User, verified: bool, reason: str | None) -> CaProfile:
     """An admin verifies or rejects a CA. Verifying needs an uploaded certificate
-    (409 CERTIFICATE_MISSING). Does not commit."""
+    (409 CERTIFICATE_MISSING)."""
     profile = ca_for_admin(profile_id)
     if verified:
         if profile.cop_document_id is None:

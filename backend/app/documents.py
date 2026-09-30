@@ -62,7 +62,7 @@ def is_financial_year(text: str) -> bool:
 
 
 def add_document(owner_id, uploaded_by_id, upload, doc_type: DocumentType) -> Document:
-    """Store an uploaded file (a werkzeug FileStorage) and add its row. Does not commit.
+    """Store an uploaded file (a werkzeug FileStorage) and add its row.
 
     The file check errors (FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, FILE_TOO_LARGE) pass through.
     """
@@ -86,7 +86,7 @@ def add_document(owner_id, uploaded_by_id, upload, doc_type: DocumentType) -> Do
 
 
 def on_document_uploaded(document: Document, data: bytes) -> None:
-    """Read every new file locally and keep what it shows. Does not commit.
+    """Read every new file locally and keep what it shows.
 
     `ocr_fields` gets only non-personal facts (acknowledgement number, filing date, forms,
     periods, a type guess; app/ocr.py). The text itself and any PAN,
@@ -109,7 +109,7 @@ def on_document_uploaded(document: Document, data: bytes) -> None:
 
 
 def type_warning(document: Document) -> DocumentType | None:
-    """DO9: the type the file looks like when it differs from the type it was uploaded as
+    """The type the file looks like when it differs from the type it was uploaded as
     (e.g. "bank_statement" for a file uploaded as an invoice), else None."""
     guess = (document.ocr_fields or {}).get("type_guess")
     if guess is None or guess == document.doc_type or document.doc_type == DocumentType.OTHER:
@@ -198,7 +198,7 @@ def read_document(document_id) -> tuple[Document, bytes]:
 
 
 def remove_document(document_id) -> None:
-    """Delete a document: its links and its row (with the file). Does not commit.
+    """Delete a document: its links and its row (with the file).
 
     The caller first clears a filing's acknowledgement or a CA's certificate that points to it.
     A document request it answered stays fulfilled, without the file.
@@ -273,7 +273,7 @@ def _check_key(filing, checklist_key: str) -> None:
 
 
 def _link(filing, document: Document, checklist_key: str, user: User) -> None:
-    """Link the document to the filing (once) and tick the checklist entry. Does not commit."""
+    """Link the document to the filing (once) and tick the checklist entry."""
     existing = db.session.scalar(
         select(ComplianceItemDocument).where(
             ComplianceItemDocument.compliance_item_id == filing.id,

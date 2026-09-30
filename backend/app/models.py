@@ -60,7 +60,7 @@ db = SQLAlchemy(model_class=Base)
 
 
 def utcnow() -> datetime:
-    """Current time as a timezone-aware UTC datetime (CLAUDE.md rule 7)."""
+    """Current time as a timezone-aware UTC datetime (we store UTC and show India time)."""
     return datetime.now(UTC)
 
 
@@ -403,7 +403,8 @@ class FilingPath(StrEnum):
 
 
 class ObligationTemplate(BaseModel):
-    """How one form applies and when it is due, valid for a period (reference data, rule 3).
+    """How one form applies and when it is due, valid for a period (reference data from
+    official sources).
 
     GSTR-1 monthly and GSTR-1 quarterly (QRMP) are two templates of the same form.
     """
@@ -585,7 +586,7 @@ class ReminderLog(BaseModel):
 
 
 class PenaltyRule(BaseModel):
-    """Late fee and interest for one form, valid for a period (reference data, rule 3)."""
+    """Late fee and interest for one form, valid for a period (reference data from official sources)."""
 
     __tablename__ = "penalty_rules"
     __table_args__ = (

@@ -62,7 +62,7 @@ def notify(
     body: str,
     link: str | None = None,
 ) -> Notification:
-    """Add a tray entry for `user`. Does not commit.
+    """Add a tray entry for `user`.
 
     `link` is an app path such as "/business/compliance/<id>". Never put PAN, GSTIN or
     other sensitive fields in the title or body.

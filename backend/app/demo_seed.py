@@ -135,7 +135,7 @@ def _pdf(text: str) -> bytes:
 
 
 def _upload(owner: User, uploader: User, name: str, doc_type: DocumentType, fy=None, period=None):
-    """Store a generated PDF in the owner's vault. Does not commit."""
+    """Store a generated PDF in the owner's vault."""
     upload = FileStorage(
         io.BytesIO(_pdf(name.rsplit(".", 1)[0])), name, content_type="application/pdf"
     )
@@ -146,7 +146,7 @@ def _upload(owner: User, uploader: User, name: str, doc_type: DocumentType, fy=N
 
 
 def _link(filing, document, key: str, user: User) -> None:
-    """Link a file to a filing's checklist entry and tick it. Does not commit."""
+    """Link a file to a filing's checklist entry and tick it."""
     db.session.add(
         ComplianceItemDocument(
             compliance_item_id=filing.id,
@@ -217,7 +217,7 @@ def _service_for(filing) -> CatalogService:
 
 
 def _engage(business, ca: CaProfile, filings, status, now, **fields) -> Engagement:
-    """An engagement of `ca` on `filings` in `status`. Does not commit."""
+    """An engagement of `ca` on `filings` in `status`."""
     engagement = Engagement(business_id=business.id, ca_profile_id=ca.id, status=status, **fields)
     engagement.requested_at = fields.get("requested_at", now - timedelta(days=3))
     db.session.add(engagement)

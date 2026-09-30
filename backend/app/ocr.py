@@ -123,7 +123,7 @@ MONTH_YEAR_DIGITS = re.compile(r"\b(0[1-9]|1[0-2])[/\-]?(20[0-9]{2})\b")
 PAN = re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b")
 GSTIN = re.compile(r"\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]\b")
 
-# DO9: words that give a document away, per type. The type with the most hits wins.
+# Words that give a document's type away. The type with the most hits wins.
 TYPE_KEYWORDS = {
     "acknowledgement": ["ACKNOWLEDGEMENT", "ACKNOWLEDGMENT", "ARN", "ITR-V", "SUCCESSFULLY FILED"],
     "gst_certificate": ["REG-06", "REGISTRATION CERTIFICATE", "CERTIFICATE OF REGISTRATION"],
@@ -137,7 +137,7 @@ TYPE_KEYWORDS = {
     "certificate_of_practice": ["CERTIFICATE OF PRACTICE", "CHARTERED ACCOUNTANTS OF INDIA"],
 }
 
-# ON13: the "Constitution of Business" on a GST certificate -> our entity types.
+# The "Constitution of Business" on a GST certificate -> our entity types.
 CONSTITUTIONS = {
     "PROPRIETORSHIP": "proprietorship",
     "PARTNERSHIP": "partnership",
@@ -183,7 +183,7 @@ def guess_document_type(text: str) -> str | None:
 
 
 def read_proof_fields(text: str, today: date) -> dict:
-    """The non-personal facts an acknowledgement shows (DO8), plus a type guess (DO9)."""
+    """The non-personal facts an acknowledgement shows, plus a guess of its type."""
     clean = _clean(text)
     # The periods are looked for without the dates, so a filing date "20/10/2026" does
     # not count as the month October.
@@ -232,7 +232,7 @@ def read_proof_fields(text: str, today: date) -> dict:
 
 
 def read_registration(text: str) -> dict:
-    """Values for the registration form from a GST certificate or PAN card (ON13).
+    """Values for the registration form from a GST certificate or PAN card.
 
     Only what was found is returned: pan, gstin, legal_name, state, entity_type. The
     user checks them in the form; nothing is saved.

@@ -585,7 +585,7 @@ def ask_gemini(prompt: str, want_json: bool = False) -> str:
         ) from error
 
 
-# --- Embeddings (the AI assistant's search, AS1 / AS2) ------------------------------------
+# --- Embeddings (the AI assistant's search) ------------------------------------
 
 EMBEDDING_SIZE = 768  # the kb_chunks.embedding column is vector(768)
 EMBED_BATCH = 50  # texts per request
