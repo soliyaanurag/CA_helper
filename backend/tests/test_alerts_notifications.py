@@ -1,6 +1,6 @@
 """The notification tray and the email switch (AL1, AL3).
 
-notify() adds a tray entry and, with email=True, emails it after the commit (unless the
+notify() adds a tray entry; email_notice() emails its text after the commit (unless the
 user switched notification emails off). The tray endpoints work for every role, on own rows only.
 """
 
@@ -47,30 +47,17 @@ def test_notify_adds_a_tray_entry_without_email_by_default(make_user, mailbox, d
     assert mailbox == []
 
 
-def test_notify_emails_only_after_the_commit(make_user, mailbox, database):
+def test_email_notice_emails_the_tray_text(make_user, mailbox, database):
     user = make_user(full_name="Asha Rao")
 
-    alerts_service.notify(
-        user, NotificationType.OVERDUE, "GSTR-1 is late", "Due 13 Oct", email=True
-    )
-    assert mailbox == []  # nothing is sent before the commit
+    alerts_service.notify(user, NotificationType.OVERDUE, "GSTR-1 is late", "Due 13 Oct")
     db.session.commit()
+    alerts_service.email_notice(user, "GSTR-1 is late", "Due 13 Oct")
 
     assert len(mailbox) == 1
     assert mailbox[0]["To"] == user.email
     assert mailbox[0]["Subject"] == "GSTR-1 is late"
     assert "Hello Asha Rao" in mailbox[0].get_content()
-
-
-def test_a_rolled_back_notification_sends_no_email(make_user, mailbox, database):
-    user = make_user()
-
-    alerts_service.notify(user, NotificationType.OVERDUE, "Late", "Body", email=True)
-    db.session.rollback()
-    db.session.commit()  # a later commit must not send the dropped email
-
-    assert mailbox == []
-    assert database.session.query(Notification).count() == 0
 
 
 def test_notify_respects_the_email_switch_but_always_adds_to_the_tray(
@@ -80,9 +67,12 @@ def test_notify_respects_the_email_switch_but_always_adds_to_the_tray(
     body = {"email_notifications": False}
     client.put(SETTINGS, json=body, headers=auth_headers(user))
 
-    alerts_service.notify(user, NotificationType.DEADLINE_REMINDER, "Soon", "Body", email=True)
-    alerts_service.notify(user, NotificationType.OVERDUE, "Late", "Body", email=True)
+    alerts_service.notify(user, NotificationType.DEADLINE_REMINDER, "Soon", "Body")
+    alerts_service.notify(user, NotificationType.OVERDUE, "Late", "Body")
     db.session.commit()
+    database.session.refresh(user)
+    alerts_service.email_notice(user, "Soon", "Body")
+    alerts_service.email_notice(user, "Late", "Body")
 
     assert database.session.query(Notification).count() == 2
     assert mailbox == []

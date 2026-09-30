@@ -167,6 +167,18 @@ Checks (all inside the containers):
   `_live_document`) instead of `read_document`; verification uses the OCR fields stored at upload, as before.
 - Checks: backend 607 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures.
 
+### 2.5g Config and direct emails (done)
+- One `Config` class reading `os.environ` (no python-dotenv, no APP_ENV, no Development/TestingConfig).
+  `create_app(test_config=None)`; the tests pass `TEST_CONFIG` (tests/conftest.py) and refuse to run when
+  TEST_DATABASE_URL equals DATABASE_URL (plan step 9). APP_ENV removed from .env.example (it is harmless in an
+  old .env). The dev-only fallbacks for SECRET_KEY/JWT_SECRET_KEY are gone: .env must set them (it does).
+- Emails: `queue_email` and the `after_commit`/`after_rollback` listeners removed. `notify()` only adds the tray
+  entry; `email_notice(user, title, body)` sends the notification email (if the switch is on) and every caller
+  calls it right after its commit (document request, request fulfilled, CA marked filed, regulatory scan).
+  Reminders are emailed after the job's commit.
+- Checks: backend 606 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures including a
+  real "Scan now".
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -242,3 +254,7 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_regulatory_monitor.py (new) test_updates_show_the_changes_about_my_forms, test_updates_are_for_businesses_and_cas | added | regulatory: new GET /regulatory/updates |
 | test_regulatory_monitor.py::test_scan_command | expects "new changes: 1" (was "new changes to review: 1") | regulatory: no admin approval |
 | test_compliance_filing_page.py (new) test_the_filing_page_does_not_open_the_acknowledgement_file | added | compliance: the page shows the acknowledgement without opening the file |
+| conftest.py `app` fixture, test_app_factory.py::test_unhandled_error_returns_standard_500_error | `create_app(TEST_CONFIG)` instead of `create_app("testing")` | Cross-cutting: one Config class, tests override values in conftest.py |
+| test_alerts_notifications.py::test_notify_emails_only_after_the_commit | rewritten as test_email_notice_emails_the_tray_text | Cross-cutting: emails sent directly, no queue |
+| test_alerts_notifications.py::test_a_rolled_back_notification_sends_no_email | deleted (no queue to drop) | Cross-cutting: emails sent directly, no after_commit listener |
+| test_alerts_notifications.py::test_notify_respects_the_email_switch_but_always_adds_to_the_tray | uses notify() + email_notice() | Cross-cutting: emails sent directly |

@@ -1,7 +1,7 @@
 """Business logic for alerts: the notification tray, email settings, reminders, penalties.
 
-notify(user, type, title, body, link, email) -> Notification   add a tray entry (+ email) (AL1)
-queue_email(to, subject, template, **context)          send an email once the commit succeeds
+notify(user, type, title, body, link) -> Notification  add a tray entry (AL1)
+email_notice(user, title, body)                        email a tray entry's text (after the commit)
 list_notifications(user, page, page_size) -> dict      the user's tray, newest first
 unread_count(user) -> dict                             {"unread": n}
 mark_read(user, notification_id) -> Notification       one entry read
@@ -10,13 +10,9 @@ send_reminders(today) -> int                           worker job: T-7/T-3/T-1/o
 estimate_penalty(business, item_id, tax_due) -> dict   one filing's late fee + interest (AL5)
 penalty_exposure(business) -> dict                     late fees of all overdue filings (AL5)
 
-Tray entries are always created. Emails from notify() are sent only when the user's
-`email_notifications` switch is on (auth_service.get_settings / save_settings).
-
-Emails and the single commit: notify() and queue_email() do not send at once. They put
-the email in a list on the database session, and the two listeners at the bottom of this
-file send the list after the caller's commit succeeds (or drop it on a rollback). So a
-service still commits once, and nobody is emailed about something that was not saved.
+Tray entries are always created. Emails go out only when the user's `email_notifications`
+switch is on (auth_service.get_settings / save_settings), and only after the caller's
+commit, so nobody is emailed about something that was not saved.
 
 Penalties are data (CLAUDE.md rule 3): `penalty_rules` rows, matched by form code and the
 filing's due date. An amount that is not confirmed yet is empty (NULL) and skipped: the
@@ -28,8 +24,7 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import event, func, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select, update
 
 from app.errors import ApiError
 from app.extensions import db
@@ -41,28 +36,6 @@ from app.utils.email import send_email
 
 log = logging.getLogger(__name__)
 
-# --- Emails sent after the commit -------------------------------------------------------
-
-_EMAIL_QUEUE = "alerts_email_queue"  # key in the session's `info` dict
-
-
-def queue_email(to: str, subject: str, template: str, **context) -> None:
-    """Send this email (app/utils/email.py) once the current transaction commits; drop it
-    if the transaction is rolled back. Does not commit."""
-    db.session.info.setdefault(_EMAIL_QUEUE, []).append((to, subject, template, context))
-
-
-@event.listens_for(Session, "after_commit")
-def _send_queued_emails(session) -> None:
-    for to, subject, template, context in session.info.pop(_EMAIL_QUEUE, []):
-        send_email(to, subject, template, **context)
-
-
-@event.listens_for(Session, "after_rollback")
-def _drop_queued_emails(session) -> None:
-    session.info.pop(_EMAIL_QUEUE, None)
-
-
 # --- The tray (AL1) ----------------------------------------------------------------------
 
 
@@ -72,10 +45,8 @@ def notify(
     title: str,
     body: str,
     link: str | None = None,
-    email: bool = False,
 ) -> Notification:
-    """Add a tray entry for `user`. With email=True, also email it after the caller's
-    commit, unless the user switched notification emails off. Does not commit.
+    """Add a tray entry for `user`. Does not commit.
 
     `link` is an app path such as "/business/compliance/<id>". Never put PAN, GSTIN or
     other sensitive fields in the title or body.
@@ -84,9 +55,13 @@ def notify(
         user_id=user.id, type=notification_type, title=title, body=body, link=link
     )
     db.session.add(notification)
-    if email and user.email_notifications:
-        queue_email(user.email, title, "notification", name=user.full_name, title=title, body=body)
     return notification
+
+
+def email_notice(user: User, title: str, body: str) -> None:
+    """Email a tray entry's text to the user, if they want emails. Call after the commit."""
+    if user.email_notifications:
+        send_email(user.email, title, "notification", name=user.full_name, title=title, body=body)
 
 
 def _tray(user: User):
@@ -243,13 +218,13 @@ def send_reminders(today: date | None = None) -> int:
             if user.email_notifications:
                 emails.setdefault(user.id, (user, []))[1].append((user_title, body))
 
+    db.session.commit()
     for user, reminders in emails.values():
         subject = reminders[0][0]
         if len(reminders) > 1:
             subject = f"{len(reminders)} filings need your attention"
         lines = [f"{title}. {body}" for title, body in reminders]
-        queue_email(user.email, subject, "reminders", name=user.full_name, lines=lines)
-    db.session.commit()
+        send_email(user.email, subject, "reminders", name=user.full_name, lines=lines)
     if count > 0:
         log.info("Recorded %d reminder(s), emailed %d person(s)", count, len(emails))
     return count

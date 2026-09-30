@@ -291,15 +291,14 @@ def create_document_request(user: User, business_id, item_id, checklist_key, mes
         message=message,
     )
     db.session.add(request)
+    owner = db.session.get(User, business.user_id)
+    title = f"Your CA asked for a document for {compliance_service.filing_name(filing)}"
+    body = f"{user.full_name}: {message}"
     alerts_service.notify(
-        db.session.get(User, business.user_id),
-        NotificationType.DOCUMENT_REQUEST,
-        f"Your CA asked for a document for {compliance_service.filing_name(filing)}",
-        f"{user.full_name}: {message}",
-        f"/business/compliance/{filing.id}",
-        email=True,
+        owner, NotificationType.DOCUMENT_REQUEST, title, body, f"/business/compliance/{filing.id}"
     )
     db.session.commit()
+    alerts_service.email_notice(owner, title, body)
     log.info("Document request %s created for filing %s", request.id, filing.id)
     return _request_details(request, filing)
 
@@ -351,15 +350,14 @@ def fulfil_document_request(business, user: User, request_id, document_id) -> di
     filing = compliance_service.get_filings_by_ids([request.compliance_item_id])[
         request.compliance_item_id
     ]
+    ca_user = cas[request.engagement_id]
+    title = f"{business.legal_name} sent the document you asked for"
+    body = f"For {compliance_service.filing_name(filing)}: {request.message}"
     alerts_service.notify(
-        cas[request.engagement_id],
-        NotificationType.DOCUMENT_REQUEST,
-        f"{business.legal_name} sent the document you asked for",
-        f"For {compliance_service.filing_name(filing)}: {request.message}",
-        f"/ca/clients/{business.id}",
-        email=True,
+        ca_user, NotificationType.DOCUMENT_REQUEST, title, body, f"/ca/clients/{business.id}"
     )
     db.session.commit()
+    alerts_service.email_notice(ca_user, title, body)
     log.info("Document request %s fulfilled", request.id)
     return _request_details(request, filing)
 
@@ -381,21 +379,19 @@ def mark_filed_for_client(
     # Requests for a filed filing can no longer be answered.
     for request in _open_requests({engagement_id}, [item_id]):
         request.status = DocumentRequestStatus.CANCELLED
+    owner = db.session.get(User, business.user_id)
+    title = f"Your CA filed {compliance_service.filing_name(filing)}"
+    body = f"{user.full_name} marked it as filed"
+    if filing.acknowledgement_no:
+        body += f" (acknowledgement number {filing.acknowledgement_no})."
+    else:
+        body += "."
     alerts_service.notify(
-        db.session.get(User, business.user_id),
-        NotificationType.ENGAGEMENT_UPDATE,
-        f"Your CA filed {compliance_service.filing_name(filing)}",
-        f"{user.full_name} marked it as filed"
-        + (
-            f" (acknowledgement number {filing.acknowledgement_no})."
-            if filing.acknowledgement_no
-            else "."
-        ),
-        f"/business/compliance/{filing.id}",
-        email=True,
+        owner, NotificationType.ENGAGEMENT_UPDATE, title, body, f"/business/compliance/{filing.id}"
     )
     completed = marketplace_service.complete_if_all_filed(engagement_id)
     db.session.commit()
+    alerts_service.email_notice(owner, title, body)
     return {
         "compliance_item_id": filing.id,
         "status": filing.status,

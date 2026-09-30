@@ -420,6 +420,7 @@ def scan_news() -> dict:
         select(NewsSource).where(NewsSource.enabled.is_(True)).order_by(NewsSource.name)
     )
     extractions_left = MAX_EXTRACTIONS_PER_RUN
+    emails = []  # (user, title, body), sent after the commit
     for source in sources:
         counts["sources"] += 1
         if not _allowed_by_robots(source.url):
@@ -453,9 +454,11 @@ def scan_news() -> dict:
             counts["changes"] += 1
             if values["affected_categories"]["extracted_by"] == "ai":
                 db.session.flush()  # gives change.id
-                _notify_affected(change)
+                emails += _notify_affected(change)
 
     db.session.commit()
+    for owner, title, body in emails:
+        alerts_service.email_notice(owner, title, body)
     log.info("News scan: %s", counts)
     return counts
 
@@ -560,9 +563,10 @@ def forms_text(form_codes: list[str]) -> str:
     return ", ".join(names)
 
 
-def _notify_affected(change: RegulatoryChange) -> None:
-    """Tell every affected business (tray + email) and their active CAs (tray), and
-    record the matches. Does not commit; the emails go out after the commit."""
+def _notify_affected(change: RegulatoryChange) -> list:
+    """Tell every affected business and their active CAs (tray) and record the matches.
+    Returns the emails for the owners, [(user, title, body)], to send after the commit.
+    Does not commit."""
     change.notified_at = utcnow()
 
     title = f"Regulatory update: {forms_text(change.form_codes)}"
@@ -571,6 +575,7 @@ def _notify_affected(change: RegulatoryChange) -> None:
         body += f" New due date: {change.dates['new_due_date']}."
     body += " Please check the details with your CA before acting."
 
+    emails = []
     for business in _affected_businesses(change):
         db.session.add(
             RegulatoryChangeMatch(
@@ -580,13 +585,9 @@ def _notify_affected(change: RegulatoryChange) -> None:
         owner = auth_service.get_user(str(business["user_id"]))
         if owner is not None:
             alerts_service.notify(
-                owner,
-                NotificationType.REGULATORY_UPDATE,
-                title,
-                body,
-                link="/business/compliance",
-                email=True,
+                owner, NotificationType.REGULATORY_UPDATE, title, body, link="/business/compliance"
             )
+            emails.append((owner, title, body))
         for ca_user in marketplace_service.active_cas_of_business(business["id"]).values():
             alerts_service.notify(
                 ca_user,
@@ -595,6 +596,7 @@ def _notify_affected(change: RegulatoryChange) -> None:
                 body,
                 link=f"/ca/clients/{business['id']}",
             )
+    return emails
 
 
 def active_changes_for(business_id, today: date | None = None) -> list[RegulatoryChange]:
