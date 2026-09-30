@@ -256,7 +256,7 @@ def test_a_business_sees_only_its_own_documents(client, owner, database, make_us
 # --- Download (DO4) --------------------------------------------------------------------
 
 
-def test_the_owner_downloads_the_decrypted_file(client, owner, upload_dir):
+def test_the_owner_downloads_the_decrypted_file(client, owner, database):
     document = upload(client, owner, name="sales.pdf").get_json()
 
     response = client.get(f"{DOCS}/{document['id']}/file", headers=owner)
@@ -265,8 +265,8 @@ def test_the_owner_downloads_the_decrypted_file(client, owner, upload_dir):
     assert response.data == PDF
     assert response.mimetype == "application/pdf"
     assert "sales.pdf" in response.headers["Content-Disposition"]
-    stored = next(upload_dir.iterdir()).read_bytes()
-    assert PDF not in stored  # encrypted at rest
+    stored = database.session.get(Document, document["id"]).content
+    assert PDF not in stored  # encrypted in the database
 
 
 def test_unknown_or_deleted_document_is_404(client, owner):

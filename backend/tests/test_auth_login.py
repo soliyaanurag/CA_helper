@@ -56,7 +56,6 @@ def test_wrong_password_and_unknown_email_get_the_same_error(client, make_user):
     assert wrong_password_error["message"] == unknown_email_error["message"]
 
 
-
 def test_unverified_email_is_rejected(client, make_user):
     make_user(email="new@example.com", email_verified_at=None)
 
@@ -90,7 +89,6 @@ def test_invalid_body_is_a_validation_error(client, database):
 
     assert response.status_code == 422
     assert set(response.get_json()["error"]["details"]["json"]) == {"email", "password"}
-
 
 
 def test_login_says_whether_the_terms_were_accepted(client, make_user):

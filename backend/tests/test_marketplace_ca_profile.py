@@ -129,7 +129,6 @@ def test_invalid_fields_are_rejected(client, ca, auth_headers, field, value):
     assert field in response.get_json()["error"]["details"]["json"]
 
 
-
 def test_array_filter_uses_contains(client, ca, auth_headers, database):
     put_profile(client, auth_headers(ca))
 

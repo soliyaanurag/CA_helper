@@ -20,8 +20,7 @@ class Config:
     # Fernet key for the encrypted columns and files (app/utils/encryption.py).
     FIELD_ENCRYPTION_KEY = os.environ.get("FIELD_ENCRYPTION_KEY")
 
-    # Uploaded files (app/utils/storage.py), encrypted, outside the repo's tracked files.
-    UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "instance/uploads")  # relative to backend/
+    # The largest file anyone may upload (files are stored encrypted in the database).
     MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "5"))
     # Flask refuses bigger requests (413) before reading them; 1 MB of room for the form.
     MAX_CONTENT_LENGTH = (MAX_UPLOAD_MB + 1) * 1024 * 1024

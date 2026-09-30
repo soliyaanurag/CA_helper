@@ -117,7 +117,6 @@ def test_lists_offered_services_in_catalog_order_with_ranges(
     assert services[0]["median_price"] is None  # only one CA offers ITR
 
 
-
 @pytest.mark.parametrize(
     "kwargs",
     [

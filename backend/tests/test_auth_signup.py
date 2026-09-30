@@ -115,7 +115,6 @@ def test_login_is_refused_until_the_email_is_verified(client, database):
     assert response.get_json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
 
 
-
 def test_signup_needs_the_terms_accepted_and_records_when(client, database):
     refused = signup(client, terms_accepted=False)
     missing = client.post(

@@ -6,7 +6,7 @@ on_document_uploaded(document, data)                                   local OCR
 verify_acknowledgement(document, filing) -> dict                       proves the filing? (DO8)
 get_document(document_id) -> Document                                 its metadata (404 if missing)
 read_document(document_id) -> (Document, bytes)                        its metadata and contents
-remove_document(document_id)                                           delete row, links, file
+remove_document(document_id)                                           delete the row and links
 document_ids_for_filings(filing_ids) -> set                            documents linked to filings
 
 The vault (routes/documents.py):
@@ -20,8 +20,8 @@ unlink_document(business, link_id)                              remove that link
 For ca_workspace: attach_document(...) (link_document without the commit),
 documents_by_filing(filings) -> dict (each filing's files and acknowledgement).
 
-The file itself is encrypted in storage (app/utils/storage.py); the `documents` row
-keeps its name, type, size and SHA-256. A document is linked to a filing per checklist
+The file itself is stored encrypted in `documents.content`, with its name, type, size
+and SHA-256. A document is linked to a filing per checklist
 key (`compliance_item_documents`), or with the key "general" when it answers no
 checklist entry; one file can serve several filings. Linking a file to a checklist
 entry also ticks that entry. Once a filing is filed, its links are fixed: they are the
@@ -46,6 +46,7 @@ from app.models.documents import DocumentType, OcrStatus
 from app.models.enums import UserRole
 from app.services import compliance_service, marketplace_service
 from app.utils import document_text, ocr, storage
+from app.utils.encryption import decrypt_bytes, encrypt_bytes
 
 log = logging.getLogger(__name__)
 
@@ -58,16 +59,16 @@ ACKNOWLEDGEMENT_KEY = "acknowledgement"
 def add_document(owner_id, uploaded_by_id, upload, doc_type: DocumentType) -> Document:
     """Store an uploaded file (a werkzeug FileStorage) and add its row. Does not commit.
 
-    The storage errors (FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, FILE_TOO_LARGE) pass through.
+    The file check errors (FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, FILE_TOO_LARGE) pass through.
     """
     data = upload.read()
-    key = storage.save_file(data, upload.mimetype)
+    storage.check_file(data, upload.mimetype)
     document = Document(
         owner_id=owner_id,
         uploaded_by_id=uploaded_by_id,
         doc_type=doc_type,
         original_filename=(upload.filename or "upload")[:255],
-        storage_key=key,
+        content=encrypt_bytes(data),
         mime_type=upload.mimetype,
         size_bytes=len(data),
         sha256=hashlib.sha256(data).hexdigest(),
@@ -188,11 +189,11 @@ def verify_acknowledgement(document: Document, filing) -> dict:
 def read_document(document_id) -> tuple[Document, bytes]:
     """A live document and its decrypted contents. 404 DOCUMENT_NOT_FOUND."""
     document = get_document(document_id)
-    return document, storage.open_file(document.storage_key)
+    return document, decrypt_bytes(document.content)
 
 
 def remove_document(document_id) -> None:
-    """Delete a document: its links, its row and its encrypted file. Does not commit.
+    """Delete a document: its links and its row (with the file). Does not commit.
 
     The caller first clears a filing's acknowledgement or a CA's certificate that points to it.
     A document request it answered stays fulfilled, without the file.
@@ -207,7 +208,6 @@ def remove_document(document_id) -> None:
         update(DocumentRequest).where(DocumentRequest.document_id == document.id).values(document_id=None)
     )
     db.session.delete(document)
-    storage.delete_file(document.storage_key)
 
 
 def document_ids_for_filings(filing_ids) -> set:
@@ -435,7 +435,7 @@ def get_document_file(user: User, document_id) -> tuple[Document, bytes]:
     if not allowed:
         raise ApiError(404, "DOCUMENT_NOT_FOUND", "This document was not found.")
     log.info("Document %s opened by user %s", document.id, user.id)
-    return document, storage.open_file(document.storage_key)
+    return document, decrypt_bytes(document.content)
 
 
 def delete_document(business, document_id) -> None:

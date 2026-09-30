@@ -98,7 +98,6 @@ def test_filings_with_a_ca_or_filed_keep_their_status(business, database, status
     assert filing(database, "gstr_1", "Q2 2026-27").status == status
 
 
-
 def test_the_worker_runs_it_every_hour(app):
     job = build_scheduler(app).get_job("compliance.mark_overdue")
 

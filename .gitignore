@@ -11,10 +11,9 @@
 /openapi.json
 
 # ---------------------------------------------------------------------------
-# Uploaded files and local instance data — never commit
+# Local instance data — never commit
 # ---------------------------------------------------------------------------
 backend/instance/
-uploads/
 
 # ---------------------------------------------------------------------------
 # Python

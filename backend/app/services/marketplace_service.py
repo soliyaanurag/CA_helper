@@ -118,7 +118,6 @@ IDENTITY_FIELDS = ("membership_no", "cop_number")
 MIN_CAS_FOR_RANGE = 3
 
 
-
 def _only_listed_cas(stmt):
     """Keep verified CA profiles: the CAs businesses may see.
 

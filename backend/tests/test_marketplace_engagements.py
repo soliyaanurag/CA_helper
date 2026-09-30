@@ -40,6 +40,7 @@ from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.seed import seed_service_catalog
 from app.services import marketplace_service
 from app.utils.decorators import require_ca_access
+from app.utils.encryption import encrypt_bytes
 from worker import build_scheduler
 
 BASE = "/api/v1/marketplace"
@@ -798,7 +799,7 @@ def _add_document(database, owner, filing=None, name="sales.pdf"):
         uploaded_by_id=owner.id,
         doc_type=DocumentType.SALES_REGISTER,
         original_filename=name,
-        storage_key="test-" + str(uuid.uuid4()),
+        content=encrypt_bytes(b"%PDF-1.4 test"),
         mime_type="application/pdf",
         size_bytes=10,
         sha256="0" * 64,

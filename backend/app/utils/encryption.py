@@ -47,7 +47,7 @@ def encrypt(value: str) -> str:
 
 
 def encrypt_bytes(data: bytes) -> bytes:
-    """Encrypt a file's contents (app/utils/storage.py)."""
+    """Encrypt a file's contents (documents.content)."""
     return _fernet().encrypt(data)
 
 

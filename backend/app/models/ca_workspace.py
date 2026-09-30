@@ -38,4 +38,3 @@ class DocumentRequest(BaseModel):
     fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The file that answered it (empty until fulfilled).
     document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
-

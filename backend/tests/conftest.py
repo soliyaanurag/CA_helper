@@ -10,7 +10,6 @@ Fixtures:
                  the user's email is verified unless you pass email_verified_at=None
     auth_headers auth_headers(user) -> {"Authorization": "Bearer <access token>"}
     mailbox      emails "sent" during the test (list of EmailMessage); emptied before each test
-    upload_dir   the temporary folder uploaded files are written to (autouse)
     legal_rules  the seeded rule thresholds and obligation templates (app/seed.py), committed
     business_with_filings
                  a registered QRMP business (no TDS) with this year's filings, created on
@@ -124,19 +123,6 @@ def database(_schema):
     for table in reversed(_schema.metadata.sorted_tables):
         _schema.session.execute(table.delete())
     _schema.session.commit()
-
-
-@pytest.fixture(autouse=True)
-def upload_dir(app, tmp_path):
-    """Uploaded files go to a temporary folder in tests, never backend/instance/uploads.
-
-    Set by hand, not with monkeypatch: an autouse monkeypatch would be undone after the
-    `database` fixture's cleanup, which breaks tests that patch the database.
-    """
-    saved = app.config["UPLOAD_DIR"]
-    app.config["UPLOAD_DIR"] = str(tmp_path / "uploads")
-    yield tmp_path / "uploads"
-    app.config["UPLOAD_DIR"] = saved
 
 
 @pytest.fixture(autouse=True)

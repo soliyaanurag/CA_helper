@@ -148,7 +148,6 @@ def test_late_fee_is_days_times_the_daily_fee_up_to_the_cap(business_with_filing
     assert capped["late_fee"] == Decimal("150.00")
 
 
-
 def test_a_flat_fee_is_charged_once_however_late(business_with_filings, rules, database):
     rules["gstr_1"].flat_late_fee = Decimal("500")
     rules["gstr_1"].late_fee_per_day = Decimal("10")  # ignored when a flat fee is set

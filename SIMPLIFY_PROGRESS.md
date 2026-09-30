@@ -66,7 +66,7 @@ Checks (all inside the containers):
 - Snapshot compare: no differences.
 - Tests changed: none.
 
-## Step 2: Cross-cutting removals (in progress)
+## Step 2: Cross-cutting removals (done)
 
 ### 2.1 Migrations (done, commit ba2ecae)
 - `backend/migrations/versions/*` deleted; `flask reset-db` added (asks for confirmation; drops the `public` schema,
@@ -179,6 +179,18 @@ Checks (all inside the containers):
 - Checks: backend 606 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures including a
   real "Scan now".
 
+### 2.6 Files in the database (done)
+- `documents.storage_key` -> `documents.content` (LargeBinary, Fernet-encrypted, deferred so lists do not load
+  the files). `storage.py` keeps only `check_file` (type by first bytes + size limit; merged into utils.py in
+  step 3). `UPLOAD_DIR` removed from Config, .env.example, conftest (`upload_dir` fixture) and .gitignore.
+  Deleting a document deletes the file with the row.
+- Local note: the old dev folder `backend/instance/uploads` (gitignored) is no longer used; left in place.
+- Checks: backend 604 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures.
+
+**Step 2 done.** Backend 644 -> 604 tests (every change listed in the table below). Snapshot: 99 differences,
+all section 4 (audit log, admin users `is_active`, the four ranking keys, alerts/auth settings, regulatory
+routes).
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -258,3 +270,7 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_alerts_notifications.py::test_notify_emails_only_after_the_commit | rewritten as test_email_notice_emails_the_tray_text | Cross-cutting: emails sent directly, no queue |
 | test_alerts_notifications.py::test_a_rolled_back_notification_sends_no_email | deleted (no queue to drop) | Cross-cutting: emails sent directly, no after_commit listener |
 | test_alerts_notifications.py::test_notify_respects_the_email_switch_but_always_adds_to_the_tray | uses notify() + email_notice() | Cross-cutting: emails sent directly |
+| test_storage.py::test_a_file_is_stored_encrypted_and_read_back, test_a_key_is_never_a_path | deleted (no files on disk, no storage keys); the type/size tests call `check_file` | documents: files stored in documents.content |
+| test_documents_vault.py::test_the_owner_downloads_the_decrypted_file | checks `documents.content` is encrypted instead of the file on disk | documents: files stored in documents.content |
+| test_marketplace_engagements.py `_add_document` helper | `content=encrypt_bytes(...)` instead of a storage key | documents: files stored in documents.content |
+| conftest.py `upload_dir` fixture | deleted | documents: UPLOAD_DIR and the upload folder go |

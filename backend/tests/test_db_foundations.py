@@ -73,11 +73,6 @@ def test_enum_stores_the_value(database):
     assert db.session.get(Gadget, gadget.id).colour == GadgetColour.DARK_BLUE
 
 
-
-
-
-
-
 # --- Per-test cleanup (conftest.py `database`) ------------------------------------
 
 

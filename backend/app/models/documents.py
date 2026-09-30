@@ -3,8 +3,8 @@
     documents                  one uploaded file's metadata (Document)
     compliance_item_documents  a file serving one filing, N-N (ComplianceItemDocument)
 
-The file itself is encrypted on disk under `storage_key` (rule 4); the database holds
-metadata only. Deleting a document deletes its row, its links and its file. A document is OWNED by a user (the business owner, or a CA for their
+The file itself is stored in `content`, encrypted with FIELD_ENCRYPTION_KEY, next to its
+metadata. Deleting a document deletes its row, its links and its file. A document is OWNED by a user (the business owner, or a CA for their
 Certificate of Practice) and UPLOADED by a user, who can differ (a CA uploading an
 acknowledgement for a client).
 """
@@ -12,7 +12,7 @@ acknowledgement for a client).
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, LargeBinary, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,7 +40,7 @@ class OcrStatus(StrEnum):
 
 
 class Document(BaseModel):
-    """One uploaded file's metadata."""
+    """One uploaded file: its metadata and its encrypted contents."""
 
     __tablename__ = "documents"
     __table_args__ = (CheckConstraint("size_bytes >= 0", name="size_not_negative"),)
@@ -49,8 +49,8 @@ class Document(BaseModel):
     uploaded_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     doc_type: Mapped[str] = mapped_column(String(50))
     original_filename: Mapped[str] = mapped_column(String(255))
-    # Where the encrypted file lives in storage (never a user-supplied path).
-    storage_key: Mapped[str] = mapped_column(String(255), unique=True)
+    # The file, encrypted. Deferred: loaded only when the file itself is read, not for lists.
+    content: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
     mime_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))  # of the original file

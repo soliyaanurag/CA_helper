@@ -24,4 +24,3 @@ class User(BaseModel):
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The user's one switch for notification emails (codes and password emails always go out).
     email_notifications: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-

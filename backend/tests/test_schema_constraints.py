@@ -107,7 +107,6 @@ def test_a_user_has_at_most_one_business(database, make_user):
     )
 
 
-
 def test_a_user_has_at_most_one_ca_profile(database, make_user):
     ca = make_user(role=UserRole.CA)
     add(database, new_ca_profile(ca))
@@ -153,7 +152,6 @@ def test_ratings_are_1_to_5_stars(database, make_user, stars):
         Rating(engagement_id=engagement.id, stars=stars),
         constraint="ck_ratings_stars_1_to_5",
     )
-
 
 
 def test_one_filing_per_business_form_and_period(database, make_user, template):
