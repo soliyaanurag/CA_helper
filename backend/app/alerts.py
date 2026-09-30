@@ -1,141 +1,58 @@
-"""Request and response shapes for /api/v1/alerts/...
-
-Business logic for alerts: the notification tray, email settings, reminders, penalties.
-
-notify(user, type, title, body, link) -> Notification  add a tray entry (AL1)
-email_notice(user, title, body)                        email a tray entry's text (after the commit)
-list_notifications(user, page, page_size) -> dict      the user's tray, newest first
-unread_count(user) -> dict                             {"unread": n}
-mark_read(user, notification_id) -> Notification       one entry read
-mark_all_read(user) -> dict                            every entry read -> {"unread": 0}
-send_reminders(today) -> int                           worker job: T-7/T-3/T-1/overdue (AL2)
-estimate_penalty(business, item_id, tax_due) -> dict   one filing's late fee + interest (AL5)
-penalty_exposure(business) -> dict                     late fees of all overdue filings (AL5)
+"""Alerts: the notification tray and bell, the daily deadline reminders and the penalty
+estimate.
 
 Tray entries are always created. Emails go out only when the user's `email_notifications`
-switch is on (auth.get_settings / save_settings), and only after the caller's
-commit, so nobody is emailed about something that was not saved.
+switch is on, and only after the caller's commit, so nobody is emailed about something
+that was not saved.
 
-Penalties are data (CLAUDE.md rule 3): `penalty_rules` rows, matched by form code and the
-filing's due date. An amount that is not confirmed yet is empty (NULL) and skipped: the
-estimate then says what is missing instead of showing a number.
-
-HTTP routes for alerts: /api/v1/alerts/...
-
-    GET  /alerts/notifications?page=           my tray, newest first (every role)
-    GET  /alerts/notifications/unread-count    {"unread": n} for the bell
-    POST /alerts/notifications/<id>/read       mark one entry read
-    POST /alerts/notifications/read-all        mark every entry read
-    GET  /alerts/penalties                     late fees of my overdue filings (business)
-    GET  /alerts/penalties/<item_id>?tax_due=  one filing's penalty estimate (business)
-
-The reminder job also runs on demand: `flask alerts send-reminders [--date YYYY-MM-DD]`.
-
-Routes stay thin: parse input (app/schemas/), call one service function, serialize
-the result. No queries and no db.session here (docs/PATTERNS.md, "Foundations").
+Penalties are data: `penalty_rules` rows, matched by form code and the filing's due date.
+An amount that is not confirmed yet is empty (NULL) and skipped: the estimate then says
+what is missing instead of showing a number.
 """
 
 import logging
 from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
 import click
-from flask_smorest import Blueprint
-from marshmallow import fields, Schema, validate
+from flask import Blueprint, jsonify, request
 from sqlalchemy import func, or_, select, update
 
 from app import compliance, marketplace, onboarding
 from app.models import (
-    db,
-    FormCode,
     Notification,
     NotificationType,
     PenaltyRule,
     ReminderKind,
     ReminderLog,
-    today_in_india,
     User,
     UserRole,
+    db,
+    today_in_india,
     utcnow,
 )
 from app.utils import (
     ApiError,
     current_business,
     current_user,
-    ErrorSchema,
+    iso,
     login_required,
-    PageArgsSchema,
-    PageSchema,
+    money,
+    read_page_args,
     roles_required,
     send_email,
+    validation_error,
 )
-
-
-# --- Request and response shapes ---------------------------------------------------------
-
-
-class NotificationSchema(Schema):
-    id = fields.UUID(required=True)
-    type = fields.String(validate=validate.OneOf(list(NotificationType)), required=True)
-    title = fields.String(required=True)
-    body = fields.String(required=True)
-    link = fields.String(allow_none=True, metadata={"description": "An app path, or null"})
-    read_at = fields.DateTime(allow_none=True)
-    created_at = fields.DateTime(required=True)
-
-
-class NotificationPageSchema(PageSchema):
-    items = fields.List(fields.Nested(NotificationSchema), required=True)
-
-
-class NotificationArgsSchema(PageArgsSchema):
-    pass
-
-
-class UnreadCountSchema(Schema):
-    unread = fields.Integer(required=True)
-
-
-class PenaltyArgsSchema(Schema):
-    tax_due = fields.Decimal(
-        places=2,
-        validate=validate.Range(min=0, max=10**10),
-        metadata={"description": "Unpaid tax in rupees, to estimate the interest"},
-    )
-
-
-class PenaltyEstimateSchema(Schema):
-    compliance_item_id = fields.UUID(required=True)
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    period_label = fields.String(required=True)
-    due_date = fields.Date(required=True)
-    days_late = fields.Integer(required=True)
-    status = fields.String(
-        required=True, metadata={"description": "not_late, filed, estimated or pending"}
-    )
-    late_fee = fields.Decimal(as_string=True, places=2, allow_none=True)
-    interest = fields.Decimal(as_string=True, places=2, allow_none=True)
-    total = fields.Decimal(as_string=True, places=2, allow_none=True)
-    notes = fields.List(fields.String(), required=True, metadata={"description": "What is missing"})
-    label = fields.String(required=True)
-
-
-class PenaltyExposureSchema(Schema):
-    total_late_fees = fields.Decimal(as_string=True, places=2, required=True)
-    overdue_count = fields.Integer(required=True)
-    estimated_count = fields.Integer(required=True)
-    pending_count = fields.Integer(required=True)
-    label = fields.String(required=True)
-    items = fields.List(fields.Nested(PenaltyEstimateSchema), required=True)
-
-
-# --- Logic -------------------------------------------------------------------------------
-
 
 log = logging.getLogger(__name__)
 
-# --- The tray (AL1) ----------------------------------------------------------------------
+bp = Blueprint("alerts", __name__)
+
+MAX_TAX_DUE = Decimal(10**10)  # rupees; the estimate's input limit
+
+
+# --- The tray ----------------------------------------------------------------------------
 
 
 def notify(
@@ -163,55 +80,19 @@ def email_notice(user: User, title: str, body: str) -> None:
         send_email(user.email, title, "notification", name=user.full_name, title=title, body=body)
 
 
-def _tray(user: User):
-    """The user's tray entries."""
-    return select(Notification).where(
-        Notification.user_id == user.id
-    )
+def notification_to_dict(notification: Notification) -> dict:
+    return {
+        "id": str(notification.id),
+        "type": notification.type,
+        "title": notification.title,
+        "body": notification.body,
+        "link": notification.link,
+        "read_at": iso(notification.read_at),
+        "created_at": iso(notification.created_at),
+    }
 
 
-def list_notifications(user: User, page: int, page_size: int) -> dict:
-    """The user's tray, newest first. Paginated: {items, page, page_size, total}."""
-    stmt = _tray(user).order_by(Notification.created_at.desc(), Notification.id)
-    result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
-    return {"items": result.items, "page": page, "page_size": page_size, "total": result.total}
-
-
-def unread_count(user: User) -> dict:
-    stmt = select(func.count()).select_from(
-        _tray(user).where(Notification.read_at.is_(None)).subquery()
-    )
-    return {"unread": db.session.scalar(stmt)}
-
-
-def mark_read(user: User, notification_id) -> Notification:
-    """Mark one of the user's entries read (again is fine). 404 NOTIFICATION_NOT_FOUND."""
-    notification = db.session.scalar(_tray(user).where(Notification.id == notification_id))
-    if notification is None:
-        raise ApiError(404, "NOTIFICATION_NOT_FOUND", "This notification was not found.")
-    if notification.read_at is None:
-        notification.read_at = utcnow()
-    db.session.commit()
-    return notification
-
-
-def mark_all_read(user: User) -> dict:
-    db.session.execute(
-        update(Notification)
-        .where(
-            Notification.user_id == user.id,
-            Notification.read_at.is_(None),
-        )
-        .values(read_at=utcnow())
-    )
-    db.session.commit()
-    return {"unread": 0}
-
-
-# --- Email settings (AL3) ----------------------------------------------------------------
-
-
-# --- Reminders (AL2): run by the worker, see backend/worker.py ---------------------------
+# --- Reminders (the worker runs send_reminders every morning) -----------------------------
 
 # (kind, fewest days left, most days left). Windows instead of exact days: if the worker
 # did not run on the 7th day before, the reminder still goes out on the 6th, 5th or 4th.
@@ -262,8 +143,8 @@ def send_reminders(today: date | None = None) -> int:
 
     - Each filing gets each kind (T-7, T-3, T-1, overdue) at most once (reminder_log).
     - A filing due before the business registered gets no reminder.
-    - Every reminder is a tray entry; each person then gets ONE summary email for the
-      run, listing the reminders whose type they have not switched off.
+    - Every reminder is a tray entry; each person who wants emails then gets ONE summary
+      email for the run.
     """
     if today is None:
         today = today_in_india()
@@ -329,7 +210,7 @@ def send_reminders(today: date | None = None) -> int:
     return count
 
 
-# --- Penalty estimator (AL5) ----------------------------------------------------------------
+# --- Penalty estimate ------------------------------------------------------------------------
 
 LABEL_PENDING = "Estimate (rules pending verification)"
 LABEL_VERIFIED = "Estimate"
@@ -453,67 +334,108 @@ def penalty_exposure(business, today=None) -> dict:
     }
 
 
+def estimate_to_dict(estimate: dict) -> dict:
+    """An estimate from _estimate() as JSON: ids and dates as text, amounts as "1250.00"."""
+    result = dict(estimate)
+    result["compliance_item_id"] = str(estimate["compliance_item_id"])
+    result["due_date"] = iso(estimate["due_date"])
+    for key in ("late_fee", "interest", "total"):
+        result[key] = money(estimate[key])
+    return result
+
+
 # --- Routes ------------------------------------------------------------------------------
 
 
-blp = Blueprint(
-    "alerts",
-    __name__,
-    description="Notification tray, reminders and the penalty estimator",
-)
+def my_tray():
+    """The logged-in user's tray entries."""
+    return select(Notification).where(Notification.user_id == current_user().id)
 
 
-@blp.route("/alerts/notifications", methods=["GET"])
+@bp.get("/alerts/notifications")
 @login_required
-@blp.arguments(NotificationArgsSchema, location="query")
-@blp.response(200, NotificationPageSchema)
-def list_notifications_view(args):
-    return list_notifications(current_user(), args["page"], args["page_size"])
+def list_notifications():
+    """The user's tray, newest first, paginated."""
+    errors = {}
+    page, page_size = read_page_args(errors)
+    if errors:
+        raise validation_error(errors, "query")
+    stmt = my_tray().order_by(Notification.created_at.desc(), Notification.id)
+    result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
+    return jsonify(
+        {
+            "items": [notification_to_dict(item) for item in result.items],
+            "page": page,
+            "page_size": page_size,
+            "total": result.total,
+        }
+    )
 
 
-@blp.route("/alerts/notifications/unread-count", methods=["GET"])
+@bp.get("/alerts/notifications/unread-count")
 @login_required
-@blp.response(200, UnreadCountSchema)
-def unread_count_view():
-    return unread_count(current_user())
+def unread_count():
+    unread = my_tray().where(Notification.read_at.is_(None)).subquery()
+    return jsonify({"unread": db.session.scalar(select(func.count()).select_from(unread))})
 
 
-@blp.route("/alerts/notifications/<uuid:notification_id>/read", methods=["POST"])
+@bp.post("/alerts/notifications/<uuid:notification_id>/read")
 @login_required
-@blp.response(200, NotificationSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="NOTIFICATION_NOT_FOUND")
-def mark_read_view(notification_id):
-    return mark_read(current_user(), notification_id)
+def mark_read(notification_id):
+    """Mark one of the user's entries read (again is fine)."""
+    notification = db.session.scalar(my_tray().where(Notification.id == notification_id))
+    if notification is None:
+        raise ApiError(404, "NOTIFICATION_NOT_FOUND", "This notification was not found.")
+    if notification.read_at is None:
+        notification.read_at = utcnow()
+    db.session.commit()
+    return jsonify(notification_to_dict(notification))
 
 
-@blp.route("/alerts/notifications/read-all", methods=["POST"])
+@bp.post("/alerts/notifications/read-all")
 @login_required
-@blp.response(200, UnreadCountSchema)
-def mark_all_read_view():
-    return mark_all_read(current_user())
+def mark_all_read():
+    db.session.execute(
+        update(Notification)
+        .where(Notification.user_id == current_user().id, Notification.read_at.is_(None))
+        .values(read_at=utcnow())
+    )
+    db.session.commit()
+    return jsonify({"unread": 0})
 
 
-@blp.route("/alerts/penalties", methods=["GET"])
+@bp.get("/alerts/penalties")
 @roles_required(UserRole.BUSINESS)
-@blp.response(200, PenaltyExposureSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND (register first)")
-def penalty_exposure_view():
-    return penalty_exposure(current_business())
+def get_penalty_exposure():
+    """The late fees of all the business's overdue filings, for the dashboard."""
+    exposure = penalty_exposure(current_business())
+    exposure["total_late_fees"] = money(exposure["total_late_fees"])
+    exposure["items"] = [estimate_to_dict(item) for item in exposure["items"]]
+    return jsonify(exposure)
 
 
-@blp.route("/alerts/penalties/<uuid:item_id>", methods=["GET"])
+@bp.get("/alerts/penalties/<uuid:item_id>")
 @roles_required(UserRole.BUSINESS)
-@blp.arguments(PenaltyArgsSchema, location="query")
-@blp.response(200, PenaltyEstimateSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND, FILING_NOT_FOUND")
-def estimate_penalty_view(args, item_id):
-    return estimate_penalty(current_business(), item_id, args.get("tax_due"))
+def get_penalty_estimate(item_id):
+    """One filing's late fee, and its interest when ?tax_due= (unpaid tax, rupees) is given."""
+    tax_due = request.args.get("tax_due")
+    if tax_due is not None:
+        try:
+            tax_due = Decimal(tax_due).quantize(Decimal("0.01"))
+        except InvalidOperation:
+            raise validation_error({"tax_due": ["Not a valid number."]}, "query")
+        if not 0 <= tax_due <= MAX_TAX_DUE:
+            raise validation_error(
+                {"tax_due": [f"Must be greater than or equal to 0 and less than or equal to {MAX_TAX_DUE}."]},
+                "query",
+            )
+    return jsonify(estimate_to_dict(estimate_penalty(current_business(), item_id, tax_due)))
 
 
 # `flask alerts send-reminders [--date 2026-10-06]`: run the daily reminder job now, for
 # demos and testing. --date runs it as if it were that day (the reminders it records then
 # count as sent, so the real day sends them no second time).
-@blp.cli.command("send-reminders")
+@bp.cli.command("send-reminders")
 @click.option("--date", "day", type=click.DateTime(formats=["%Y-%m-%d"]), help="YYYY-MM-DD")
 def send_reminders_command(day):
     """Send the deadline and overdue reminders now (what the worker does every morning)."""

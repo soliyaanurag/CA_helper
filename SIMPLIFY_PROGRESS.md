@@ -286,6 +286,15 @@ working, stop and ask.
 - No test changed. demo_walk.py now also links, unlinks and deletes a vault document.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.5 alerts (done)
+- Plain Flask; the tray routes query the user's own entries directly; `notification_to_dict`, `estimate_to_dict`.
+  `flask alerts send-reminders` still works (Flask blueprint CLI group).
+- Kept for other modules and the tests: `notify`, `email_notice`, `send_reminders`, `reminder_kind`,
+  `_reminder_title`, `estimate_penalty` and `penalty_exposure` (still Decimals and dates; the routes convert).
+- The email switch, direct emails and the nil-return fee removal were done in step 2.
+- No test changed. demo_walk.py now also marks one / all notifications read and reads the penalty exposure.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |

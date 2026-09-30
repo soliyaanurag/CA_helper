@@ -213,7 +213,7 @@ BLUEPRINTS = [
     ca_workspace.blp,
     marketplace.blp,
     admin.blp,
-    alerts.blp,
+    alerts.bp,
     documents.bp,
     regulatory.blp,
     assistant.blp,

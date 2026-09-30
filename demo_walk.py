@@ -255,6 +255,14 @@ def main():
     # 10. Notifications
     r = c.get("/api/v1/alerts/notifications", headers=B)
     check("business notification tray", r.status_code == 200, r.data[:200])
+    tray = r.get_json()["items"] if r.status_code == 200 else []
+    if tray:
+        r = c.post(f"/api/v1/alerts/notifications/{tray[0]['id']}/read", headers=B)
+        check("mark one notification read", r.status_code == 200 and r.get_json()["read_at"], r.data[:200])
+    r = c.post("/api/v1/alerts/notifications/read-all", headers=B)
+    check("mark all read", r.status_code == 200 and r.get_json() == {"unread": 0}, r.data[:200])
+    r = c.get("/api/v1/alerts/penalties", headers=B)
+    check("penalty exposure", r.status_code == 200 and "total_late_fees" in r.get_json(), r.data[:200])
 
     print(f"\n{len(failures)} failure(s)" + (": " + ", ".join(failures) if failures else ""))
     sys.exit(1 if failures else 0)
