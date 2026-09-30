@@ -215,7 +215,7 @@ BLUEPRINTS = [
     admin.blp,
     alerts.bp,
     documents.bp,
-    regulatory.blp,
+    regulatory.bp,
     assistant.blp,
 ]
 

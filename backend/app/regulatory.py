@@ -1,42 +1,22 @@
-"""Request and response shapes for /api/v1/regulatory/... and /api/v1/admin/regulatory/...
-
-Business logic for the regulatory monitor (RE1-RE6).
+"""The regulatory monitor: read tax news, find deadline or rule changes, tell the users
+they affect, and list them.
 
 How it works, step by step:
-  1. scan_news() (daily worker job, or `flask regulatory scan`): for each enabled news
-     source, check robots.txt, download the RSS feed or web page, and save articles we
-     have not seen (same URL or same text = skipped).
+  1. scan_news() (daily worker job, `flask regulatory scan`, or "Scan now"): for each
+     enabled news source, check robots.txt, download the RSS feed or web page, and save
+     the articles we have not seen (same URL or same text = skipped).
   2. Keyword filter: an article is looked at only if it names one of our 7 forms AND a
      change word ("due date", "extended", "late fee", ...).
-  3. Gemini (app/utils/gemini_client.py) reads such an article and returns the change as
-     JSON; we keep only known values. Without Gemini, a simple keyword version is saved.
+  3. Gemini reads such an article and returns the change as JSON; we keep only known
+     values. Without Gemini, a simple keyword version is saved.
   4. A change Gemini extracted is sent at once: the businesses with an open filing of
      those forms (and of the right GST scheme / entity type / state, if the change says
      so) get a tray entry and an email; their active CAs get a tray entry, and the
-     client's urgency score rises (ca_workspace reads active_changes_for()).
-     A change found by keywords only is saved and listed, but nobody is told.
-
-Public functions:
-  scan_news() -> dict                               RE2 + RE3 (worker job, CLI)
-  list_changes() -> list[dict]                      every change found (admin)
-  list_updates(user) -> list[dict]                  the changes about my forms (business, CA)
-  list_sources() / add_source(data) / set_source_enabled(source_id, enabled)   RE1
-  active_changes_for(business_id, today=None) -> list[RegulatoryChange]        urgency hook
+     client's urgency rises (ca_workspace reads active_changes_for()). A change found by
+     keywords only is saved and listed, but nobody is told.
 
 Only public news is read; the articles hold no personal data. Only standard-library
 tools are used for the web (urllib, urllib.robotparser, xml.etree).
-
-Routes for the regulatory monitor (all under /api/v1).
-
-    GET  /regulatory/updates                     the changes about my forms (business, CA)
-    GET  /admin/regulatory/changes               changes found in the news, newest first (admin)
-    GET  /admin/regulatory/sources               the news sources
-    POST /admin/regulatory/sources               add a source
-    PUT  /admin/regulatory/sources/<id>          switch a source on or off
-    POST /admin/regulatory/scan                  run the news scan now (demo)
-
-The scan also runs on demand: `flask regulatory scan` (RE6), and every morning in the
-worker (backend/worker.py).
 """
 
 import hashlib
@@ -53,14 +33,12 @@ from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
 import click
-from flask_smorest import Blueprint
-from marshmallow import fields, Schema, validate
+from flask import Blueprint, jsonify
 from sqlalchemy import func, select
 
 from app import alerts, auth, compliance, marketplace, onboarding, utils
 from app.models import (
     ChangeType,
-    db,
     EntityType,
     FormCode,
     GstScheme,
@@ -70,70 +48,27 @@ from app.models import (
     NotificationType,
     RegulatoryChange,
     RegulatoryChangeMatch,
-    today_in_india,
     User,
     UserRole,
+    db,
+    today_in_india,
     utcnow,
 )
-from app.utils import ApiError, current_user, ErrorSchema, GST_STATES, roles_required
-
-
-# --- Request and response shapes ---------------------------------------------------------
-
-
-class RegulatoryChangeSchema(Schema):
-    """A change extracted from a news article, with the article it came from."""
-
-    id = fields.UUID(required=True)
-    change_type = fields.String(required=True)
-    summary = fields.String(required=True)
-    form_codes = fields.List(fields.String(), required=True)
-    # Who it is for: {extracted_by: "ai" | "keywords", gst_schemes?, entity_types?, states?}
-    affected_categories = fields.Dict(required=True)
-    # {old_due_date?, new_due_date?, period?}
-    dates = fields.Dict(required=True)
-    created_at = fields.DateTime(required=True)
-    # When the affected users were told; null for a change found by keywords only.
-    notified_at = fields.DateTime(allow_none=True)
-    article_title = fields.String(required=True)
-    article_url = fields.String(required=True)
-    published_at = fields.DateTime(allow_none=True)
-    source_name = fields.String(required=True)
-    match_count = fields.Integer(required=True)  # businesses told about it
-
-
-class NewsSourceSchema(Schema):
-    id = fields.UUID(required=True)
-    name = fields.String(required=True)
-    url = fields.String(required=True)
-    kind = fields.String(validate=validate.OneOf(list(NewsSourceKind)), required=True)
-    enabled = fields.Boolean(required=True)
-
-
-class NewsSourceInputSchema(Schema):
-    """POST /admin/regulatory/sources: a new RSS feed or official update page."""
-
-    name = fields.String(required=True, validate=validate.Length(1, 100))
-    url = fields.URL(required=True, schemes={"https", "http"}, validate=validate.Length(max=500))
-    kind = fields.String(validate=validate.OneOf(list(NewsSourceKind)), required=True)
-
-
-class NewsSourceEnabledSchema(Schema):
-    enabled = fields.Boolean(required=True)
-
-
-class ScanResultSchema(Schema):
-    sources = fields.Integer(required=True)
-    blocked_by_robots = fields.Integer(required=True)
-    failed = fields.Integer(required=True)
-    new_articles = fields.Integer(required=True)
-    changes = fields.Integer(required=True)
-
-
-# --- Logic -------------------------------------------------------------------------------
-
+from app.utils import (
+    GST_STATES,
+    MISSING,
+    ApiError,
+    current_user,
+    iso,
+    json_body,
+    roles_required,
+    validation_error,
+)
 
 log = logging.getLogger(__name__)
+
+bp = Blueprint("regulatory", __name__)
+
 
 # How we introduce ourselves to websites (robots.txt rules are checked for this name).
 USER_AGENT = "CAHelperBot/1.0 (student project; reads public tax news once a day)"
@@ -180,9 +115,7 @@ FORM_NAMES = {
 }
 
 
-# ---------------------------------------------------------------------------------
-# Step 1: downloading, robots.txt and reading feeds / pages
-# ---------------------------------------------------------------------------------
+# --- Step 1: downloading, robots.txt and reading feeds / pages ------------------------------
 
 
 def _download(url: str) -> tuple[int, str]:
@@ -298,9 +231,7 @@ def _save_new_articles(source: NewsSource, items: list[dict]) -> list[NewsArticl
     return new_articles
 
 
-# ---------------------------------------------------------------------------------
-# Steps 2 and 3: keyword filter and extraction
-# ---------------------------------------------------------------------------------
+# --- Steps 2 and 3: keyword filter and extraction --------------------------------------------
 
 
 def _forms_mentioned(text: str) -> list[str]:
@@ -478,9 +409,7 @@ def _extract_change(article: NewsArticle) -> dict | None:
     return _change_from_keywords(article)
 
 
-# ---------------------------------------------------------------------------------
-# The job: steps 1-3 for every enabled source (RE2, RE3, RE6)
-# ---------------------------------------------------------------------------------
+# --- The job: steps 1-3 for every enabled source ----------------------------------------------
 
 
 def scan_news() -> dict:
@@ -538,12 +467,10 @@ def scan_news() -> dict:
     return counts
 
 
-# ---------------------------------------------------------------------------------
-# Telling the affected businesses and listing the changes (RE4, RE5)
-# ---------------------------------------------------------------------------------
+# --- Telling the affected businesses and listing the changes ---------------------------------
 
 
-def _change_row(change: RegulatoryChange) -> dict:
+def change_to_dict(change: RegulatoryChange) -> dict:
     """A change with its article and source, for the pages."""
     article = db.session.get(NewsArticle, change.article_id)
     source = db.session.get(NewsSource, article.source_id)
@@ -553,17 +480,17 @@ def _change_row(change: RegulatoryChange) -> dict:
         )
     )
     return {
-        "id": change.id,
+        "id": str(change.id),
         "change_type": change.change_type,
         "summary": change.summary,
         "form_codes": change.form_codes,
         "affected_categories": change.affected_categories,
         "dates": change.dates,
-        "created_at": change.created_at,
-        "notified_at": change.notified_at,
+        "created_at": iso(change.created_at),
+        "notified_at": iso(change.notified_at),
         "article_title": article.title,
         "article_url": article.url,
-        "published_at": article.published_at,
+        "published_at": iso(article.published_at),
         "source_name": source.name,
         "match_count": match_count,
     }
@@ -578,7 +505,7 @@ def list_changes() -> list[dict]:
     )
     rows = []
     for change in db.session.scalars(stmt):
-        rows.append(_change_row(change))
+        rows.append(change_to_dict(change))
     return rows
 
 
@@ -691,94 +618,103 @@ def active_changes_for(business_id, today: date | None = None) -> list[Regulator
     return list(db.session.scalars(stmt))
 
 
-# ---------------------------------------------------------------------------------
-# News sources (RE1)
-# ---------------------------------------------------------------------------------
+# --- Routes ------------------------------------------------------------------------------
 
 
-def list_sources() -> list[NewsSource]:
-    return list(db.session.scalars(select(NewsSource).order_by(NewsSource.name)))
+def source_to_dict(source: NewsSource) -> dict:
+    return {
+        "id": str(source.id),
+        "name": source.name,
+        "url": source.url,
+        "kind": source.kind,
+        "enabled": source.enabled,
+    }
 
 
-def add_source(data: dict) -> NewsSource:
-    """Add a source (409 SOURCE_EXISTS for a URL we already have). It starts enabled."""
-    exists = db.session.scalar(select(NewsSource.id).where(NewsSource.url == data["url"]))
-    if exists:
+@bp.get("/regulatory/updates")
+@roles_required(UserRole.BUSINESS, UserRole.CA)
+def get_updates():
+    """The changes about my forms: a business's own filings, a CA's active clients' filings."""
+    return jsonify(list_updates(current_user()))
+
+
+@bp.get("/admin/regulatory/changes")
+@roles_required(UserRole.ADMIN)
+def get_changes():
+    """Every change found in the news. Those Gemini extracted were sent to the affected
+    users at once; those found by keywords only were not sent to anyone."""
+    return jsonify(list_changes())
+
+
+@bp.get("/admin/regulatory/sources")
+@roles_required(UserRole.ADMIN)
+def list_sources():
+    sources = db.session.scalars(select(NewsSource).order_by(NewsSource.name))
+    return jsonify([source_to_dict(source) for source in sources])
+
+
+@bp.post("/admin/regulatory/sources")
+@roles_required(UserRole.ADMIN)
+def add_source():
+    """Add an RSS feed or official update page; it starts enabled. 409 SOURCE_EXISTS."""
+    data = json_body()
+    errors = {}
+    name = data.get("name")
+    if name is None:
+        errors["name"] = [MISSING]
+    elif not isinstance(name, str) or not 1 <= len(name) <= 100:
+        errors["name"] = ["Length must be between 1 and 100."]
+    url = data.get("url")
+    if url is None:
+        errors["url"] = [MISSING]
+    elif (
+        not isinstance(url, str)
+        or len(url) > 500
+        or urlparse(url).scheme not in ("http", "https")
+        or not urlparse(url).netloc
+    ):
+        errors["url"] = ["Not a valid URL."]
+    kind = data.get("kind")
+    if kind is None:
+        errors["kind"] = [MISSING]
+    elif kind not in list(NewsSourceKind):
+        errors["kind"] = [f"Must be one of: {', '.join(NewsSourceKind)}."]
+    if errors:
+        raise validation_error(errors)
+    if db.session.scalar(select(NewsSource.id).where(NewsSource.url == url)):
         raise ApiError(409, "SOURCE_EXISTS", "This URL is already a news source.")
-    source = NewsSource(name=data["name"], url=data["url"], kind=NewsSourceKind(data["kind"]))
+    source = NewsSource(name=name, url=url, kind=kind)
     db.session.add(source)
     db.session.commit()
-    return source
+    return jsonify(source_to_dict(source)), 201
 
 
-def set_source_enabled(source_id, enabled: bool) -> NewsSource:
+@bp.put("/admin/regulatory/sources/<uuid:source_id>")
+@roles_required(UserRole.ADMIN)
+def set_source_enabled(source_id):
+    """Switch a news source on or off."""
+    enabled = json_body().get("enabled")
+    if enabled is None:
+        raise validation_error({"enabled": [MISSING]})
+    if not isinstance(enabled, bool):
+        raise validation_error({"enabled": ["Not a valid boolean."]})
     source = db.session.get(NewsSource, source_id)
     if source is None:
         raise ApiError(404, "SOURCE_NOT_FOUND", "This news source does not exist.")
     source.enabled = enabled
     db.session.commit()
-    return source
+    return jsonify(source_to_dict(source))
 
 
-# --- Routes ------------------------------------------------------------------------------
-
-
-blp = Blueprint("regulatory", __name__, description="Regulatory news monitor")
-
-
-# The changes about my forms: a business's own filings, a CA's active clients' filings.
-@blp.route("/regulatory/updates", methods=["GET"])
-@roles_required(UserRole.BUSINESS, UserRole.CA)
-@blp.response(200, RegulatoryChangeSchema(many=True))
-def list_updates_view():
-    return list_updates(current_user())
-
-
-# Every change found in the news. Those Gemini extracted were sent to the affected users
-# at once; those found by keywords only were not sent to anyone.
-@blp.route("/admin/regulatory/changes", methods=["GET"])
+@bp.post("/admin/regulatory/scan")
 @roles_required(UserRole.ADMIN)
-@blp.response(200, RegulatoryChangeSchema(many=True))
-def list_changes_view():
-    return list_changes()
-
-
-@blp.route("/admin/regulatory/sources", methods=["GET"])
-@roles_required(UserRole.ADMIN)
-@blp.response(200, NewsSourceSchema(many=True))
-def list_sources_view():
-    return list_sources()
-
-
-@blp.route("/admin/regulatory/sources", methods=["POST"])
-@roles_required(UserRole.ADMIN)
-@blp.arguments(NewsSourceInputSchema)
-@blp.response(201, NewsSourceSchema)
-@blp.alt_response(409, schema=ErrorSchema, description="SOURCE_EXISTS")
-def add_source_view(data):
-    return add_source(data)
-
-
-@blp.route("/admin/regulatory/sources/<uuid:source_id>", methods=["PUT"])
-@roles_required(UserRole.ADMIN)
-@blp.arguments(NewsSourceEnabledSchema)
-@blp.response(200, NewsSourceSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="SOURCE_NOT_FOUND")
-def set_source_enabled_view(data, source_id):
-    return set_source_enabled(source_id, data["enabled"])
-
-
-# Run the news scan now (for demos). It downloads every enabled source, so it is slow
-# and limited per minute.
-@blp.route("/admin/regulatory/scan", methods=["POST"])
-@roles_required(UserRole.ADMIN)
-@blp.response(200, ScanResultSchema)
 def scan_now():
-    return scan_news()
+    """Run the news scan now (for demos). It downloads every enabled source, so it is slow."""
+    return jsonify(scan_news())
 
 
 # `flask regulatory scan`: run the news scan now (what the worker does every morning).
-@blp.cli.command("scan")
+@bp.cli.command("scan")
 def scan_command():
     """Fetch the news sources, save new articles and the changes found in them."""
     counts = scan_news()

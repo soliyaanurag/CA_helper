@@ -323,6 +323,15 @@ working, stop and ask.
 - No test changed.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.8 regulatory (done)
+- Plain Flask; the scan pipeline is unchanged; `change_to_dict` (JSON-ready rows for the admin list and the
+  updates page), `source_to_dict`; the source routes do their own work. `flask regulatory scan` still works.
+- The section 4 changes (no approval, auto-notify, updates page) were done in step 2.5e.
+- Kept for other modules: `scan_news`, `active_changes_for`, `forms_text`.
+- No test changed.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures (with a
+  real "Scan now").
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
