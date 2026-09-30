@@ -313,6 +313,16 @@ working, stop and ask.
   with one message (e.g. `items`, `prices`) instead of per-index details.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.7 ca_workspace (done)
+- Plain Flask; each route does its work (clients by urgency, client page, document request create / cancel,
+  CA marks filed, batches, the business's requests and fulfil). `request_to_dict`. The client page reuses
+  `onboarding.business_page`, `compliance.filing_detail_to_dict`, `compliance.checklist_with_ticks` and
+  `documents.documents_by_filing` (now JSON-ready), so the temporary copied schemas are gone.
+- `compliance.read_acknowledgement_no()` reads the optional ARN of both mark-filed forms.
+- Kept for the tests: `_urgency` (native dates), `regulatory_points`, the POINTS_* weights.
+- No test changed.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |

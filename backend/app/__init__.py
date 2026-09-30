@@ -210,7 +210,7 @@ BLUEPRINTS = [
     auth.bp,
     onboarding.bp,
     compliance.bp,
-    ca_workspace.blp,
+    ca_workspace.bp,
     marketplace.bp,
     admin.blp,
     alerts.bp,

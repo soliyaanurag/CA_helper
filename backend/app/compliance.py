@@ -821,6 +821,16 @@ def filing_stats(today: date | None = None) -> dict:
 # --- Routes ------------------------------------------------------------------------------
 
 
+def read_acknowledgement_no() -> str | None:
+    """The optional ARN of a mark-filed form (up to 50 characters), in capitals."""
+    acknowledgement_no = request.form.get("acknowledgement_no")
+    if acknowledgement_no is None:
+        return None
+    if len(acknowledgement_no) > 50:
+        raise validation_error({"acknowledgement_no": ["Longer than maximum length 50."]}, "form")
+    return acknowledgement_no.strip().upper() or None
+
+
 def own_filing(business, item_id) -> ComplianceItem:
     """One filing of this business. 404 FILING_NOT_FOUND for anyone else's."""
     filing = db.session.get(ComplianceItem, item_id)
@@ -921,13 +931,7 @@ def tick_checklist(item_id):
 def mark_filed(item_id):
     """The business filed it itself on the government portal (multipart/form-data): an
     optional ARN and an optional acknowledgement file, stored encrypted."""
-    acknowledgement_no = request.form.get("acknowledgement_no")
-    if acknowledgement_no is not None:
-        if len(acknowledgement_no) > 50:
-            raise validation_error(
-                {"acknowledgement_no": ["Longer than maximum length 50."]}, "form"
-            )
-        acknowledgement_no = acknowledgement_no.strip().upper() or None
+    acknowledgement_no = read_acknowledgement_no()
     business = current_business()
     user = current_user()
     filing = own_filing(business, item_id)

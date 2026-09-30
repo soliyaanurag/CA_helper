@@ -391,11 +391,11 @@ def documents_by_filing(filings) -> dict:
     for filing_id, checklist_key, document in rows:
         result[filing_id].append(
             {
-                "document_id": document.id,
+                "document_id": str(document.id),
                 "original_filename": document.original_filename,
                 "doc_type": document.doc_type,
                 "size_bytes": document.size_bytes,
-                "created_at": document.created_at,
+                "created_at": iso(document.created_at),
                 "checklist_key": checklist_key,
             }
         )
