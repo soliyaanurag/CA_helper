@@ -12,7 +12,7 @@ x-backend: &backend
       RUN pip install --no-cache-dir -r requirements.txt
   volumes: [".:/app"]
   working_dir: /app/backend
-  env_file: .env                       # DATABASE_URL = Neon (the local db until step 9)
+  env_file: .env                       # DATABASE_URL = the shared Neon database
   environment:
     TEST_DATABASE_URL: postgresql+psycopg://ca_helper:ca_helper_dev@db:5432/ca_helper_test
     MAIL_SERVER: mailpit
@@ -21,7 +21,7 @@ x-backend: &backend
     db: { condition: service_healthy }
 
 services:
-  db:                                   # tests only after step 9
+  db:                                   # the tests only (TEST_DATABASE_URL)
     image: pgvector/pgvector:pg16
     environment: { POSTGRES_USER: ca_helper, POSTGRES_PASSWORD: ca_helper_dev, POSTGRES_DB: ca_helper }
     volumes: ["pgdata:/var/lib/postgresql/data"]

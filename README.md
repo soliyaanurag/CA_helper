@@ -15,13 +15,19 @@ You need Docker: Docker Desktop on macOS, or on Windows with WSL2 (enable WSL in
 and keep the repo **inside Linux**, e.g. `~/projects/ca-helper`, never under `/mnt/c`); Docker Engine with the
 Compose plugin (2.17+) on Linux. Nothing else: Python, Node, Postgres and Tesseract run in containers.
 
+1. Get the team's `.env` privately from a teammate (it has the shared Neon `DATABASE_URL`, `SECRET_KEY`,
+   `JWT_SECRET_KEY` and `FIELD_ENCRYPTION_KEY`; everyone must use the same values). Starting a new database of
+   your own instead: `cp .env.example .env` and fill in those four (each line says how to make it).
+   `GEMINI_API_KEY` is optional.
+2. Start everything (the first time builds the images, a few minutes):
+
 ```bash
-cp .env.example .env        # then fill in the three secrets (each line says how to make it)
-docker compose up           # first time: builds the images (a few minutes)
+docker compose up
 ```
 
-When it is running, open a second terminal in the same folder and run this once (one line): it creates the
-tables, adds the rules, forms, NIC codes and demo users, then the demo data below.
+A new, empty database needs this once, from one person only (the shared Neon database already has it). In a
+second terminal in the same folder, one line: it creates the tables, adds the rules, forms, NIC codes and demo
+users, then the demo data below.
 
 ```bash
 docker compose exec backend sh -c "flask --app app db upgrade && flask --app app seed && flask --app app seed-demo"
