@@ -18,6 +18,7 @@ content/faqs/ with their source URL. kb_chunks holds only this public text.
 import json
 import logging
 import re
+import time
 
 import click
 import yaml
@@ -48,6 +49,10 @@ TOP_K = 5  # chunks given to Gemini per question
 # question. Measured on our content: on-topic questions 0.21-0.37, off-topic ones 0.44+.
 MAX_DISTANCE = 0.40
 HISTORY_SIZE = 50  # messages shown in the chat
+# `flask assistant ingest` embeds this many chunks per Gemini request and waits between
+# requests, because the free Gemini key refuses (429) many texts within one minute.
+INGEST_BATCH = 50
+INGEST_PAUSE_SECONDS = 60
 
 # Words that point to a question a professional should look at.
 ASK_A_CA_WORDS = (
@@ -144,11 +149,12 @@ def build_chunks() -> list[dict]:
 
 
 def ingest_knowledge() -> dict:
-    """Bring kb_chunks in line with content/ (`flask assistant ingest`). One commit.
+    """Bring kb_chunks in line with content/ (`flask assistant ingest`).
 
     Only new or changed chunks are embedded, so running it again is cheap; chunks whose
-    text is gone are deleted (reference data, not an entity). Needs Gemini for the
-    embeddings: 503 GEMINI_UNAVAILABLE changes nothing.
+    text is gone are deleted (reference data, not an entity). The chunks are embedded
+    INGEST_BATCH at a time and each batch is saved at once, so when Gemini fails (503
+    GEMINI_UNAVAILABLE) the batches before it are kept and the next run carries on.
     Returns {"chunks": total, "embedded": new or changed, "removed": deleted}.
     """
     chunks = build_chunks()
@@ -167,18 +173,23 @@ def ingest_knowledge() -> dict:
         if not same:
             changed.append(chunk)
 
-    # The page title goes into the vector too, so "GSTR-3B" questions find GSTR-3B pages.
-    vectors = []
-    if changed:
-        texts = [chunk["title"] + "\n\n" + chunk["content"] for chunk in changed]
+    for start in range(0, len(changed), INGEST_BATCH):
+        if start > 0:
+            log.info("Waiting %d s before the next batch (Gemini's limit)", INGEST_PAUSE_SECONDS)
+            time.sleep(INGEST_PAUSE_SECONDS)
+        batch = changed[start : start + INGEST_BATCH]
+        # The page title goes into the vector too, so "GSTR-3B" questions find GSTR-3B pages.
+        texts = [chunk["title"] + "\n\n" + chunk["content"] for chunk in batch]
         vectors = utils.embed_texts(texts)
-    for chunk, vector in zip(changed, vectors, strict=True):
-        row = existing.get((chunk["source_path"], chunk["chunk_index"]))
-        if row is None:
-            db.session.add(KbChunk(**chunk, embedding=vector))
-        else:
-            row.title, row.url, row.content = chunk["title"], chunk["url"], chunk["content"]
-            row.embedding = vector
+        for chunk, vector in zip(batch, vectors, strict=True):
+            row = existing.get((chunk["source_path"], chunk["chunk_index"]))
+            if row is None:
+                db.session.add(KbChunk(**chunk, embedding=vector))
+            else:
+                row.title, row.url, row.content = chunk["title"], chunk["url"], chunk["content"]
+                row.embedding = vector
+        db.session.commit()
+        log.info("Knowledge base: saved %d of %d chunks", start + len(batch), len(changed))
 
     wanted = {(chunk["source_path"], chunk["chunk_index"]) for chunk in chunks}
     removed = 0
@@ -432,7 +443,13 @@ def clear_history():
 @bp.cli.command("ingest")
 def ingest_command():
     """Read content/forms and content/faqs, embed new or changed chunks, save them."""
-    counts = ingest_knowledge()
+    try:
+        counts = ingest_knowledge()
+    except ApiError as error:
+        raise click.ClickException(
+            f"{error.message} Gemini refused (no key, or its limit). The chunks saved so far "
+            "are kept: run `flask --app app assistant ingest` again later to finish."
+        ) from error
     click.echo(
         f"Knowledge base: {counts['chunks']} chunks ({counts['embedded']} embedded now, "
         f"{counts['removed']} removed)."
