@@ -20,15 +20,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
-    Index,
     String,
     UniqueConstraint,
-    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import FormCode, str_enum
 
 
@@ -79,20 +77,13 @@ class ObligationTemplate(BaseModel):
     effective_to: Mapped[date | None] = mapped_column(Date)
 
 
-class ComplianceItem(SoftDeleteMixin, BaseModel):
+class ComplianceItem(BaseModel):
     """One filing of one business for one period, e.g. GSTR-3B for April 2026."""
 
     __tablename__ = "compliance_items"
     __table_args__ = (
-        # One live item per business, form and period; a soft-deleted one can be recreated.
-        Index(
-            "ux_compliance_items_business_form_period",
-            "business_id",
-            "form_code",
-            "period_start",
-            unique=True,
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
+        # One filing per business, form and period.
+        UniqueConstraint("business_id", "form_code", "period_start"),
         CheckConstraint("period_end >= period_start", name="valid_period"),
         CheckConstraint("fy ~ '^[0-9]{4}-[0-9]{2}$'", name="fy_format"),
     )

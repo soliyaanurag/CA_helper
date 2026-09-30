@@ -10,7 +10,6 @@ from datetime import date
 import pytest
 
 from app.models import Business, ComplianceItem, RegulatoryProfile
-from app.models.base import utcnow
 from app.models.compliance import ComplianceStatus
 from app.models.enums import UserRole
 from app.models.onboarding import EntityType, GstScheme
@@ -98,13 +97,6 @@ def test_filings_with_a_ca_or_filed_keep_their_status(business, database, status
 
     assert filing(database, "gstr_1", "Q2 2026-27").status == status
 
-
-def test_removed_filings_are_left_alone(business, database):
-    item = filing(database, "gstr_1", "Q2 2026-27")
-    item.deleted_at = utcnow()
-    database.session.commit()
-
-    assert mark_overdue_filings(date(2026, 10, 14)) == 0
 
 
 def test_the_worker_runs_it_every_hour(app):

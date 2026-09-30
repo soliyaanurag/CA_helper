@@ -104,13 +104,12 @@ def test_every_role_sees_its_tray_newest_first(client, make_user, auth_headers, 
     assert data["items"][0]["read_at"] is None
 
 
-def test_the_tray_shows_only_own_live_entries(client, make_user, auth_headers, database):
+def test_the_tray_shows_only_own_entries(client, make_user, auth_headers, database):
     me, other = make_user(), make_user()
     add_notifications(me, 2)
     add_notifications(other, 1)
     dismissed = database.session.query(Notification).filter_by(user_id=me.id).first()
-    dismissed.deleted_at = utcnow()
-    dismissed.is_active = False
+    database.session.delete(dismissed)
     database.session.commit()
 
     data = client.get(f"{BASE}/notifications", headers=auth_headers(me)).get_json()

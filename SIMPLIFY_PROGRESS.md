@@ -82,6 +82,21 @@ Checks (all inside the containers):
   EMAIL_ALREADY_VERIFIED (existing codes). The frontend pages already show the server's message; no change needed.
 - Checks: backend 637 passed; frontend 240 passed; build OK; snapshot no differences; demo walk 0 failures.
 
+### 2.3 Soft delete -> real delete (done)
+- `SoftDeleteMixin` removed. `users.is_active` stays until suspend goes (2.5); `users.deleted_at` is gone.
+- Partial unique indexes -> plain UNIQUE: `businesses.user_id` (`uq_businesses_user_id`) and
+  (business_id, form_code, period_start) on compliance_items (`uq_compliance_items_business_id`).
+- Real deletes: a filing that no longer applies (with its checklist ticks, document links, reminder log rows,
+  document requests and engagement items of closed engagements; its files stay in the vault); a document (its links,
+  its row and its encrypted file; a document request it answered keeps status fulfilled with document_id NULL);
+  the old CA certificate on re-upload; a CA price row left out of the menu; chat history on "clear".
+- All `deleted_at`/`is_active` filters on businesses, filings, documents, notifications, CA profiles, catalog,
+  CA prices and chat messages removed.
+- `sync_filings` still returns the `restored` key (always 0) and `moved`; they go in step 4 onboarding together with
+  the frontend "What changed" box (step 6).
+- Checks: backend 629 passed; frontend 240 passed; build OK; snapshot no differences; demo walk 0 failures.
+  Dev database recreated with `flask reset-db` + `flask seed-demo`.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -101,3 +116,28 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_auth_login.py::test_unknown_email_still_checks_a_password_hash | deleted | auth: dummy-hash timing trick removed |
 | test_auth_password_reset.py::test_forgot_password_never_reveals_whether_an_account_exists | rewritten as test_forgot_password_for_an_unknown_email_is_404 (404 USER_NOT_FOUND) | auth: "always 204" answers removed |
 | test_auth_verify_email.py::test_resend_never_reveals_whether_an_account_exists | rewritten as test_resend_for_an_unknown_or_verified_email_is_an_error (404 USER_NOT_FOUND / 409 EMAIL_ALREADY_VERIFIED) | auth: "always 204" answers removed |
+| test_db_foundations.py::test_soft_delete_mixin_defaults_to_active | deleted | Cross-cutting: soft delete removed |
+| test_db_foundations.py::test_database_defaults_cover_raw_sql_inserts | no longer reads `is_active` (timestamps only) | Cross-cutting: soft delete removed |
+| tests/_models.py `Gadget` | no SoftDeleteMixin | Cross-cutting: soft delete removed |
+| test_compliance_items.py `by_key` helper | no `deleted_at` filter | Cross-cutting: soft delete removed |
+| test_compliance_items.py::test_a_filing_that_no_longer_applies_is_soft_deleted | renamed ..._is_deleted; asserts the rows are gone | Cross-cutting: soft delete removed |
+| test_compliance_items.py::test_a_filing_that_applies_again_is_reactivated_not_inserted | renamed ..._is_added_again; asserts added == 4 | Cross-cutting: soft delete removed; onboarding: no `restored` |
+| test_onboarding_edit.py `live_forms`, labels filter, ..._keeps_filings_in_an_open_engagement | no `deleted_at`; the kept filing still exists | Cross-cutting: soft delete removed |
+| test_compliance_overdue.py::test_removed_filings_are_left_alone | deleted (no soft-deleted filings exist) | Cross-cutting: soft delete removed |
+| test_documents_vault.py::test_delete_is_soft_and_removes_open_links | renamed test_delete_removes_the_document_and_its_links; the row is gone | documents: delete is a real delete |
+| test_documents_vault.py::test_proof_of_a_filed_filing_cannot_be_deleted | checks the row still exists instead of `deleted_at is None` | documents: delete is a real delete |
+| test_admin_ca_verification.py::test_a_new_certificate_sends_a_verified_ca_back_to_pending | counts all documents (old certificate deleted) | Cross-cutting: soft delete removed |
+| test_alerts_notifications.py::test_the_tray_shows_only_own_live_entries | renamed ..._own_entries; the "dismissed" entry is deleted instead of soft-deleted | Cross-cutting: soft delete removed |
+| test_assistant.py::test_history_is_saved_listed_and_cleared | cleared messages are deleted (count 0, was 2) | Cross-cutting: soft delete removed |
+| test_auth_login.py::test_soft_deleted_user_is_rejected | deleted | Cross-cutting: soft delete removed |
+| test_marketplace_ca_list.py::test_lists_only_verified_cas_with_live_accounts | "Deleted CA" case removed | Cross-cutting: soft delete removed |
+| test_marketplace_ca_detail.py `service` fixture, ..._in_catalog_order_with_ranges | no `is_active`; a dropped price row is deleted | Cross-cutting: soft delete removed |
+| test_marketplace_ca_detail.py::test_hides_services_removed_from_the_catalog | deleted (a catalog service cannot be soft-deleted any more) | Cross-cutting: soft delete removed |
+| test_marketplace_ca_detail.py::test_unlisted_cas_are_not_found[deleted] | parameter removed | Cross-cutting: soft delete removed |
+| test_marketplace_services.py `catalog` fixture | "retired" (inactive) service removed | Cross-cutting: soft delete removed |
+| test_marketplace_services.py::test_only_active_catalog_services_can_be_priced[retired/made_up] | now test_only_catalog_services_can_be_priced (unknown id only) | Cross-cutting: soft delete removed |
+| test_marketplace_services.py::test_range_counts_only_listed_cas_and_current_prices | deleted-user case removed; the dropped price row is deleted | Cross-cutting: soft delete removed |
+| test_marketplace_services.py::test_saving_again_replaces_the_menu | a dropped price row is deleted and re-offering adds a new row | Cross-cutting: soft delete removed |
+| test_schema_constraints.py::test_a_user_has_at_most_one_live_business, ..._one_live_filing_... | renamed without "live"; new constraint names | Cross-cutting: partial indexes -> UNIQUE |
+| test_schema_constraints.py::test_a_soft_deleted_business_does_not_block_a_new_one | deleted | Cross-cutting: soft delete removed |
+| test_schema_constraints.py::test_a_soft_deleted_filing_can_be_created_again | deleted | Cross-cutting: soft delete removed |

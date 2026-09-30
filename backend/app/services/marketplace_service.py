@@ -140,15 +140,13 @@ def _only_listed_cas(stmt):
     """
     return stmt.where(
         CaProfile.verification_status == CaVerificationStatus.VERIFIED,
-        CaProfile.is_active,
         User.is_active,
-        User.deleted_at.is_(None),
     )
 
 
 def _find_profile(user: User) -> CaProfile | None:
     return db.session.scalar(
-        select(CaProfile).where(CaProfile.user_id == user.id, CaProfile.is_active)
+        select(CaProfile).where(CaProfile.user_id == user.id)
     )
 
 
@@ -208,7 +206,7 @@ def save_certificate(user: User, upload) -> CaProfile:
     """Store the CA's Certificate of Practice (encrypted) and link it to their profile.
 
     A new certificate needs a new admin check: the profile goes back to `pending`
-    (a verified CA leaves the marketplace until then). The old certificate is soft-deleted.
+    (a verified CA leaves the marketplace until then). The old certificate is deleted.
     404 CA_PROFILE_NOT_FOUND before the first profile save; storage errors pass through.
     """
     profile = get_own_profile(user)
@@ -216,9 +214,11 @@ def save_certificate(user: User, upload) -> CaProfile:
         user.id, user.id, upload, DocumentType.CERTIFICATE_OF_PRACTICE
     )
     db.session.flush()  # gives document.id
-    if profile.cop_document_id:
-        documents_service.remove_document(profile.cop_document_id)
+    old_document_id = profile.cop_document_id
     profile.cop_document_id = document.id
+    if old_document_id:
+        db.session.flush()  # the profile lets go of the old file before it is deleted
+        documents_service.remove_document(old_document_id)
     profile.verification_status = CaVerificationStatus.PENDING
     db.session.commit()
     log.info("CA profile %s uploaded a certificate", profile.id)
@@ -254,7 +254,7 @@ def _admin_row(profile: CaProfile) -> dict:
 
 def list_cas_for_admin(status: CaVerificationStatus | None) -> list[dict]:
     """CA profiles (optionally of one status), the longest-waiting first."""
-    stmt = select(CaProfile).where(CaProfile.is_active).order_by(CaProfile.updated_at)
+    stmt = select(CaProfile).order_by(CaProfile.updated_at)
     if status is not None:
         stmt = stmt.where(CaProfile.verification_status == status)
     rows = []
@@ -265,7 +265,7 @@ def list_cas_for_admin(status: CaVerificationStatus | None) -> list[dict]:
 
 def _ca_for_admin(profile_id) -> CaProfile:
     profile = db.session.get(CaProfile, profile_id)
-    if profile is None or not profile.is_active:
+    if profile is None:
         raise ApiError(404, "CA_NOT_FOUND", "This CA was not found.")
     return profile
 
@@ -304,11 +304,9 @@ def set_verification(profile_id, admin: User, verified: bool, reason: str | None
 
 
 def count_cas_by_status() -> dict:
-    """{"pending": n, "verified": n, "rejected": n} over live CA profiles."""
+    """{"pending": n, "verified": n, "rejected": n} over all CA profiles."""
     counts = {"pending": 0, "verified": 0, "rejected": 0}
-    for status in db.session.scalars(
-        select(CaProfile.verification_status).where(CaProfile.is_active)
-    ):
+    for status in db.session.scalars(select(CaProfile.verification_status)):
         counts[status.value] += 1
     return counts
 
@@ -366,7 +364,7 @@ def list_verified_cas(
         stmt = stmt.join(CaService, CaService.ca_profile_id == CaProfile.id)
         stmt = stmt.join(CatalogService, CaService.service_id == CatalogService.id)
         stmt = stmt.where(
-            CatalogService.code == service, CatalogService.is_active, CaService.is_active
+            CatalogService.code == service
         )
 
     business = None
@@ -556,7 +554,6 @@ def _price_of(profile: CaProfile, service_code: str):
         .join(CatalogService, CaService.service_id == CatalogService.id)
         .where(
             CaService.ca_profile_id == profile.id,
-            CaService.is_active,
             CatalogService.code == service_code,
         )
     )
@@ -572,7 +569,6 @@ def _prices_by_service() -> dict:
         select(CaService.service_id, CaService.price)
         .join(CaProfile, CaService.ca_profile_id == CaProfile.id)
         .join(User, CaProfile.user_id == User.id)
-        .where(CaService.is_active)
     )
     stmt = _only_listed_cas(stmt)
 
@@ -587,7 +583,7 @@ def _prices_by_service() -> dict:
 def list_catalog() -> list[dict]:
     """Every active catalog service, in catalog order, with its typical price range."""
     services = db.session.scalars(
-        select(CatalogService).where(CatalogService.is_active).order_by(CatalogService.sort_order)
+        select(CatalogService).order_by(CatalogService.sort_order)
     ).all()
     prices = _prices_by_service()
 
@@ -617,7 +613,7 @@ def list_catalog() -> list[dict]:
 def _menu_of(profile: CaProfile) -> dict:
     """The services a CA offers now, as {"items": [{service_id, price}]}. Does not commit."""
     rows = db.session.scalars(
-        select(CaService).where(CaService.ca_profile_id == profile.id, CaService.is_active)
+        select(CaService).where(CaService.ca_profile_id == profile.id)
     ).all()
     items = []
     for row in rows:
@@ -636,8 +632,7 @@ def get_own_menu(user: User) -> dict:
 def save_own_menu(user: User, items: list[dict]) -> dict:
     """Replace the CA's price menu with `items` ([{service_id, price}]).
 
-    Services left out are no longer offered (soft delete); offering one again later
-    brings its row back. Raises 404 CA_PROFILE_NOT_FOUND without a profile, and
+    Services left out are no longer offered (their rows are deleted). Raises 404 CA_PROFILE_NOT_FOUND without a profile, and
     400 UNKNOWN_SERVICE for a service that is not in the active catalog.
     """
     profile = get_own_profile(user)
@@ -648,22 +643,19 @@ def save_own_menu(user: User, items: list[dict]) -> dict:
 
     for service_id in new_prices:
         service = db.session.get(CatalogService, service_id)
-        if service is None or not service.is_active:
+        if service is None:
             raise ApiError(400, "UNKNOWN_SERVICE", "One of the services is not in the catalog.")
 
-    # Update the rows the CA already has (offered now or before).
+    # Update the rows the CA already has; delete the ones left out.
     old_rows = db.session.scalars(
         select(CaService).where(CaService.ca_profile_id == profile.id)
     ).all()
     for row in old_rows:
         if row.service_id in new_prices:
             row.price = new_prices[row.service_id]
-            row.is_active = True
-            row.deleted_at = None
             del new_prices[row.service_id]
-        elif row.is_active:
-            row.is_active = False
-            row.deleted_at = utcnow()
+        else:
+            db.session.delete(row)
 
     # Whatever is left is offered for the first time.
     for service_id, price in new_prices.items():
@@ -696,7 +688,7 @@ def get_verified_ca(profile_id) -> dict:
     # The CA's current prices, by catalog service id.
     my_prices = {}
     for row in db.session.scalars(
-        select(CaService).where(CaService.ca_profile_id == profile.id, CaService.is_active)
+        select(CaService).where(CaService.ca_profile_id == profile.id)
     ):
         my_prices[row.service_id] = row.price
 
@@ -784,8 +776,6 @@ def _filing_services(ca: CaProfile) -> list:
         .join(CaService, CaService.service_id == CatalogService.id)
         .where(
             CaService.ca_profile_id == ca.id,
-            CaService.is_active,
-            CatalogService.is_active,
             CatalogService.form_code.is_not(None),
         )
         .order_by(CatalogService.sort_order)
@@ -1726,7 +1716,7 @@ def _catalog_service_for(filing, itr_service_code):
     """The catalog service that fits a filing (for ITR: the business's ITR form), or None."""
     stmt = (
         select(CatalogService)
-        .where(CatalogService.form_code == filing.form_code, CatalogService.is_active)
+        .where(CatalogService.form_code == filing.form_code)
         .order_by(CatalogService.sort_order)
     )
     for service in db.session.scalars(stmt):

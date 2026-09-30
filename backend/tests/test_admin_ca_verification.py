@@ -81,7 +81,7 @@ def test_a_new_certificate_sends_a_verified_ca_back_to_pending(client, ca, admin
     upload(client, headers)
 
     assert status_of(database, profile_id) == CaVerificationStatus.PENDING
-    assert database.session.query(Document).filter(Document.deleted_at.is_(None)).count() == 1
+    assert database.session.query(Document).count() == 1  # the old certificate is deleted
 
 
 def test_the_pro_bono_pledge_is_saved_and_kept_when_not_sent(client, ca):

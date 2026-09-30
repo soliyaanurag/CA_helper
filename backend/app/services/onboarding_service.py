@@ -230,7 +230,7 @@ def register_business(user: User, data: dict) -> dict:
     409 BUSINESS_EXISTS if the user already registered one (one business per user).
     """
     exists = db.session.scalar(
-        select(Business.id).where(Business.user_id == user.id, Business.deleted_at.is_(None))
+        select(Business.id).where(Business.user_id == user.id)
     )
     if exists:
         raise ApiError(409, "BUSINESS_EXISTS", "You have already registered your business.")
@@ -609,14 +609,14 @@ def get_itr_form(business: Business) -> str | None:
 
 
 def count_businesses() -> int:
-    """How many live businesses are registered (admin dashboard)."""
-    return db.session.scalar(select(func.count(Business.id)).where(Business.deleted_at.is_(None)))
+    """How many businesses are registered (admin dashboard)."""
+    return db.session.scalar(select(func.count(Business.id)))
 
 
 def business_of_user(user: User) -> Business | None:
     """The user's live business, or None before registration (used by marketplace)."""
     return db.session.scalar(
-        select(Business).where(Business.user_id == user.id, Business.deleted_at.is_(None))
+        select(Business).where(Business.user_id == user.id)
     )
 
 
@@ -636,7 +636,7 @@ def business_categories(business_ids) -> list[dict]:
     stmt = (
         select(Business, RegulatoryProfile.gst_scheme)
         .join(RegulatoryProfile, RegulatoryProfile.business_id == Business.id)
-        .where(Business.id.in_(list(business_ids)), Business.deleted_at.is_(None))
+        .where(Business.id.in_(list(business_ids)))
         .order_by(Business.legal_name)
     )
     rows = []
@@ -660,7 +660,6 @@ def business_ids_in_segment(entity_type, msme_tier) -> set:
         select(Business.id)
         .join(RegulatoryProfile, RegulatoryProfile.business_id == Business.id)
         .where(
-            Business.deleted_at.is_(None),
             Business.entity_type == entity_type,
             RegulatoryProfile.msme_tier == msme_tier,
         )
@@ -710,7 +709,6 @@ def resync_all_filings(today: date | None = None) -> dict:
     stmt = (
         select(Business, RegulatoryProfile)
         .join(RegulatoryProfile, RegulatoryProfile.business_id == Business.id)
-        .where(Business.deleted_at.is_(None))
     )
     for business, profile in db.session.execute(stmt).all():
         filing_ids = [filing.id for filing in compliance_service.list_filings(business)]

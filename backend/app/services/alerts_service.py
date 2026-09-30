@@ -116,9 +116,9 @@ def notify(
 
 
 def _tray(user: User):
-    """The user's live (not dismissed) tray entries."""
+    """The user's tray entries."""
     return select(Notification).where(
-        Notification.user_id == user.id, Notification.deleted_at.is_(None)
+        Notification.user_id == user.id
     )
 
 
@@ -152,7 +152,6 @@ def mark_all_read(user: User) -> dict:
         update(Notification)
         .where(
             Notification.user_id == user.id,
-            Notification.deleted_at.is_(None),
             Notification.read_at.is_(None),
         )
         .values(read_at=utcnow())
@@ -274,7 +273,7 @@ def send_reminders(today: date | None = None) -> int:
         if kind is None or (filing.id, kind) in already_sent:
             continue
         business = onboarding_service.get_business(filing.business_id)
-        if business is None or business.deleted_at is not None:
+        if business is None:
             continue
         if filing.due_date < _registered_on(business):
             continue
@@ -298,7 +297,7 @@ def send_reminders(today: date | None = None) -> int:
                 (ca_user, f"{business.legal_name}: {title}", f"/ca/clients/{business.id}")
             )
         for user, user_title, link in recipients:
-            if not user.is_active or user.deleted_at is not None:
+            if not user.is_active:
                 continue
             notify(user, notification_type, user_title, body, link)
             if wants_email(user.id, notification_type):

@@ -21,16 +21,14 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
-    Index,
     Numeric,
     String,
     UniqueConstraint,
-    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import str_enum
 from app.utils.encryption import EncryptedString
 
@@ -73,18 +71,11 @@ class NicCode(BaseModel):
     description: Mapped[str] = mapped_column(String(500))
 
 
-class Business(SoftDeleteMixin, BaseModel):
-    """A registered business: at most one live business per business user."""
+class Business(BaseModel):
+    """A registered business: at most one business per business user."""
 
     __tablename__ = "businesses"
     __table_args__ = (
-        # One live business per user; a soft-deleted one does not block a new one.
-        Index(
-            "ux_businesses_user_id",
-            "user_id",
-            unique=True,
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
         CheckConstraint(
             "NOT gst_registered OR gstin IS NOT NULL", name="gstin_when_gst_registered"
         ),
@@ -98,7 +89,7 @@ class Business(SoftDeleteMixin, BaseModel):
         ),
     )
 
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True)
     legal_name: Mapped[str] = mapped_column(String(200))
     entity_type: Mapped[EntityType] = mapped_column(str_enum(EntityType))
     state: Mapped[str] = mapped_column(String(50))  # Indian state or union territory

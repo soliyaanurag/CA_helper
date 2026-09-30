@@ -207,7 +207,7 @@ def _add_business(index: int, row, user: User, today) -> Business:
 def _service_for(filing) -> CatalogService:
     return db.session.scalar(
         select(CatalogService)
-        .where(CatalogService.form_code == filing.form_code, CatalogService.is_active)
+        .where(CatalogService.form_code == filing.form_code)
         .order_by(CatalogService.sort_order)
     )
 
@@ -224,7 +224,6 @@ def _engage(business, ca: CaProfile, filings, status, now, **fields) -> Engageme
             select(CaService.price).where(
                 CaService.ca_profile_id == ca.id,
                 CaService.service_id == service.id,
-                CaService.is_active,
             )
         )
         price = own or Decimal("750")

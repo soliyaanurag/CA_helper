@@ -54,7 +54,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import BaseModel, SoftDeleteMixin, utcnow
+from app.models.base import BaseModel, utcnow
 from app.models.enums import FormCode, only_codes, str_enum
 from app.models.user import User
 
@@ -118,7 +118,7 @@ CA_LANGUAGES = (
 )
 
 
-class CaProfile(SoftDeleteMixin, BaseModel):
+class CaProfile(BaseModel):
     """One CA's practice profile (at most one per CA user)."""
 
     __tablename__ = "ca_profiles"
@@ -166,7 +166,7 @@ class ServiceUnit(StrEnum):
     PER_NOTICE = "per_notice"
 
 
-class CatalogService(SoftDeleteMixin, BaseModel):
+class CatalogService(BaseModel):
     """One standard service, e.g. "GSTR-3B filing", priced per return."""
 
     __tablename__ = "service_catalog"
@@ -181,8 +181,8 @@ class CatalogService(SoftDeleteMixin, BaseModel):
     form_code: Mapped[FormCode | None] = mapped_column(str_enum(FormCode))
 
 
-class CaService(SoftDeleteMixin, BaseModel):
-    """One CA's price for one catalog service. Unticking a service soft-deletes the row."""
+class CaService(BaseModel):
+    """One CA's price for one catalog service. Unticking a service deletes the row."""
 
     __tablename__ = "ca_services"
     __table_args__ = (

@@ -66,14 +66,6 @@ def test_inactive_user_is_rejected(client, make_user):
     assert response.get_json()["error"]["code"] == "ACCOUNT_INACTIVE"
 
 
-def test_soft_deleted_user_is_rejected(client, make_user):
-    make_user(email="deleted@example.com", deleted_at=datetime.now(UTC))
-
-    response = login(client, "deleted@example.com")
-
-    assert response.status_code == 403
-    assert response.get_json()["error"]["code"] == "ACCOUNT_INACTIVE"
-
 
 def test_unverified_email_is_rejected(client, make_user):
     make_user(email="new@example.com", email_verified_at=None)

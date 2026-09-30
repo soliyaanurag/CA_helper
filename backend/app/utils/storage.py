@@ -3,8 +3,7 @@
     check_file(data, "application/pdf")        the type and size checks only
     key = save_file(data, "application/pdf")   checks type and size, encrypts, writes
     data = open_file(key)                      reads and decrypts
-    delete_file(key)                           removes the file (only when its save failed:
-                                               documents are soft-deleted, files are kept)
+    delete_file(key)                           removes the file
 
 Files are written to UPLOAD_DIR (default backend/instance/uploads, gitignored), each
 under a random name, encrypted with Fernet (FIELD_ENCRYPTION_KEY). Only PDF, JPG and

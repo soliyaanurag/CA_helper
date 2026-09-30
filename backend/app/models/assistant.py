@@ -15,7 +15,7 @@ from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import str_enum
 
 EMBEDDING_SIZE = 768
@@ -40,8 +40,8 @@ class KbChunk(BaseModel):
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_SIZE))
 
 
-class ChatMessage(SoftDeleteMixin, BaseModel):
-    """One message in a user's assistant conversation (soft-deleted when cleared)."""
+class ChatMessage(BaseModel):
+    """One message in a user's assistant conversation (deleted when cleared)."""
 
     __tablename__ = "chat_messages"
 

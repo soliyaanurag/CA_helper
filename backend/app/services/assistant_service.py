@@ -25,14 +25,14 @@ import logging
 import re
 
 import yaml
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.config import REPO_ROOT
 from app.errors import ApiError
 from app.extensions import db
 from app.models import ChatMessage, KbChunk, User
 from app.models.assistant import ChatRole
-from app.models.base import today_in_india, utcnow
+from app.models.base import today_in_india
 from app.models.enums import UserRole
 from app.services import compliance_service, onboarding_service
 from app.utils import gemini_client
@@ -393,7 +393,7 @@ def list_history(user: User) -> list[dict]:
     """The user's last HISTORY_SIZE messages, oldest first."""
     rows = db.session.scalars(
         select(ChatMessage)
-        .where(ChatMessage.user_id == user.id, ChatMessage.deleted_at.is_(None))
+        .where(ChatMessage.user_id == user.id)
         .order_by(ChatMessage.created_at.desc())
         .limit(HISTORY_SIZE)
     ).all()
@@ -415,11 +415,6 @@ def list_history(user: User) -> list[dict]:
 
 
 def clear_history(user: User) -> None:
-    """Soft-delete the user's messages (CLAUDE.md rule 6). One commit."""
-    now = utcnow()
-    for row in db.session.scalars(
-        select(ChatMessage).where(ChatMessage.user_id == user.id, ChatMessage.deleted_at.is_(None))
-    ):
-        row.is_active = False
-        row.deleted_at = now
+    """Delete the user's messages. One commit."""
+    db.session.execute(delete(ChatMessage).where(ChatMessage.user_id == user.id))
     db.session.commit()

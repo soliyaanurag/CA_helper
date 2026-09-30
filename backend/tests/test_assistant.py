@@ -291,9 +291,7 @@ def test_history_is_saved_listed_and_cleared(
 
     assert client.delete(HISTORY, headers=headers).status_code == 204
     assert client.get(HISTORY, headers=headers).get_json() == []
-    assert (
-        client.application.extensions["sqlalchemy"].session.query(ChatMessage).count() == 2
-    )  # soft delete
+    assert client.application.extensions["sqlalchemy"].session.query(ChatMessage).count() == 0
 
 
 def test_the_ask_route(client, knowledge, gemini, owner, auth_headers):

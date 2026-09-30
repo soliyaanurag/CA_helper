@@ -4,7 +4,7 @@
     compliance_item_documents  a file serving one filing, N-N (ComplianceItemDocument)
 
 The file itself is encrypted on disk under `storage_key` (rule 4); the database holds
-metadata only. A document is OWNED by a user (the business owner, or a CA for their
+metadata only. Deleting a document deletes its row, its links and its file. A document is OWNED by a user (the business owner, or a CA for their
 Certificate of Practice) and UPLOADED by a user, who can differ (a CA uploading an
 acknowledgement for a client).
 """
@@ -16,7 +16,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, UniqueConst
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import str_enum
 
 
@@ -40,7 +40,7 @@ class OcrStatus(StrEnum):
     FAILED = "failed"
 
 
-class Document(SoftDeleteMixin, BaseModel):
+class Document(BaseModel):
     """One uploaded file's metadata."""
 
     __tablename__ = "documents"

@@ -31,9 +31,9 @@ def headers(owner, auth_headers):
 
 
 def live_forms(database) -> dict:
-    """{form code: number of live filings}."""
+    """{form code: number of filings}."""
     counts = {}
-    for item in database.session.query(ComplianceItem).filter(ComplianceItem.deleted_at.is_(None)):
+    for item in database.session.query(ComplianceItem):
         counts[item.form_code] = counts.get(item.form_code, 0) + 1
     return counts
 
@@ -132,7 +132,6 @@ def test_switching_back_to_quarterly_removes_the_extra_months(client, headers, d
     labels = {
         item.period_label
         for item in database.session.query(ComplianceItem).filter_by(form_code="gstr_3b")
-        if item.deleted_at is None
     }
     assert labels == {"Q1 2026-27", "Q2 2026-27", "Q3 2026-27", "Q4 2026-27"}
 
@@ -145,7 +144,7 @@ def test_editing_keeps_filings_in_an_open_engagement(client, headers, database, 
     response = client.put(URL, json=FORM, headers=headers)  # back to quarterly: no May
 
     assert response.get_json()["changes"]["filings"]["kept_with_ca"] == 1
-    assert database.session.get(ComplianceItem, may.id).deleted_at is None
+    assert database.session.get(ComplianceItem, may.id) is not None
 
 
 def test_editing_before_registering_is_404(client, headers):

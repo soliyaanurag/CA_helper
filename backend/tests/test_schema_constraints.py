@@ -15,7 +15,6 @@ from app.models import (
     ObligationTemplate,
     Rating,
 )
-from app.models.base import utcnow
 from app.models.enums import FormCode, UserRole
 from app.models.marketplace import CaVerificationStatus
 from app.models.onboarding import EntityType
@@ -98,25 +97,16 @@ def template(database):
     return row
 
 
-def test_a_user_has_at_most_one_live_business(database, make_user):
+def test_a_user_has_at_most_one_business(database, make_user):
     owner = make_user()
     add(database, new_business(owner))
 
     refused(
         database,
         new_business(owner, legal_name="Second business"),
-        constraint="ux_businesses_user_id",
+        constraint="uq_businesses_user_id",
     )
 
-
-def test_a_soft_deleted_business_does_not_block_a_new_one(database, make_user):
-    owner = make_user()
-    old = new_business(owner)
-    add(database, old)
-    old.is_active, old.deleted_at = False, utcnow()
-    database.session.commit()
-
-    add(database, new_business(owner, legal_name="New business"))
 
 
 def test_a_user_has_at_most_one_ca_profile(database, make_user):
@@ -179,7 +169,7 @@ def test_an_unknown_enum_value_is_refused_even_in_raw_sql(database, make_user, t
     database.session.rollback()
 
 
-def test_one_live_filing_per_business_form_and_period(database, make_user, template):
+def test_one_filing_per_business_form_and_period(database, make_user, template):
     business = new_business(make_user())
     add(database, business)
     add(database, new_item(business, template))
@@ -187,19 +177,5 @@ def test_one_live_filing_per_business_form_and_period(database, make_user, templ
     refused(
         database,
         new_item(business, template),
-        constraint="ux_compliance_items_business_form_period",
+        constraint="uq_compliance_items_business_id",
     )
-
-
-def test_a_soft_deleted_filing_can_be_created_again(database, make_user, template):
-    business = new_business(make_user())
-    add(database, business)
-    old = new_item(business, template)
-    add(database, old)
-    old.is_active, old.deleted_at = False, utcnow()
-    database.session.commit()
-
-    again = new_item(business, template)
-    add(database, again)
-
-    assert again.id != old.id

@@ -2,14 +2,14 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import UserRole, str_enum
 
 
-class User(SoftDeleteMixin, BaseModel):
+class User(BaseModel):
     """A login account (business owner, CA or admin)."""
 
     __tablename__ = "users"
@@ -23,3 +23,5 @@ class User(SoftDeleteMixin, BaseModel):
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # When the user accepted the terms (set by signup in a later task; empty until then).
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # False while an admin has suspended the account.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

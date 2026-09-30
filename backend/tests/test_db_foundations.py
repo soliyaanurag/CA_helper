@@ -1,4 +1,4 @@
-"""BaseModel, the timestamp/soft-delete mixins, str_enum() and per-test cleanup."""
+"""BaseModel, the timestamp mixin, str_enum() and per-test cleanup."""
 
 import uuid
 from datetime import timedelta
@@ -50,13 +50,6 @@ def test_updated_at_changes_on_update(database):
     assert gadget.created_at == created_at
 
 
-def test_soft_delete_mixin_defaults_to_active(database):
-    gadget = create_gadget()
-
-    assert gadget.is_active is True
-    assert gadget.deleted_at is None
-
-
 def test_database_defaults_cover_raw_sql_inserts(database):
     db.session.execute(
         text("INSERT INTO test_gadgets (id, name, colour) VALUES (:id, 'Raw', 'red')"),
@@ -64,11 +57,10 @@ def test_database_defaults_cover_raw_sql_inserts(database):
     )
 
     row = db.session.execute(
-        text("SELECT created_at, updated_at, is_active FROM test_gadgets WHERE name = 'Raw'")
+        text("SELECT created_at, updated_at FROM test_gadgets WHERE name = 'Raw'")
     ).one()
     assert row.created_at is not None
     assert row.updated_at is not None
-    assert row.is_active is True
 
 
 # --- str_enum() -----------------------------------------------------------------

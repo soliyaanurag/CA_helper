@@ -1,20 +1,16 @@
 """Shared model building blocks: every table's model subclasses `BaseModel`.
 
-    class Widget(BaseModel):                     # id + created_at + updated_at
+    class Widget(BaseModel):   # id + created_at + updated_at
         __tablename__ = "widgets"
 
-    class Document(SoftDeleteMixin, BaseModel):  # ... + is_active + deleted_at
-        __tablename__ = "documents"
-
-Models hold data only: columns, relationships and constraints. Logic (including
-soft-deleting a row) lives in app/services/. See docs/PATTERNS.md, "Foundations".
+Models hold data only: columns, relationships and constraints. Logic lives in app/services/.
 """
 
 import uuid
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Boolean, DateTime, func, true
+from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.extensions import db
@@ -44,18 +40,6 @@ class TimestampMixin:
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, server_default=func.now()
     )
-
-
-class SoftDeleteMixin:
-    """Opt-in soft delete (CLAUDE.md rule 6): rows are never removed.
-
-    A service soft-deletes a row by setting `is_active = False` and
-    `deleted_at = utcnow()`, then commits. Queries for live rows filter on
-    `is_active`.
-    """
-
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class BaseModel(TimestampMixin, db.Model):

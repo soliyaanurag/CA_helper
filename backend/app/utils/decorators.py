@@ -45,7 +45,7 @@ def current_user() -> User:
 def current_business_or_none() -> Business | None:
     """The logged-in business user's registered business, or None before registration."""
     return db.session.scalar(
-        select(Business).where(Business.user_id == current_user().id, Business.deleted_at.is_(None))
+        select(Business).where(Business.user_id == current_user().id)
     )
 
 

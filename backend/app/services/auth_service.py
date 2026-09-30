@@ -57,8 +57,8 @@ def normalize_email(email: str) -> str:
 
 
 def _is_live(user: User | None) -> bool:
-    """True for an existing account that is neither deactivated nor deleted."""
-    return user is not None and user.is_active and user.deleted_at is None
+    """True for an existing account that is not suspended."""
+    return user is not None and user.is_active
 
 
 def _live_user_by_email(email: str) -> User | None:
@@ -308,9 +308,9 @@ def accept_terms(user: User) -> None:
 
 
 def list_users(role: UserRole | None, search: str | None, page: int, page_size: int) -> dict:
-    """Live accounts, newest first, optionally of one role and matching `search` (in the
+    """Accounts, newest first, optionally of one role and matching `search` (in the
     name or email). Paginated: {items, page, page_size, total}."""
-    stmt = select(User).where(User.deleted_at.is_(None)).order_by(User.created_at.desc())
+    stmt = select(User).order_by(User.created_at.desc())
     if role is not None:
         stmt = stmt.where(User.role == role)
     if search:
@@ -321,9 +321,9 @@ def list_users(role: UserRole | None, search: str | None, page: int, page_size: 
 
 
 def get_user_for_admin(user_id) -> User:
-    """A live (not deleted) account by id. 404 USER_NOT_FOUND."""
+    """An account by id. 404 USER_NOT_FOUND."""
     user = db.session.get(User, user_id)
-    if user is None or user.deleted_at is not None:
+    if user is None:
         raise ApiError(404, "USER_NOT_FOUND", "This account was not found.")
     return user
 
@@ -343,8 +343,8 @@ def names_of(user_ids) -> dict:
 
 
 def count_users_by_role() -> dict:
-    """{"business": n, "ca": n, "admin": n} over live accounts."""
+    """{"business": n, "ca": n, "admin": n} over all accounts."""
     counts = {role.value: 0 for role in UserRole}
-    for role in db.session.scalars(select(User.role).where(User.deleted_at.is_(None))):
+    for role in db.session.scalars(select(User.role)):
         counts[role.value] += 1
     return counts

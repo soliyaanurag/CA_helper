@@ -5,7 +5,7 @@ add_document(owner_id, uploaded_by_id, upload, doc_type) -> Document   store a f
 on_document_uploaded(document, data)                                   local OCR (ON12, DO8, DO9)
 verify_acknowledgement(document, filing) -> dict                       proves the filing? (DO8)
 read_document(document_id) -> (Document, bytes)                        its metadata and contents
-remove_document(document_id)                                           soft delete
+remove_document(document_id)                                           delete row, links, file
 document_ids_for_filings(filing_ids) -> set                            documents linked to filings
 
 The vault (routes/documents.py):
@@ -35,12 +35,12 @@ import hashlib
 import logging
 from datetime import date
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select, update
 
 from app.errors import ApiError
 from app.extensions import db
-from app.models import ComplianceItemDocument, Document, User
-from app.models.base import today_in_india, utcnow
+from app.models import ComplianceItemDocument, Document, DocumentRequest, User
+from app.models.base import today_in_india
 from app.models.documents import DocumentType, OcrStatus
 from app.models.enums import UserRole
 from app.services import compliance_service, marketplace_service
@@ -191,11 +191,22 @@ def read_document(document_id) -> tuple[Document, bytes]:
 
 
 def remove_document(document_id) -> None:
-    """Soft-delete a document (the encrypted file stays). Does not commit."""
+    """Delete a document: its links, its row and its encrypted file. Does not commit.
+
+    The caller first clears a filing's acknowledgement or a CA's certificate that points to it.
+    A document request it answered stays fulfilled, without the file.
+    """
     document = db.session.get(Document, document_id)
-    if document is not None and document.deleted_at is None:
-        document.is_active = False
-        document.deleted_at = utcnow()
+    if document is None:
+        return
+    db.session.execute(
+        delete(ComplianceItemDocument).where(ComplianceItemDocument.document_id == document.id)
+    )
+    db.session.execute(
+        update(DocumentRequest).where(DocumentRequest.document_id == document.id).values(document_id=None)
+    )
+    db.session.delete(document)
+    storage.delete_file(document.storage_key)
 
 
 def document_ids_for_filings(filing_ids) -> set:
@@ -208,7 +219,6 @@ def document_ids_for_filings(filing_ids) -> set:
         .join(Document, ComplianceItemDocument.document_id == Document.id)
         .where(
             ComplianceItemDocument.compliance_item_id.in_(filing_ids),
-            Document.deleted_at.is_(None),
         )
     )
     return set(db.session.scalars(stmt))
@@ -218,9 +228,9 @@ def document_ids_for_filings(filing_ids) -> set:
 
 
 def _live_document(document_id) -> Document:
-    """A live document. 404 DOCUMENT_NOT_FOUND."""
+    """A document. 404 DOCUMENT_NOT_FOUND."""
     document = db.session.get(Document, document_id) if document_id else None
-    if document is None or document.deleted_at is not None:
+    if document is None:
         raise ApiError(404, "DOCUMENT_NOT_FOUND", "This document was not found.")
     return document
 
@@ -384,7 +394,7 @@ def list_documents(
     acknowledgement).
     """
     stmt = select(Document).where(
-        Document.owner_id == business.user_id, Document.deleted_at.is_(None)
+        Document.owner_id == business.user_id
     )
     if fy is not None:
         stmt = stmt.where(Document.fy == fy)
@@ -428,7 +438,7 @@ def get_document_file(user: User, document_id) -> tuple[Document, bytes]:
 
 
 def delete_document(business, document_id) -> None:
-    """Soft-delete one of the business's documents and remove its links (DO5).
+    """Delete one of the business's documents with its links (DO5).
 
     409 DOCUMENT_IN_USE when it is a filing's acknowledgement or linked to a filed
     filing: it is the proof of that filing.
@@ -452,8 +462,6 @@ def delete_document(business, document_id) -> None:
                 f"This document is proof for {_filing_name(filing)}, which is filed, "
                 "so it cannot be deleted.",
             )
-    for link in links:
-        db.session.delete(link)
     remove_document(document.id)
     db.session.commit()
     log.info("Document %s deleted", document.id)
@@ -492,7 +500,6 @@ def documents_by_filing(filings) -> dict:
         .join(Document, ComplianceItemDocument.document_id == Document.id)
         .where(
             ComplianceItemDocument.compliance_item_id.in_(list(result)),
-            Document.deleted_at.is_(None),
         )
         .order_by(Document.created_at)
     )
@@ -502,7 +509,7 @@ def documents_by_filing(filings) -> dict:
     for filing in filings:
         if filing.acknowledgement_document_id is not None:
             document = db.session.get(Document, filing.acknowledgement_document_id)
-            if document is not None and document.deleted_at is None:
+            if document is not None:
                 rows.append((filing.id, ACKNOWLEDGEMENT_KEY, document))
     for filing_id, checklist_key, document in rows:
         result[filing_id].append(

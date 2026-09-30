@@ -41,7 +41,7 @@ from datetime import date
 from zoneinfo import ZoneInfo
 
 import yaml
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 
 from app.config import REPO_ROOT
 from app.errors import ApiError
@@ -49,8 +49,12 @@ from app.extensions import db
 from app.models import (
     ChecklistTick,
     ComplianceItem,
+    ComplianceItemDocument,
+    DocumentRequest,
+    EngagementItem,
     ObligationTemplate,
     RegulatoryProfile,
+    ReminderLog,
     User,
 )
 from app.models.base import today_in_india, utcnow
@@ -171,15 +175,15 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
     - Every applicable form and period gets a filing, from 1 April: periods whose due
       date has passed start as "overdue" (the business may have filed them before it
       joined; it can mark them filed).
-    - A soft-deleted filing that applies again is reactivated, not inserted again.
-    - A filing that no longer applies is soft-deleted, unless it is filed, with a CA
+    - A filing that no longer applies is deleted, unless it is filed, with a CA
       (status "with_ca") or in `keep_ids` (filings in an open engagement).
     - A not-started filing whose period or due date changed gets the new one: the audit
       answer moves the ITR date; switching between monthly and quarterly returns turns
       "Q1" into "Apr" (both start on 1 April, and only one live filing per form and start
       date may exist).
 
-    Returns {"added", "restored", "removed", "moved", "kept_with_ca"} counts.
+    Returns {"added", "restored", "removed", "moved", "kept_with_ca"} counts ("restored" is
+    always 0 now that nothing is soft-deleted).
     """
     fy_start = financial_year_start(today)
     fy = fy_label(fy_start)
@@ -206,13 +210,8 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
         .order_by(ComplianceItem.created_at)
     ).all()
     live = {}
-    deleted = {}
     for item in this_year:
-        key = (item.form_code, item.period_start)
-        if item.deleted_at is None:
-            live[key] = item
-        else:
-            deleted[key] = item  # the newest one wins
+        live[(item.form_code, item.period_start)] = item
 
     def reshape(item, template, label, end, due):
         """Give a not-started filing the wanted template, period and due date."""
@@ -232,15 +231,6 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
                 counts["moved"] += 1
             elif item.template_id != template.id:
                 item.template_id = template.id  # a newer rule row; dates and status stay
-        elif key in deleted:
-            item = deleted[key]
-            item.is_active = True
-            item.deleted_at = None
-            if item.status in DONE_STATUSES:
-                item.template_id = template.id
-            else:
-                reshape(item, template, label, end, due)
-            counts["restored"] += 1
         else:
             db.session.add(
                 ComplianceItem(
@@ -263,10 +253,17 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
         if item.status == ComplianceStatus.WITH_CA or item.id in keep_ids:
             counts["kept_with_ca"] += 1
             continue
-        item.is_active = False
-        item.deleted_at = utcnow()
+        _delete_filing(item)
         counts["removed"] += 1
     return counts
+
+
+def _delete_filing(filing) -> None:
+    """Delete a filing and the rows that point to it (its files stay in the vault).
+    Does not commit."""
+    for model in (ChecklistTick, ComplianceItemDocument, ReminderLog, DocumentRequest, EngagementItem):
+        db.session.execute(delete(model).where(model.compliance_item_id == filing.id))
+    db.session.delete(filing)
 
 
 def create_filings(business_id, profile: RegulatoryProfile, today: date) -> int:
@@ -285,7 +282,7 @@ def list_filings(
     Optional filters (CO4): one status, one form, and due dates from / to (inclusive).
     """
     stmt = select(ComplianceItem).where(
-        ComplianceItem.business_id == business.id, ComplianceItem.deleted_at.is_(None)
+        ComplianceItem.business_id == business.id
     )
     if status is not None:
         stmt = stmt.where(ComplianceItem.status == status)
@@ -422,9 +419,9 @@ SELF_FILEABLE_STATUSES = (
 
 
 def _own_filing(business, item_id) -> ComplianceItem:
-    """One live filing of this business. 404 FILING_NOT_FOUND for anyone else's."""
+    """One filing of this business. 404 FILING_NOT_FOUND for anyone else's."""
     filing = db.session.get(ComplianceItem, item_id)
-    if filing is None or filing.deleted_at is not None or filing.business_id != business.id:
+    if filing is None or filing.business_id != business.id:
         raise ApiError(404, "FILING_NOT_FOUND", "This filing was not found.")
     return filing
 
@@ -596,9 +593,11 @@ def unmark_filed(business, item_id) -> dict:
     filing = _own_filing(business, item_id)
     if filing.status not in DONE_STATUSES or filing.filing_path != FilingPath.SELF:
         raise ApiError(409, "NOT_SELF_FILED", "Only a filing you marked as filed can be undone.")
-    if filing.acknowledgement_document_id is not None:
-        documents_service.remove_document(filing.acknowledgement_document_id)
+    old_document_id = filing.acknowledgement_document_id
     filing.acknowledgement_document_id = None
+    if old_document_id is not None:
+        db.session.flush()  # the filing lets go of the file before the file is deleted
+        documents_service.remove_document(old_document_id)
     filing.acknowledgement_no = None
     filing.filed_at = None
     filing.verified_at = None
@@ -678,7 +677,6 @@ def filings_by_acknowledgement(document_ids) -> dict:
         return {}
     stmt = select(ComplianceItem).where(
         ComplianceItem.acknowledgement_document_id.in_(document_ids),
-        ComplianceItem.deleted_at.is_(None),
     )
     filings = {}
     for filing in db.session.scalars(stmt):
@@ -692,7 +690,7 @@ def filings_by_acknowledgement(document_ids) -> dict:
 def get_filings_by_ids(filing_ids) -> dict:
     """{id: ComplianceItem} for the live filings among `filing_ids`. Does not commit."""
     stmt = select(ComplianceItem).where(
-        ComplianceItem.id.in_(filing_ids), ComplianceItem.deleted_at.is_(None)
+        ComplianceItem.id.in_(filing_ids)
     )
     filings = {}
     for filing in db.session.scalars(stmt):
@@ -718,7 +716,6 @@ def list_unfiled_filings_due_by(day: date) -> list[ComplianceItem]:
         .where(
             ComplianceItem.due_date <= day,
             ComplianceItem.status.not_in(DONE_STATUSES),
-            ComplianceItem.deleted_at.is_(None),
         )
         .order_by(ComplianceItem.due_date)
     )
@@ -731,7 +728,6 @@ def business_ids_with_open_filings(form_codes) -> set:
     stmt = select(ComplianceItem.business_id).where(
         ComplianceItem.form_code.in_(list(form_codes)),
         ComplianceItem.status.not_in(DONE_STATUSES),
-        ComplianceItem.deleted_at.is_(None),
     )
     return set(db.session.scalars(stmt))
 
@@ -760,7 +756,6 @@ def mark_overdue_filings(today: date | None = None) -> int:
         select(ComplianceItem).where(
             ComplianceItem.status.in_(NOT_STARTED_STATUSES),
             ComplianceItem.due_date < today,
-            ComplianceItem.deleted_at.is_(None),
         )
     ).all()
     for filing in late:
@@ -835,7 +830,6 @@ def _figures(form_code, business_ids=None) -> dict | None:
         ComplianceItem.form_code == form_code,
         ComplianceItem.status.in_(DONE_STATUSES),
         ComplianceItem.filed_at.is_not(None),
-        ComplianceItem.deleted_at.is_(None),
     )
     if business_ids is not None:
         stmt = stmt.where(ComplianceItem.business_id.in_(business_ids))
@@ -893,9 +887,7 @@ def filing_stats(today: date | None = None) -> dict:
     by_status = {status.value: 0 for status in ComplianceStatus}
     due = 0
     late = 0
-    for filing in db.session.scalars(
-        select(ComplianceItem).where(ComplianceItem.deleted_at.is_(None))
-    ):
+    for filing in db.session.scalars(select(ComplianceItem)):
         by_status[filing.status.value] += 1
         if filing.due_date < today:
             due += 1

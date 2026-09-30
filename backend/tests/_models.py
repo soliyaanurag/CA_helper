@@ -9,7 +9,7 @@ from enum import StrEnum
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import str_enum
 
 
@@ -18,7 +18,7 @@ class GadgetColour(StrEnum):
     DARK_BLUE = "dark_blue"
 
 
-class Gadget(SoftDeleteMixin, BaseModel):
+class Gadget(BaseModel):
     __tablename__ = "test_gadgets"
 
     name: Mapped[str] = mapped_column(String(50))

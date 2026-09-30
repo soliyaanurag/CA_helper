@@ -14,7 +14,7 @@ from enum import StrEnum
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import str_enum
 
 
@@ -42,7 +42,7 @@ class DocumentRequest(BaseModel):
     document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
 
 
-class CaNote(SoftDeleteMixin, BaseModel):
+class CaNote(BaseModel):
     """A CA's private note about one client business."""
 
     __tablename__ = "ca_notes"

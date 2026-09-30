@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel, SoftDeleteMixin
+from app.models.base import BaseModel
 from app.models.enums import FormCode, str_enum
 
 
@@ -47,8 +47,8 @@ class ReminderKind(StrEnum):
     OVERDUE = "overdue"
 
 
-class Notification(SoftDeleteMixin, BaseModel):
-    """One entry in a user's notification tray (soft-deleted when dismissed)."""
+class Notification(BaseModel):
+    """One entry in a user's notification tray."""
 
     __tablename__ = "notifications"
 
