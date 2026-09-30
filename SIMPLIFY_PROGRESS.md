@@ -497,6 +497,35 @@ Done:
 
 Results: backend 598 passed; frontend 235 passed; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+## Finish
+
+- Deleted: `api_snapshot.py`, `api_snapshot_baseline.json`, `api_snapshot_current.json` (untracked output),
+  `demo_walk.py`, and the `ca_helper_snapshot` database. This file stays.
+- Final run: backend 598 passed (644 on main before; every removed or changed test is in the table below), frontend
+  235 passed (240 before), `npm run build` OK. The last snapshot compare (step 8) had 102 differences, all section 4
+  items, 0 unexplained.
+
+Size, `before-simplify` tag -> this branch (files / lines):
+
+| | before | after |
+|---|---|---|
+| Backend code (`backend/**/*.py`, no tests, no migrations) | 69 / 13,616 | 18 / 10,178 |
+| Backend tests | 50 / 9,554 | 50 / 8,998 |
+| Migrations | 11 / 1,156 | 2 / 700 (env.py + one initial migration) |
+| Frontend code (`frontend/src`, no tests) | 81 / 10,523 | 23 / 10,159 |
+| Frontend tests (+ `src/test/`) | 39 / 5,064 | 38 / 4,944 |
+
+The frontend lost few lines: its files were merged (79 -> 23) but the components were kept, not rewritten.
+
+Demo walk (section 5.6): `demo_walk.py` checked every part **through the API** after every step (signup + the code
+read from Mailpit, register and edit a business, NIC, dashboard, checklist tick, self path, mark filed with an
+acknowledgement -> filed_verified, vault upload/download/link/unlink/delete, CA prices, Find a CA with a filter,
+request -> quote -> accept, CA client page, document request fulfilled, CA marks filed, CA dashboard/clients/batches,
+pro-bono, assistant ask + history, admin verifies a CA, Scan now with the real news sources (step 5), the tray,
+penalty exposure). What only a browser shows (layout, clicks, the new Settings and Regulatory updates pages, the
+admin regulatory page without Approve/Reject) is covered by the frontend tests with fake API answers, and should be
+clicked through once in the browser (README "Demo script").
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
