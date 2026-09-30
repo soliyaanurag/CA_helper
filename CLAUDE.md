@@ -4,8 +4,6 @@ Flask + React + Postgres (Neon) lab project. Keep it simple: a beginner should b
 Run: `docker compose up` (app http://localhost:5173, API :8000, Mailpit :8025).
 Tests: `docker compose exec backend pytest`, `docker compose exec frontend npm test`.
 
-While SIMPLIFICATION_PLAN.md exists, follow it: do only the step you are asked to do.
-
 Code style:
 - Backend: plain Flask routes in app/<feature>.py; models in app/models.py; helpers in app/utils.py.
 - Short functions, plain loops, one-line docstrings, comments only for the "why". No task ids or rule numbers.
