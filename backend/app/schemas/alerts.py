@@ -10,7 +10,7 @@ from app.services.alerts_service import CONFIGURABLE_TYPES
 
 class NotificationSchema(Schema):
     id = fields.UUID(required=True)
-    type = fields.Enum(NotificationType, by_value=True, required=True)
+    type = fields.String(validate=validate.OneOf(list(NotificationType)), required=True)
     title = fields.String(required=True)
     body = fields.String(required=True)
     link = fields.String(allow_none=True, metadata={"description": "An app path, or null"})
@@ -31,9 +31,7 @@ class UnreadCountSchema(Schema):
 
 
 class NotificationSettingSchema(Schema):
-    type = fields.Enum(
-        NotificationType,
-        by_value=True,
+    type = fields.String(
         required=True,
         validate=validate.OneOf(CONFIGURABLE_TYPES, error="Emails of this type are always sent."),
     )
@@ -43,7 +41,7 @@ class NotificationSettingSchema(Schema):
 class NotificationSettingsSchema(Schema):
     items = fields.List(fields.Nested(NotificationSettingSchema), required=True)
     always_emailed = fields.List(
-        fields.Enum(NotificationType, by_value=True),
+        fields.String(validate=validate.OneOf(list(NotificationType))),
         dump_only=True,
         metadata={"description": "Types that are always emailed (no switch)"},
     )
@@ -59,7 +57,7 @@ class PenaltyArgsSchema(Schema):
 
 class PenaltyEstimateSchema(Schema):
     compliance_item_id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     period_label = fields.String(required=True)
     due_date = fields.Date(required=True)
     days_late = fields.Integer(required=True)

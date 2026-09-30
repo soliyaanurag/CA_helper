@@ -55,7 +55,6 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, utcnow
-from app.models.enums import FormCode, only_codes, str_enum
 from app.models.user import User
 
 
@@ -123,8 +122,6 @@ class CaProfile(BaseModel):
 
     __tablename__ = "ca_profiles"
     __table_args__ = (
-        only_codes("specializations", CA_SPECIALIZATIONS),
-        only_codes("languages", CA_LANGUAGES),
         Index("ix_ca_profiles_specializations", "specializations", postgresql_using="gin"),
         CheckConstraint("pro_bono_slots_per_month >= 0", name="pro_bono_slots_not_negative"),
     )
@@ -143,8 +140,8 @@ class CaProfile(BaseModel):
     capacity: Mapped[int] = mapped_column(Integer)
     years_experience: Mapped[int] = mapped_column(Integer)
     about: Mapped[str] = mapped_column(String(500), default="", server_default="")
-    verification_status: Mapped[CaVerificationStatus] = mapped_column(
-        str_enum(CaVerificationStatus), default=CaVerificationStatus.PENDING
+    verification_status: Mapped[str] = mapped_column(
+        String(50), default=CaVerificationStatus.PENDING
     )
     # Pro-bono engagements the CA pledges to take each month (0 = none).
     pro_bono_slots_per_month: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -174,11 +171,11 @@ class CatalogService(BaseModel):
     code: Mapped[str] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(String(300))
-    unit: Mapped[ServiceUnit] = mapped_column(str_enum(ServiceUnit))
+    unit: Mapped[str] = mapped_column(String(50))
     # Services are listed in this order (smallest first).
     sort_order: Mapped[int] = mapped_column(Integer)
     # The filing this service is for; empty for services that are not one filing (tax audit).
-    form_code: Mapped[FormCode | None] = mapped_column(str_enum(FormCode))
+    form_code: Mapped[str | None] = mapped_column(String(50))
 
 
 class CaService(BaseModel):
@@ -223,8 +220,8 @@ class Engagement(BaseModel):
 
     business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), index=True)
     ca_profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ca_profiles.id"), index=True)
-    status: Mapped[EngagementStatus] = mapped_column(
-        str_enum(EngagementStatus), default=EngagementStatus.REQUESTED
+    status: Mapped[str] = mapped_column(
+        String(50), default=EngagementStatus.REQUESTED
     )
     is_pro_bono: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Why the CA's quote differs from the listed prices (required once quoted).
@@ -294,8 +291,8 @@ class ClientInvite(BaseModel):
     email: Mapped[str] = mapped_column(String(254), index=True)  # normalized, like users.email
     # SHA-256 of the one-time token in the invitation link; the token itself is never stored.
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    status: Mapped[InviteStatus] = mapped_column(
-        str_enum(InviteStatus), default=InviteStatus.PENDING
+    status: Mapped[str] = mapped_column(
+        String(50), default=InviteStatus.PENDING
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # The business that accepted (empty until then).
@@ -316,8 +313,8 @@ class ProBonoRequest(BaseModel):
     __tablename__ = "pro_bono_requests"
 
     business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), index=True)
-    status: Mapped[ProBonoRequestStatus] = mapped_column(
-        str_enum(ProBonoRequestStatus), default=ProBonoRequestStatus.QUEUED
+    status: Mapped[str] = mapped_column(
+        String(50), default=ProBonoRequestStatus.QUEUED
     )
     note: Mapped[str] = mapped_column(String(1000), default="", server_default="")
     # The filings (compliance item ids) the business wants free help with.

@@ -15,7 +15,6 @@ from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import str_enum
 
 
 class DocumentRequestStatus(StrEnum):
@@ -34,8 +33,8 @@ class DocumentRequest(BaseModel):
     # The checklist entry asked for (content/forms/<FORM>/checklist.yaml), or "general".
     checklist_key: Mapped[str] = mapped_column(String(50))
     message: Mapped[str] = mapped_column(String(1000))
-    status: Mapped[DocumentRequestStatus] = mapped_column(
-        str_enum(DocumentRequestStatus), default=DocumentRequestStatus.OPEN
+    status: Mapped[str] = mapped_column(
+        String(50), default=DocumentRequestStatus.OPEN
     )
     fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The file that answered it (empty until fulfilled).

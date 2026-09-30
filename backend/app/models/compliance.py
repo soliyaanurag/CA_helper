@@ -27,7 +27,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import FormCode, str_enum
 
 
 class Frequency(StrEnum):
@@ -65,9 +64,9 @@ class ObligationTemplate(BaseModel):
         ),
     )
 
-    form_code: Mapped[FormCode] = mapped_column(str_enum(FormCode))
+    form_code: Mapped[str] = mapped_column(String(50))
     name: Mapped[str] = mapped_column(String(100))
-    frequency: Mapped[Frequency] = mapped_column(str_enum(Frequency))
+    frequency: Mapped[str] = mapped_column(String(50))
     # Which profiles it applies to, e.g. {"gst_scheme": ["regular_monthly"]}.
     applicability: Mapped[dict] = mapped_column(JSONB)
     # How to compute the due date, e.g. {"day": 11, "month_offset": 1}.
@@ -90,17 +89,17 @@ class ComplianceItem(BaseModel):
 
     business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), index=True)
     template_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("obligation_templates.id"))
-    form_code: Mapped[FormCode] = mapped_column(str_enum(FormCode))
+    form_code: Mapped[str] = mapped_column(String(50))
     fy: Mapped[str] = mapped_column(String(7))  # financial year, e.g. "2026-27"
     period_label: Mapped[str] = mapped_column(String(30))  # e.g. "Apr 2026", "Q1 2026-27"
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date)
     due_date: Mapped[date] = mapped_column(Date, index=True)
-    status: Mapped[ComplianceStatus] = mapped_column(
-        str_enum(ComplianceStatus), default=ComplianceStatus.UPCOMING
+    status: Mapped[str] = mapped_column(
+        String(50), default=ComplianceStatus.UPCOMING
     )
     # Self-filing or through a CA; empty until the business chooses.
-    filing_path: Mapped[FilingPath | None] = mapped_column(str_enum(FilingPath))
+    filing_path: Mapped[str | None] = mapped_column(String(50))
     is_nil_return: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     filed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     acknowledgement_no: Mapped[str | None] = mapped_column(String(50))  # ARN / ack number

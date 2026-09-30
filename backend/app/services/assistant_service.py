@@ -244,11 +244,11 @@ def user_context(user: User) -> str:
     if business is None:
         return "The user is a business owner who has not registered their business in the app yet."
     profile = onboarding_service.get_my_business(business)["profile"]
-    facts = [f"entity type: {business.entity_type.value}"]
+    facts = [f"entity type: {business.entity_type}"]
     if profile is not None:
-        facts.append(f"MSME tier: {profile.msme_tier.value}")
-        facts.append(f"GST scheme: {profile.gst_scheme.value}")
-        facts.append(f"income tax return form: {profile.itr_form.value}")
+        facts.append(f"MSME tier: {profile.msme_tier}")
+        facts.append(f"GST scheme: {profile.gst_scheme}")
+        facts.append(f"income tax return form: {profile.itr_form}")
         facts.append(f"presumptive scheme: {'yes' if profile.presumptive_eligible else 'no'}")
         facts.append(f"tax audit: {'yes' if profile.audit_applicable else 'no'}")
         tds = [
@@ -261,7 +261,7 @@ def user_context(user: User) -> str:
     upcoming = []
     for filing in compliance_service.list_filings(business, due_from=today):
         if filing.status not in compliance_service.DONE_STATUSES and len(upcoming) < 3:
-            upcoming.append(f"{filing.form_code.value} {filing.period_label} due {filing.due_date}")
+            upcoming.append(f"{filing.form_code} {filing.period_label} due {filing.due_date}")
     facts.append(f"next filings: {'; '.join(upcoming) or 'none'}")
     return "About the user's business (categories only): " + ", ".join(facts) + "."
 

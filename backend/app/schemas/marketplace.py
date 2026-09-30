@@ -77,7 +77,7 @@ class CaProfileSchema(Schema):
     capacity = fields.Integer(required=True)
     years_experience = fields.Integer(required=True)
     about = fields.String(required=True)
-    verification_status = fields.Enum(CaVerificationStatus, by_value=True, required=True)
+    verification_status = fields.String(validate=validate.OneOf(list(CaVerificationStatus)), required=True)
     updated_at = fields.DateTime(required=True)
     pro_bono_slots_per_month = fields.Integer(required=True)
     rejection_reason = fields.String(allow_none=True)  # set by an admin when rejecting
@@ -106,7 +106,7 @@ class CaListArgsSchema(PageArgsSchema):
 class MyPriceSchema(Schema):
     """The CA's price for one of the business's filing forms."""
 
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     price = fields.Decimal(as_string=True, places=2, required=True)
 
 
@@ -171,7 +171,7 @@ class CatalogServiceSchema(Schema):
     code = fields.String(required=True)
     name = fields.String(required=True)
     description = fields.String(required=True)
-    unit = fields.Enum(ServiceUnit, by_value=True, required=True)
+    unit = fields.String(validate=validate.OneOf(list(ServiceUnit)), required=True)
     # The CA specialization this service belongs to (null: none).
     specialization = fields.String(allow_none=True)
     ca_count = fields.Integer(required=True, metadata={"description": "Verified CAs offering it"})
@@ -242,10 +242,10 @@ class RequestableFilingSchema(Schema):
     """One of the business's filings on the "Request this CA" page."""
 
     id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     period_label = fields.String(required=True)
     due_date = fields.Date(required=True)
-    status = fields.Enum(ComplianceStatus, by_value=True, required=True)
+    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
     options = fields.List(fields.Nested(FilingServiceOptionSchema), required=True)
     # Why it cannot be picked ("Already filed." ...); null when it can.
     blocked_reason = fields.String(allow_none=True)
@@ -272,7 +272,7 @@ class EngagementItemSchema(Schema):
 
     id = fields.UUID(required=True)
     compliance_item_id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, allow_none=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), allow_none=True)
     period_label = fields.String(allow_none=True)
     due_date = fields.Date(allow_none=True)
     service_name = fields.String(required=True)
@@ -285,7 +285,7 @@ class EngagementSchema(Schema):
     """One engagement between a business and a CA."""
 
     id = fields.UUID(required=True)
-    status = fields.Enum(EngagementStatus, by_value=True, required=True)
+    status = fields.String(validate=validate.OneOf(list(EngagementStatus)), required=True)
     ca_profile_id = fields.UUID(required=True)
     ca_name = fields.String(required=True)
     business_name = fields.String(required=True)
@@ -335,7 +335,7 @@ class RatingInputSchema(Schema):
 
 class ProBonoFilingSchema(Schema):
     id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     period_label = fields.String(required=True)
     due_date = fields.Date(required=True)
     # Why it cannot be chosen ("Already filed." ...); null when it can.
@@ -344,7 +344,7 @@ class ProBonoFilingSchema(Schema):
 
 class ProBonoRequestSchema(Schema):
     id = fields.UUID(required=True)
-    status = fields.Enum(ProBonoRequestStatus, by_value=True, required=True)
+    status = fields.String(validate=validate.OneOf(list(ProBonoRequestStatus)), required=True)
     note = fields.String(required=True)
     created_at = fields.DateTime(required=True)
     business_name = fields.String(required=True)

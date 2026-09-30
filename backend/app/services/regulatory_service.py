@@ -472,12 +472,12 @@ def _change_row(change: RegulatoryChange) -> dict:
     )
     return {
         "id": change.id,
-        "change_type": change.change_type.value,
+        "change_type": change.change_type,
         "summary": change.summary,
         "form_codes": change.form_codes,
         "affected_categories": change.affected_categories,
         "dates": change.dates,
-        "status": change.status.value,
+        "status": change.status,
         "created_at": change.created_at,
         "reviewed_at": change.reviewed_at,
         "article_title": article.title,

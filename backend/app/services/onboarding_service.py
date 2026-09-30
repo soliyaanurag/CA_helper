@@ -605,7 +605,7 @@ def get_itr_form(business: Business) -> str | None:
     )
     if profile is None:
         return None
-    return profile.itr_form.value
+    return profile.itr_form
 
 
 def count_businesses() -> int:
@@ -627,7 +627,7 @@ def get_msme_tier(business: Business) -> str | None:
     )
     if profile is None:
         return None
-    return profile.msme_tier.value
+    return profile.msme_tier
 
 
 def business_categories(business_ids) -> list[dict]:
@@ -646,9 +646,9 @@ def business_categories(business_ids) -> list[dict]:
                 "id": business.id,
                 "user_id": business.user_id,
                 "legal_name": business.legal_name,
-                "entity_type": business.entity_type.value,
+                "entity_type": business.entity_type,
                 "state": business.state,
-                "gst_scheme": gst_scheme.value,
+                "gst_scheme": gst_scheme,
             }
         )
     return rows

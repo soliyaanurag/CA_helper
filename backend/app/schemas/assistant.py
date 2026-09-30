@@ -30,7 +30,7 @@ class AnswerSchema(Schema):
 
 class ChatMessageSchema(Schema):
     id = fields.UUID(required=True)
-    role = fields.Enum(ChatRole, by_value=True, required=True)
+    role = fields.String(validate=validate.OneOf(list(ChatRole)), required=True)
     content = fields.String(required=True)
     citations = fields.List(fields.Nested(CitationSchema), required=True)
     ask_a_ca = fields.Boolean(required=True)

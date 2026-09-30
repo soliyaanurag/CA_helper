@@ -6,7 +6,6 @@ from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import UserRole, str_enum
 
 
 class User(BaseModel):
@@ -18,7 +17,7 @@ class User(BaseModel):
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))  # argon2, never the password
     full_name: Mapped[str] = mapped_column(String(200))
-    role: Mapped[UserRole] = mapped_column(str_enum(UserRole))
+    role: Mapped[str] = mapped_column(String(50))
     # Set when the user enters the code we emailed them; login is refused while it is empty.
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # When the user accepted the terms (set by signup in a later task; empty until then).

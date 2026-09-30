@@ -14,7 +14,6 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
-from app.models.enums import str_enum
 from app.models.user import User
 
 
@@ -32,7 +31,7 @@ class EmailOtp(BaseModel):
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     user: Mapped[User] = relationship()
-    purpose: Mapped[OtpPurpose] = mapped_column(str_enum(OtpPurpose))
+    purpose: Mapped[str] = mapped_column(String(50))
     code_hash: Mapped[str] = mapped_column(String(255))  # argon2 hash of the 6 digits
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # Wrong guesses so far; the code stops working at auth_service.OTP_MAX_ATTEMPTS.

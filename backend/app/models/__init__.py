@@ -1,7 +1,7 @@
 """Database models (SQLAlchemy): one file per module (docs/DATA_MODEL.md has every table).
 
     base.py          BaseModel (UUID id + timestamps), utcnow()
-    enums.py         str_enum(), only_codes() and the shared enums (UserRole, FormCode)
+    enums.py         the shared enums (UserRole, FormCode)
     user.py          core-auth: User (`users`)
     email_otp.py     core-auth: EmailOtp (`email_otps`), OtpPurpose
     onboarding.py    Business, RegulatoryProfile, NicCode, RuleThreshold

@@ -32,7 +32,7 @@ class AdminStatsSchema(Schema):
 
 
 class AdminUserArgsSchema(PageArgsSchema):
-    role = fields.Enum(UserRole, by_value=True)
+    role = fields.String(validate=validate.OneOf(list(UserRole)))
     search = fields.String(validate=validate.Length(max=100))
 
 
@@ -40,7 +40,7 @@ class AdminUserSchema(Schema):
     id = fields.UUID(required=True)
     full_name = fields.String(required=True)
     email = fields.String(required=True)
-    role = fields.Enum(UserRole, by_value=True, required=True)
+    role = fields.String(validate=validate.OneOf(list(UserRole)), required=True)
     is_active = fields.Boolean(required=True)
     email_verified = fields.Function(lambda user: user.email_verified_at is not None)
     created_at = fields.DateTime(required=True)
@@ -51,7 +51,7 @@ class AdminUserPageSchema(PageSchema):
 
 
 class AdminCaArgsSchema(Schema):
-    status = fields.Enum(CaVerificationStatus, by_value=True)
+    status = fields.String(validate=validate.OneOf(list(CaVerificationStatus)))
 
 
 class AdminCaSchema(Schema):
@@ -70,7 +70,7 @@ class AdminCaSchema(Schema):
     years_experience = fields.Integer(required=True)
     pro_bono_slots_per_month = fields.Integer(required=True)
     about = fields.String(required=True)
-    verification_status = fields.Enum(CaVerificationStatus, by_value=True, required=True)
+    verification_status = fields.String(validate=validate.OneOf(list(CaVerificationStatus)), required=True)
     rejection_reason = fields.String(allow_none=True)
     verified_at = fields.DateTime(allow_none=True)
     has_certificate = fields.Boolean(required=True)

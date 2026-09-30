@@ -28,7 +28,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import FormCode, str_enum
 
 
 class NotificationType(StrEnum):
@@ -53,7 +52,7 @@ class Notification(BaseModel):
     __tablename__ = "notifications"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    type: Mapped[NotificationType] = mapped_column(str_enum(NotificationType))
+    type: Mapped[str] = mapped_column(String(50))
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(String(2000))
     link: Mapped[str | None] = mapped_column(
@@ -69,7 +68,7 @@ class NotificationSetting(BaseModel):
     __table_args__ = (UniqueConstraint("user_id", "type"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    type: Mapped[NotificationType] = mapped_column(str_enum(NotificationType))
+    type: Mapped[str] = mapped_column(String(50))
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
@@ -80,7 +79,7 @@ class ReminderLog(BaseModel):
     __table_args__ = (UniqueConstraint("compliance_item_id", "kind"),)
 
     compliance_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("compliance_items.id"))
-    kind: Mapped[ReminderKind] = mapped_column(str_enum(ReminderKind))
+    kind: Mapped[str] = mapped_column(String(50))
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -105,7 +104,7 @@ class PenaltyRule(BaseModel):
     )
 
     # Every amount may be empty (NULL) while it is not confirmed from an official source.
-    form_code: Mapped[FormCode] = mapped_column(str_enum(FormCode))
+    form_code: Mapped[str] = mapped_column(String(50))
     late_fee_per_day: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # rupees
     max_late_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # empty = no cap
     # A fixed late fee, charged once however late (e.g. the ITR); used instead of the per-day fee.

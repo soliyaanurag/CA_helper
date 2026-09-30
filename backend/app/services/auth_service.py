@@ -227,7 +227,7 @@ def authenticate(email: str, password: str) -> User:
 def issue_access_token(user: User) -> str:
     """Access token: `sub` = the user's id, `role` = business | ca | admin, `exp` from
     JWT_ACCESS_TOKEN_EXPIRES."""
-    return create_access_token(identity=str(user.id), additional_claims={"role": user.role.value})
+    return create_access_token(identity=str(user.id), additional_claims={"role": user.role})
 
 
 def get_active_user(user_id: str) -> User | None:
@@ -346,5 +346,5 @@ def count_users_by_role() -> dict:
     """{"business": n, "ca": n, "admin": n} over all accounts."""
     counts = {role.value: 0 for role in UserRole}
     for role in db.session.scalars(select(User.role)):
-        counts[role.value] += 1
+        counts[role] += 1
     return counts

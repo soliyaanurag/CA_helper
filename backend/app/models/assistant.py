@@ -16,7 +16,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import str_enum
 
 EMBEDDING_SIZE = 768
 
@@ -46,7 +45,7 @@ class ChatMessage(BaseModel):
     __tablename__ = "chat_messages"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    role: Mapped[ChatRole] = mapped_column(str_enum(ChatRole))
+    role: Mapped[str] = mapped_column(String(50))
     content: Mapped[str] = mapped_column(Text)
     # For an answer: {"sources": [{number, title, url, source_path, excerpt}], "ask_a_ca": bool,
     # "ai_used": bool} (assistant_service.ask). Empty for a question.

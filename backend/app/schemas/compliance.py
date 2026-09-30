@@ -10,7 +10,7 @@ class ComplianceItemSchema(Schema):
     """One filing, e.g. GSTR-3B for Apr 2026, due 2026-05-20."""
 
     id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     fy = fields.String(required=True, metadata={"description": 'Financial year, e.g. "2026-27"'})
     period_label = fields.String(
         required=True, metadata={"description": '"Apr 2026", "Q1 2026-27"'}
@@ -18,15 +18,15 @@ class ComplianceItemSchema(Schema):
     period_start = fields.Date(required=True)
     period_end = fields.Date(required=True)
     due_date = fields.Date(required=True)
-    status = fields.Enum(ComplianceStatus, by_value=True, required=True)
-    filing_path = fields.Enum(FilingPath, by_value=True, allow_none=True)
+    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
+    filing_path = fields.String(validate=validate.OneOf(list(FilingPath)), allow_none=True)
 
 
 class ItemListArgsSchema(Schema):
     """GET /compliance/items filters (CO4); all optional."""
 
-    status = fields.Enum(ComplianceStatus, by_value=True)
-    form_code = fields.Enum(FormCode, by_value=True)
+    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)))
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)))
     due_from = fields.Date(metadata={"description": "Due on or after this date"})
     due_to = fields.Date(metadata={"description": "Due on or before this date"})
 
@@ -56,7 +56,7 @@ class ChecklistEntrySchema(Schema):
 class FormContentSchema(Schema):
     """GET /compliance/forms/<form_code> (CO6). The texts are Markdown."""
 
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     status = fields.String(required=True, metadata={"description": "TODO, DRAFT or DONE"})
     explanation = fields.String(required=True)
     instructions = fields.String(required=True)
@@ -108,7 +108,7 @@ class FilingDetailSchema(Schema):
 class ChoosePathSchema(Schema):
     """POST /compliance/items/<id>/path (CO8)."""
 
-    path = fields.Enum(FilingPath, by_value=True, required=True)
+    path = fields.String(validate=validate.OneOf(list(FilingPath)), required=True)
 
 
 class ChecklistTickSchema(Schema):
@@ -145,7 +145,7 @@ class PeerPathSchema(Schema):
 class PeerInsightsSchema(Schema):
     """GET /compliance/items/<id>/peer-insights (CO13)."""
 
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     scope = fields.String(
         required=True,
         metadata={"description": '"segment" (same entity type and MSME tier), "overall" or "none"'},

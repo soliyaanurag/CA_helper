@@ -13,7 +13,6 @@ app/services/assistant_service.py and returns its result as JSON.
 import click
 from flask_smorest import Blueprint
 
-from app.errors import ErrorSchema
 from app.models.enums import UserRole
 from app.schemas.assistant import AnswerSchema, ChatMessageSchema, QuestionSchema
 from app.services import assistant_service

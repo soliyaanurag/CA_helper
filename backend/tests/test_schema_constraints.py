@@ -4,7 +4,6 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.models import (
@@ -155,18 +154,6 @@ def test_ratings_are_1_to_5_stars(database, make_user, stars):
         constraint="ck_ratings_stars_1_to_5",
     )
 
-
-def test_an_unknown_enum_value_is_refused_even_in_raw_sql(database, make_user, template):
-    business = new_business(make_user())
-    add(database, business)
-    item = new_item(business, template)
-    add(database, item)
-
-    with pytest.raises(IntegrityError, match="ck_compliance_items_compliance_status"):
-        database.session.execute(
-            text("UPDATE compliance_items SET status = 'lost' WHERE id = :id"), {"id": item.id}
-        )
-    database.session.rollback()
 
 
 def test_one_filing_per_business_form_and_period(database, make_user, template):

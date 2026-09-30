@@ -43,7 +43,7 @@ class BusinessInputSchema(Schema):
     """POST and PUT /onboarding/business: the registration (and edit) form."""
 
     legal_name = _text(200)
-    entity_type = fields.Enum(EntityType, by_value=True, required=True)
+    entity_type = fields.String(validate=validate.OneOf(list(EntityType)), required=True)
     state = fields.String(
         required=True,
         validate=validate.OneOf(
@@ -136,7 +136,7 @@ class BusinessSchema(Schema):
 
     id = fields.UUID(required=True)
     legal_name = fields.String(required=True)
-    entity_type = fields.Enum(EntityType, by_value=True, required=True)
+    entity_type = fields.String(validate=validate.OneOf(list(EntityType)), required=True)
     state = fields.String(required=True)
     address = fields.String(required=True)
     description = fields.String(required=True)
@@ -162,10 +162,10 @@ class BusinessSchema(Schema):
 class RegulatoryProfileSchema(Schema):
     """The computed profile; `explanations` has a "why" sentence for each line."""
 
-    msme_tier = fields.Enum(MsmeTier, by_value=True, required=True)
-    gst_scheme = fields.Enum(GstScheme, by_value=True, required=True)
+    msme_tier = fields.String(validate=validate.OneOf(list(MsmeTier)), required=True)
+    gst_scheme = fields.String(validate=validate.OneOf(list(GstScheme)), required=True)
     gst_registration_suggested = fields.Boolean(required=True)
-    itr_form = fields.Enum(ItrForm, by_value=True, required=True)
+    itr_form = fields.String(validate=validate.OneOf(list(ItrForm)), required=True)
     presumptive_eligible = fields.Boolean(required=True)
     audit_applicable = fields.Boolean(required=True)
     other_audit_applicable = fields.Boolean(required=True)
@@ -259,7 +259,7 @@ class RegistrationFieldsSchema(Schema):
     gstin = fields.String()
     legal_name = fields.String()
     state = fields.String()
-    entity_type = fields.Enum(EntityType, by_value=True)
+    entity_type = fields.String(validate=validate.OneOf(list(EntityType)))
 
 
 class AutofillSchema(Schema):

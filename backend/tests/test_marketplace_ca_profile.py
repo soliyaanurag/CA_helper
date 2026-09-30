@@ -2,7 +2,6 @@
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
 
 from app.models import CaProfile
 from app.models.enums import UserRole
@@ -129,15 +128,6 @@ def test_invalid_fields_are_rejected(client, ca, auth_headers, field, value):
     assert response.status_code == 422
     assert field in response.get_json()["error"]["details"]["json"]
 
-
-def test_database_rejects_unknown_codes(ca, database):
-    # The CHECK constraint guards the array columns even without the API.
-    database.session.add(
-        CaProfile(user_id=ca.id, **{**PROFILE, "specializations": ["itr", "made_up"]})
-    )
-    with pytest.raises(IntegrityError, match="ck_ca_profiles_known_specializations"):
-        database.session.commit()
-    database.session.rollback()
 
 
 def test_array_filter_uses_contains(client, ca, auth_headers, database):

@@ -17,7 +17,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import str_enum
 
 
 class DocumentType(StrEnum):
@@ -48,7 +47,7 @@ class Document(BaseModel):
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     uploaded_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    doc_type: Mapped[DocumentType] = mapped_column(str_enum(DocumentType))
+    doc_type: Mapped[str] = mapped_column(String(50))
     original_filename: Mapped[str] = mapped_column(String(255))
     # Where the encrypted file lives in storage (never a user-supplied path).
     storage_key: Mapped[str] = mapped_column(String(255), unique=True)
@@ -57,7 +56,7 @@ class Document(BaseModel):
     sha256: Mapped[str] = mapped_column(String(64))  # of the original file
     fy: Mapped[str | None] = mapped_column(String(7))  # e.g. "2026-27"
     period_label: Mapped[str | None] = mapped_column(String(30))  # e.g. "Apr 2026"
-    ocr_status: Mapped[OcrStatus] = mapped_column(str_enum(OcrStatus), default=OcrStatus.NONE)
+    ocr_status: Mapped[str] = mapped_column(String(50), default=OcrStatus.NONE)
     # What OCR extracted, e.g. {"arn": "...", "filed_on": "2026-05-11"}.
     ocr_fields: Mapped[dict | None] = mapped_column(JSONB)
 

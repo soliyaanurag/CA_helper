@@ -21,29 +21,27 @@ def _check_fy(value: str) -> None:
 class DocumentLinkSchema(Schema):
     id = fields.UUID(required=True, metadata={"description": "The link's id (to unlink it)"})
     compliance_item_id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     period_label = fields.String(required=True)
     checklist_key = fields.String(required=True, metadata={"description": 'or "general"'})
 
 
 class AcknowledgedFilingSchema(Schema):
     compliance_item_id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     period_label = fields.String(required=True)
 
 
 class DocumentSchema(Schema):
     id = fields.UUID(required=True)
-    doc_type = fields.Enum(DocumentType, by_value=True, required=True)
+    doc_type = fields.String(validate=validate.OneOf(list(DocumentType)), required=True)
     original_filename = fields.String(required=True)
     mime_type = fields.String(required=True)
     size_bytes = fields.Integer(required=True)
     fy = fields.String(allow_none=True, metadata={"description": 'e.g. "2026-27"'})
     period_label = fields.String(allow_none=True, metadata={"description": 'e.g. "Apr 2026"'})
-    ocr_status = fields.Enum(OcrStatus, by_value=True, required=True)
-    type_warning = fields.Enum(
-        DocumentType,
-        by_value=True,
+    ocr_status = fields.String(validate=validate.OneOf(list(OcrStatus)), required=True)
+    type_warning = fields.String(
         allow_none=True,
         metadata={"description": "What the file looks like when it differs from doc_type (DO9)"},
     )
@@ -66,7 +64,7 @@ class DocumentPageSchema(PageSchema):
 
 class DocumentListArgsSchema(PageArgsSchema):
     fy = fields.String(load_default=None, validate=_check_fy)
-    doc_type = fields.Enum(DocumentType, by_value=True, load_default=None)
+    doc_type = fields.String(validate=validate.OneOf(list(DocumentType)), load_default=None)
     compliance_item_id = fields.UUID(
         load_default=None, metadata={"description": "Only the documents of this filing"}
     )
@@ -75,13 +73,14 @@ class DocumentListArgsSchema(PageArgsSchema):
 class DocumentUploadFormSchema(Schema):
     """POST /documents (multipart/form-data), the text part."""
 
-    doc_type = fields.Enum(
-        DocumentType,
-        by_value=True,
+    doc_type = fields.String(
         required=True,
-        validate=validate.NoneOf(
-            [DocumentType.CERTIFICATE_OF_PRACTICE], error="This type cannot be uploaded here."
-        ),
+        validate=[
+            validate.OneOf(list(DocumentType)),
+            validate.NoneOf(
+                [DocumentType.CERTIFICATE_OF_PRACTICE], error="This type cannot be uploaded here."
+            ),
+        ],
     )
     fy = fields.String(load_default=None, validate=_check_fy)
     period_label = fields.String(load_default=None, validate=validate.Length(max=30))

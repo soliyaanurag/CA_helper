@@ -188,7 +188,7 @@ def sync_filings(business_id, profile: RegulatoryProfile, today: date, keep_ids=
     fy_start = financial_year_start(today)
     fy = fy_label(fy_start)
     audit = bool(profile.audit_applicable or profile.other_audit_applicable)
-    itr_form = profile.itr_form.value if profile.itr_form else None
+    itr_form = profile.itr_form
     templates = db.session.scalars(
         select(ObligationTemplate).where(
             ObligationTemplate.effective_from <= today,
@@ -888,7 +888,7 @@ def filing_stats(today: date | None = None) -> dict:
     due = 0
     late = 0
     for filing in db.session.scalars(select(ComplianceItem)):
-        by_status[filing.status.value] += 1
+        by_status[filing.status] += 1
         if filing.due_date < today:
             due += 1
             done = filing.status in DONE_STATUSES and filing.filed_at is not None

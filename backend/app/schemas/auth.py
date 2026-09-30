@@ -55,7 +55,7 @@ class UserSchema(Schema):
     id = fields.UUID(required=True)
     email = fields.String(required=True)
     full_name = fields.String(required=True)
-    role = fields.Enum(UserRole, by_value=True, required=True)
+    role = fields.String(validate=validate.OneOf(list(UserRole)), required=True)
 
 
 class LoginResponseSchema(Schema):
@@ -71,9 +71,7 @@ class SignupSchema(Schema):
     email = fields.Email(required=True, validate=validate.Length(max=254))
     password = _new_password_field()
     # Only businesses and CAs sign up; admins are created by `flask seed` or an admin.
-    role = fields.Enum(
-        UserRole,
-        by_value=True,
+    role = fields.String(
         required=True,
         validate=validate.OneOf([UserRole.BUSINESS, UserRole.CA], error="Choose business or ca."),
     )

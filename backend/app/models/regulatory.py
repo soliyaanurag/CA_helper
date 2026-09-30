@@ -17,7 +17,6 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import FormCode, only_codes, str_enum
 
 
 class NewsSourceKind(StrEnum):
@@ -45,7 +44,7 @@ class NewsSource(BaseModel):
 
     name: Mapped[str] = mapped_column(String(100))
     url: Mapped[str] = mapped_column(String(500), unique=True)
-    kind: Mapped[NewsSourceKind] = mapped_column(str_enum(NewsSourceKind))
+    kind: Mapped[str] = mapped_column(String(50))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
@@ -66,10 +65,8 @@ class RegulatoryChange(BaseModel):
     """A deadline or rule change extracted from an article, reviewed by an admin."""
 
     __tablename__ = "regulatory_changes"
-    __table_args__ = (only_codes("form_codes", [code.value for code in FormCode]),)
-
     article_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("news_articles.id"), index=True)
-    change_type: Mapped[ChangeType] = mapped_column(str_enum(ChangeType))
+    change_type: Mapped[str] = mapped_column(String(50))
     summary: Mapped[str] = mapped_column(Text)
     # The forms it affects, e.g. {gstr_3b}: an array of FormCode values.
     form_codes: Mapped[list[str]] = mapped_column(ARRAY(String(50)))
@@ -78,8 +75,8 @@ class RegulatoryChange(BaseModel):
     affected_categories: Mapped[dict] = mapped_column(JSONB)
     # The dates it mentions, e.g. {"old_due_date": "2026-10-20", "new_due_date": "2026-10-31"}.
     dates: Mapped[dict] = mapped_column(JSONB)
-    status: Mapped[RegulatoryChangeStatus] = mapped_column(
-        str_enum(RegulatoryChangeStatus), default=RegulatoryChangeStatus.PENDING
+    status: Mapped[str] = mapped_column(
+        String(50), default=RegulatoryChangeStatus.PENDING
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))

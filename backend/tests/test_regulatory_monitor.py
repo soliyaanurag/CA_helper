@@ -252,8 +252,8 @@ def test_gemini_extracts_the_change_as_pending(app, database, web, feed_source, 
 
     assert counts["changes"] == 1  # the unrelated article never reaches Gemini
     change = only_change(database)
-    assert change.status.value == "pending"
-    assert change.change_type.value == "due_date_extension"
+    assert change.status == "pending"
+    assert change.change_type == "due_date_extension"
     assert change.form_codes == ["gstr_3b"]
     assert change.dates == {
         "old_due_date": "2026-10-20",
@@ -281,7 +281,7 @@ def test_unknown_values_from_gemini_are_dropped(app, database, web, feed_source,
     scan(app)
 
     change = only_change(database)
-    assert change.change_type.value == "other"
+    assert change.change_type == "other"
     assert change.form_codes == ["gstr_3b"]
     assert change.affected_categories["states"] == ["Maharashtra"]
     assert "new_due_date" not in change.dates
@@ -304,7 +304,7 @@ def test_without_gemini_a_keyword_change_is_saved(app, database, web, feed_sourc
     change = only_change(database)
     assert change.summary == EXTENSION[0]
     assert change.form_codes == ["gstr_3b"]
-    assert change.change_type.value == "due_date_extension"
+    assert change.change_type == "due_date_extension"
     assert change.affected_categories == {"extracted_by": "keywords"}
 
 
@@ -316,7 +316,7 @@ def test_a_request_for_an_extension_is_not_called_an_extension(app, database, we
 
     scan(app)
 
-    assert only_change(database).change_type.value == "other"
+    assert only_change(database).change_type == "other"
 
 
 # --- RE4 + RE5: approval and who is told -------------------------------------------------
@@ -401,7 +401,7 @@ def test_a_change_for_another_scheme_or_state_tells_nobody(
 
 def test_a_filed_filing_is_not_affected(client, database, business, pending, admin):
     for item in compliance_service.list_filings(business):
-        if item.form_code.value == "gstr_3b":
+        if item.form_code == "gstr_3b":
             item.status = "filed"
     database.session.commit()
 

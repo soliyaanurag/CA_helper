@@ -29,7 +29,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-from app.models.enums import str_enum
 from app.utils.encryption import EncryptedString
 
 
@@ -91,7 +90,7 @@ class Business(BaseModel):
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True)
     legal_name: Mapped[str] = mapped_column(String(200))
-    entity_type: Mapped[EntityType] = mapped_column(str_enum(EntityType))
+    entity_type: Mapped[str] = mapped_column(String(50))
     state: Mapped[str] = mapped_column(String(50))  # Indian state or union territory
     address: Mapped[str] = mapped_column(String(500))
     description: Mapped[str] = mapped_column(String(1000))
@@ -129,11 +128,11 @@ class RegulatoryProfile(BaseModel):
     __tablename__ = "regulatory_profiles"
 
     business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), unique=True)
-    msme_tier: Mapped[MsmeTier] = mapped_column(str_enum(MsmeTier))
-    gst_scheme: Mapped[GstScheme] = mapped_column(str_enum(GstScheme))
+    msme_tier: Mapped[str] = mapped_column(String(50))
+    gst_scheme: Mapped[str] = mapped_column(String(50))
     # Not registered, but the rules suggest registering (e.g. turnover near the limit).
     gst_registration_suggested: Mapped[bool] = mapped_column(Boolean)
-    itr_form: Mapped[ItrForm] = mapped_column(str_enum(ItrForm))
+    itr_form: Mapped[str] = mapped_column(String(50))
     presumptive_eligible: Mapped[bool] = mapped_column(Boolean)
     # Tax audit under section 44AB (from turnover).
     audit_applicable: Mapped[bool] = mapped_column(Boolean)

@@ -307,7 +307,7 @@ def count_cas_by_status() -> dict:
     """{"pending": n, "verified": n, "rejected": n} over all CA profiles."""
     counts = {"pending": 0, "verified": 0, "rejected": 0}
     for status in db.session.scalars(select(CaProfile.verification_status)):
-        counts[status.value] += 1
+        counts[status] += 1
     return counts
 
 
@@ -1063,7 +1063,7 @@ def _check_status(engagement: Engagement, expected: EngagementStatus) -> None:
         raise ApiError(
             409,
             "INVALID_STATUS",
-            f"This engagement is {engagement.status.value}, so this is no longer possible.",
+            f"This engagement is {engagement.status}, so this is no longer possible.",
         )
 
 

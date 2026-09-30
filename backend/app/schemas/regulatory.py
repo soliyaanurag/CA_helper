@@ -8,7 +8,7 @@ from app.models.regulatory import NewsSourceKind, RegulatoryChangeStatus
 class ChangeListArgsSchema(Schema):
     """?status=pending | approved | rejected (empty = all)."""
 
-    status = fields.Enum(RegulatoryChangeStatus, by_value=True, load_default=None)
+    status = fields.String(validate=validate.OneOf(list(RegulatoryChangeStatus)), load_default=None)
 
 
 class RegulatoryChangeSchema(Schema):
@@ -36,7 +36,7 @@ class NewsSourceSchema(Schema):
     id = fields.UUID(required=True)
     name = fields.String(required=True)
     url = fields.String(required=True)
-    kind = fields.Enum(NewsSourceKind, by_value=True, required=True)
+    kind = fields.String(validate=validate.OneOf(list(NewsSourceKind)), required=True)
     enabled = fields.Boolean(required=True)
 
 
@@ -45,7 +45,7 @@ class NewsSourceInputSchema(Schema):
 
     name = fields.String(required=True, validate=validate.Length(1, 100))
     url = fields.URL(required=True, schemes={"https", "http"}, validate=validate.Length(max=500))
-    kind = fields.Enum(NewsSourceKind, by_value=True, required=True)
+    kind = fields.String(validate=validate.OneOf(list(NewsSourceKind)), required=True)
 
 
 class NewsSourceEnabledSchema(Schema):

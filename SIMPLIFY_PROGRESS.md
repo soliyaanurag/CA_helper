@@ -97,6 +97,19 @@ Checks (all inside the containers):
 - Checks: backend 629 passed; frontend 240 passed; build OK; snapshot no differences; demo walk 0 failures.
   Dev database recreated with `flask reset-db` + `flask seed-demo`.
 
+### 2.4 Enums -> String columns (done)
+- Every `str_enum(...)` column is now `String(50)` (`Mapped[str]`); the StrEnums stay next to their models and the
+  request schemas check them (`fields.String(validate=validate.OneOf(list(X)))` instead of `fields.Enum`).
+- Removed: `str_enum()`, `only_codes()` and every generated CHECK (enum values and the code-list checks on
+  `ca_profiles.languages/specializations` and `regulatory_changes.form_codes`).
+- Kept (hand-written, a reader expects them; section 4 does not list them): amounts/prices >= 0, stars 1-5,
+  GSTIN when GST registered, TAN when deducting TDS, CIN/LLPIN for LLPs and companies, valid rule periods, fy
+  format, quote needs a reason, checklist key not empty. **Unsure:** the plan says "the few CHECKs a reader
+  expects"; I kept these because removing them would change what the database accepts beyond section 4.
+- Loaded values are plain `str` now, so `.value` on a loaded column was removed (JWT role claim, counts, profile
+  facts, admin rows, regulatory change rows). StrEnum members still compare and hash equal to their values.
+- Checks: backend 622 passed; frontend 240 passed; build OK; snapshot no differences; demo walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -141,3 +154,9 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_schema_constraints.py::test_a_user_has_at_most_one_live_business, ..._one_live_filing_... | renamed without "live"; new constraint names | Cross-cutting: partial indexes -> UNIQUE |
 | test_schema_constraints.py::test_a_soft_deleted_business_does_not_block_a_new_one | deleted | Cross-cutting: soft delete removed |
 | test_schema_constraints.py::test_a_soft_deleted_filing_can_be_created_again | deleted | Cross-cutting: soft delete removed |
+| test_db_foundations.py::test_enum_stores_the_value_and_loads_the_member | renamed test_enum_stores_the_value; compares with == (a plain str loads back) | Cross-cutting: enums -> String columns |
+| test_db_foundations.py::test_enum_rejects_unknown_value_in_the_orm, ..._check_constraint_rejects_unknown_value_in_raw_sql, ..._check_constraint_has_a_stable_name, ..._values_must_be_lowercase_snake_case, ..._constraint_name_can_be_overridden | deleted (tested `str_enum()` and its generated CHECK) | Cross-cutting: enums -> String, no generated CHECKs |
+| tests/_models.py `Gadget.colour` | String(50) instead of str_enum | Cross-cutting: enums -> String columns |
+| test_marketplace_ca_profile.py::test_database_rejects_unknown_codes | deleted (generated code-list CHECK) | Cross-cutting: no generated CHECKs |
+| test_schema_constraints.py::test_an_unknown_enum_value_is_refused_even_in_raw_sql | deleted (generated enum CHECK) | Cross-cutting: no generated CHECKs |
+| test_regulatory_monitor.py (5 asserts) | `x.value == "..."` -> `x == "..."` (loaded values are str) | Cross-cutting: enums -> String columns |

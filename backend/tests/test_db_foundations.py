@@ -1,15 +1,11 @@
-"""BaseModel, the timestamp mixin, str_enum() and per-test cleanup."""
+"""BaseModel, the timestamp mixin, enum values stored as text, and per-test cleanup."""
 
 import uuid
 from datetime import timedelta
-from enum import StrEnum
 
-import pytest
 from sqlalchemy import func, select, text
-from sqlalchemy.exc import IntegrityError, StatementError
 
 from app.extensions import db
-from app.models.enums import str_enum
 from tests._models import Gadget, GadgetColour
 
 
@@ -63,10 +59,10 @@ def test_database_defaults_cover_raw_sql_inserts(database):
     assert row.updated_at is not None
 
 
-# --- str_enum() -----------------------------------------------------------------
+# --- Enum values in plain text columns -------------------------------------------
 
 
-def test_enum_stores_the_value_and_loads_the_member(database):
+def test_enum_stores_the_value(database):
     gadget = create_gadget(colour=GadgetColour.DARK_BLUE)
     db.session.expire_all()
 
@@ -74,46 +70,12 @@ def test_enum_stores_the_value_and_loads_the_member(database):
         text("SELECT colour FROM test_gadgets WHERE id = :id"), {"id": gadget.id}
     ).scalar_one()
     assert stored == "dark_blue"  # the value, not the member name DARK_BLUE
-    assert db.session.get(Gadget, gadget.id).colour is GadgetColour.DARK_BLUE
+    assert db.session.get(Gadget, gadget.id).colour == GadgetColour.DARK_BLUE
 
 
-def test_enum_rejects_unknown_value_in_the_orm(database):
-    db.session.add(Gadget(name="Bad", colour="purple"))
-
-    with pytest.raises(StatementError):
-        db.session.flush()
-    db.session.rollback()
 
 
-def test_enum_check_constraint_rejects_unknown_value_in_raw_sql(database):
-    with pytest.raises(IntegrityError, match="ck_test_gadgets_gadget_colour"):
-        db.session.execute(
-            text("INSERT INTO test_gadgets (id, name, colour) VALUES (:id, 'Bad', 'purple')"),
-            {"id": uuid.uuid4()},
-        )
-    db.session.rollback()
 
-
-def test_enum_check_constraint_has_a_stable_name(database):
-    names = db.session.execute(
-        text(
-            "SELECT conname FROM pg_constraint "
-            "WHERE conrelid = 'test_gadgets'::regclass AND contype = 'c'"
-        )
-    ).scalars()
-    assert set(names) == {"ck_test_gadgets_gadget_colour"}
-
-
-def test_enum_values_must_be_lowercase_snake_case():
-    class BadStatus(StrEnum):
-        DOCS_PENDING = "Docs pending"
-
-    with pytest.raises(ValueError, match="lowercase snake_case"):
-        str_enum(BadStatus)
-
-
-def test_enum_constraint_name_can_be_overridden():
-    assert str_enum(GadgetColour, name="paint").name == "paint"
 
 
 # --- Per-test cleanup (conftest.py `database`) ------------------------------------

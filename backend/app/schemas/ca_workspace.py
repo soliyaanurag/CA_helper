@@ -37,11 +37,11 @@ class CaClientSchema(Schema):
 class DocumentRequestSchema(Schema):
     id = fields.UUID(required=True)
     compliance_item_id = fields.UUID(required=True)
-    form_code = fields.Enum(FormCode, by_value=True, allow_none=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), allow_none=True)
     period_label = fields.String(allow_none=True)
     checklist_key = fields.String(required=True, metadata={"description": 'or "general"'})
     message = fields.String(required=True)
-    status = fields.Enum(DocumentRequestStatus, by_value=True, required=True)
+    status = fields.String(validate=validate.OneOf(list(DocumentRequestStatus)), required=True)
     created_at = fields.DateTime(required=True)
     fulfilled_at = fields.DateTime(allow_none=True)
     document_id = fields.UUID(allow_none=True)
@@ -54,7 +54,7 @@ class BusinessDocumentRequestSchema(DocumentRequestSchema):
 class ClientDocumentSchema(Schema):
     document_id = fields.UUID(required=True)
     original_filename = fields.String(required=True)
-    doc_type = fields.Enum(DocumentType, by_value=True, required=True)
+    doc_type = fields.String(validate=validate.OneOf(list(DocumentType)), required=True)
     size_bytes = fields.Integer(required=True)
     created_at = fields.DateTime(required=True)
     checklist_key = fields.String(
@@ -80,7 +80,7 @@ class BatchFilingSchema(Schema):
     business_name = fields.String(required=True)
     compliance_item_id = fields.UUID(required=True)
     period_label = fields.String(required=True)
-    status = fields.Enum(ComplianceStatus, by_value=True, required=True)
+    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
     required_total = fields.Integer(required=True)
     required_ready = fields.Integer(required=True)
     missing = fields.List(fields.String(), required=True)
@@ -90,7 +90,7 @@ class BatchFilingSchema(Schema):
 class BatchSchema(Schema):
     """One form due on one day across clients (CW7)."""
 
-    form_code = fields.Enum(FormCode, by_value=True, required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
     due_date = fields.Date(required=True)
     ready_count = fields.Integer(required=True)
     filings = fields.List(fields.Nested(BatchFilingSchema), required=True)
@@ -123,7 +123,7 @@ class FulfilSchema(Schema):
 
 class CaMarkFiledResultSchema(Schema):
     compliance_item_id = fields.UUID(required=True)
-    status = fields.Enum(ComplianceStatus, by_value=True, required=True)
+    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
     acknowledgement_no = fields.String(allow_none=True)
     engagement_completed = fields.Boolean(
         required=True, metadata={"description": "True when this was the engagement's last filing"}

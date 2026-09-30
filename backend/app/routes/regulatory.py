@@ -37,10 +37,7 @@ blp = Blueprint("regulatory", __name__, description="Regulatory news monitor (ad
 @blp.arguments(ChangeListArgsSchema, location="query")
 @blp.response(200, RegulatoryChangeSchema(many=True))
 def list_changes(args):
-    status = None
-    if args["status"] is not None:
-        status = args["status"].value
-    return regulatory_service.list_changes(status)
+    return regulatory_service.list_changes(args["status"])
 
 
 # Approve a change: the affected businesses get a tray entry and an email, their CAs a
