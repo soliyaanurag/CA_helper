@@ -110,7 +110,7 @@ export function OnboardingPage() {
 const AMOUNT = /^[0-9]+(\.[0-9]{1,2})?$/; // rupees, e.g. 4500000 or 4500000.50
 const GSTIN_FORMAT = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 
-// The same rules as BusinessInputSchema in backend/app/schemas/onboarding.py.
+// The same rules as the checks in backend/app/onboarding.py.
 // `states` is [{name, code}]: the state must be one of them, and a GSTIN must fit it.
 function makeSchema(states) {
   const codeOf = Object.fromEntries(states.map((state) => [state.name, state.code]));
@@ -450,7 +450,7 @@ function BusinessForm({ states, business, onSaved, onCancel }) {
   );
 }
 
-// The form fields ON13 can fill, with the names people see.
+// The form fields "Fill in from a document" can fill, with the names people see.
 const FILLABLE = {
   legal_name: "business name",
   entity_type: "type of business",
@@ -460,7 +460,7 @@ const FILLABLE = {
 };
 
 /**
- * ON13: "Fill in from a document". The server reads a GST certificate or PAN card with
+ * "Fill in from a document": The server reads a GST certificate or PAN card with
  * OCR (locally; the file is not stored) and the found values go into the form. The user
  * checks them before registering.
  */
@@ -710,7 +710,7 @@ function WhatChanged({ changes }) {
 // --- NicCodeCard -------------------------------------------------------------------------------
 
 /**
- * "Business activity (NIC code)" on the Business profile page (ON10).
+ * "Business activity (NIC code)" on the Business profile page.
  *
  * 1. "Suggest codes" asks the backend for up to 3 real codes that fit the description
  *    (Gemini's picks, or keyword matches when AI is not available).

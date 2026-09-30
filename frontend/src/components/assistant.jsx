@@ -22,7 +22,7 @@ const EXAMPLES = [
 ];
 
 /**
- * The AI assistant conversation (AS2-AS5), used by the floating AssistantWidget and the
+ * The AI assistant conversation, used by the floating AssistantWidget and the
  * /business/assistant page. Answers come from our guides and official FAQs and list their
  * sources; "Ask a CA" links to the marketplace for business owners.
  */

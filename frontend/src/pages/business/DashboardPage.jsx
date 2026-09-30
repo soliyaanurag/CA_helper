@@ -130,7 +130,7 @@ function NumberCard({ title, value, note, alert }) {
 function ToDo({ filings, engagements }) {
   const requests = useMyDocumentRequests();
   const tasks = [];
-  // Documents a CA asked for (CW4), first: someone is waiting for them.
+  // Documents a CA asked for, first: someone is waiting for them.
   for (const request of requests.data ?? []) {
     tasks.push({
       key: request.id,

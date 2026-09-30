@@ -162,7 +162,7 @@ function BusinessActions({ engagement }) {
   );
 }
 
-// MA17: rate the CA once the work is completed (1 to 5 stars and an optional review).
+// Rate the CA once the work is completed (1 to 5 stars and an optional review).
 function RateForm({ engagement }) {
   const queryClient = useQueryClient();
   const [stars, setStars] = useState(0);

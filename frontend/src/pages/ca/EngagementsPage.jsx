@@ -34,7 +34,7 @@ const GROUPS = [
   { title: "Finished", statuses: ["completed", "declined", "expired", "cancelled"] },
 ];
 
-// The same limits as QuotePriceInputSchema in backend/app/schemas/marketplace.py.
+// The same limits as the checks in backend/app/marketplace.py.
 const MAX_PRICE = 1000000;
 
 // /ca/engagements: every request businesses sent to this CA, grouped by status, with

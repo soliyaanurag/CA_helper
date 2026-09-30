@@ -19,8 +19,7 @@ export function cn(...inputs) {
  *
  * The API and database store lowercase snake_case codes (e.g. "ca"); people see
  * these labels ("Chartered Accountant"). This file is the only place the frontend
- * turns codes into text. Codes and labels must match the "Status values" tables in
- * docs/DATA_MODEL.md; add a map here when a new enum reaches the UI.
+ * turns codes into text; add a map here when a new enum reaches the UI.
  *
  * Usage: label(USER_ROLE_LABELS, user.role)
  */
@@ -129,7 +128,7 @@ export const FORM_LABELS = {
  * Forms renamed by law, shown under the new name from the first financial year given (the
  * code stays). The Income-tax Act, 2025 renamed the quarterly TDS statements from tax year
  * 2026-27: 24Q is Form 138 and 26Q is Form 140. Same list as RENAMED_FORMS in
- * backend/app/services/compliance_service.py.
+ * backend/app/compliance.py.
  */
 export const RENAMED_FORMS = {
   tds_24q: { fromFy: "2026-27", name: "Form 138 (earlier 24Q)" },
@@ -351,7 +350,7 @@ export function isPast(isoTimestamp) {
 // --- gstin -------------------------------------------------------------------------------------
 
 /**
- * GSTIN checks, the same as backend/app/utils/gstin.py (and the same messages).
+ * GSTIN checks, the same as backend/app/utils.py (and the same messages).
  *
  *   gstinError("27ABCDE1234F1Z0", "ABCDE1234F", "27")   -> null (fine)
  *
@@ -436,7 +435,7 @@ export function clearSession() {
 
 /**
  * Zod rules shared by the account forms (signup, verify email, reset and change
- * password). The backend checks the same rules in backend/app/schemas/auth.py.
+ * password). The backend checks the same rules in backend/app/auth.py.
  */
 
 export const PASSWORD_RULE_TEXT =

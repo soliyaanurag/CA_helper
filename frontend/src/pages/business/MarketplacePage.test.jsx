@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -110,46 +110,6 @@ describe("Find a CA page", () => {
     renderApp("/business/marketplace");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Something broke.");
-  });
-
-  it("ranks for my filings: prices, same city, why this CA, and greyed CAs offering none", async () => {
-    loginAs("business");
-    fakeApi({
-      [`GET ${URL}`]: page([
-        ca({
-          full_name: "Zara Near",
-          my_prices: [{ form_code: "gstr_3b", price: "600.00" }],
-          same_city: true,
-          match_score: 35,
-          match_reasons: [
-            { reason: "Handles 1 of your filings (GSTR-3B)", points: 20 },
-            { reason: "In your city (Pune)", points: 15 },
-          ],
-        }),
-        ca({
-          full_name: "Aaron Far",
-          my_prices: [],
-          same_city: false,
-          match_score: 0,
-          match_reasons: [],
-        }),
-      ]),
-    });
-    renderApp("/business/marketplace");
-
-    const near = (await screen.findByRole("heading", { name: "Zara Near" })).closest("a");
-    const far = screen.getByRole("heading", { name: "Aaron Far" }).closest("a");
-    expect(within(near).getByLabelText("Prices for your filings")).toHaveTextContent(
-      "GSTR-3B from ₹600",
-    );
-    expect(within(near).getByText("Same city")).toBeInTheDocument();
-    const why = within(near).getByLabelText("Why this CA");
-    expect(why).toHaveTextContent("(match 35)");
-    expect(why).toHaveTextContent("Handles 1 of your filings (GSTR-3B) (+20)");
-    expect(why).toHaveTextContent("In your city (Pune) (+15)");
-    expect(within(far).queryByLabelText("Why this CA")).not.toBeInTheDocument();
-    expect(within(far).getByText("Offers none of your filings.")).toBeInTheDocument();
-    expect(far.firstChild).toHaveClass("opacity-60");
   });
 
   it("shows a CA's average rating on the card", async () => {

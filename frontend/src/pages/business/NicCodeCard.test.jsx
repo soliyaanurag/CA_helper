@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
 
-// The "Business activity (NIC code)" card on the Business profile page (ON10).
+// The "Business activity (NIC code)" card on the Business profile page.
 
 const BUSINESS_URL = "/api/v1/onboarding/business";
 const SUGGEST = "POST /api/v1/onboarding/nic-suggestions";

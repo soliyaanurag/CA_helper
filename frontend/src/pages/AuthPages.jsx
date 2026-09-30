@@ -144,10 +144,7 @@ const loginSchema = z.object({
 /** What to tell the user for each login error code from the API. */
 const LOGIN_ERROR_TEXT = {
   INVALID_CREDENTIALS: "Wrong email or password.",
-  ACCOUNT_INACTIVE:
-    "This account is suspended. Contact the CA Helper team if you think this is a mistake.",
   EMAIL_NOT_VERIFIED: "Your email is not verified yet.",
-  TOO_MANY_REQUESTS: "Too many login attempts. Wait a minute and try again.",
 };
 
 function errorText(error) {
@@ -434,9 +431,7 @@ export function VerifyEmailPage() {
     setResending(true);
     try {
       await resendVerificationCode(getValues("email"));
-      setNotice(
-        "If this email is waiting to be verified, we sent it a new code. We send at most one code a minute.",
-      );
+      setNotice("We sent a new code to this email.");
     } catch (error) {
       setServerError(errorMessage(error));
     } finally {
@@ -609,9 +604,7 @@ export function ResetPasswordPage() {
     setResending(true);
     try {
       await forgotPassword(getValues("email"));
-      setNotice(
-        "If this email has an account, we sent it a new code. We send at most one code a minute.",
-      );
+      setNotice("We sent a new code to this email.");
     } catch (error) {
       setServerError(errorMessage(error));
     } finally {
@@ -622,7 +615,7 @@ export function ResetPasswordPage() {
   return (
     <FormCard
       title="Reset your password"
-      description="If an account uses this email, we sent it a 6-digit code. Enter it and choose a new password."
+      description="We sent a 6-digit code to your email. Enter it and choose a new password."
     >
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
         <FormField

@@ -333,7 +333,7 @@ function DocumentRow({ document }) {
       <td className="py-2 pr-4 break-all">{document.original_filename}</td>
       <td className="py-2 pr-4">
         {label(DOCUMENT_TYPE_LABELS, document.doc_type)}
-        {/* DO9: the file was read (OCR) and looks like another type. */}
+        {/* The file was read (OCR) and looks like another type. */}
         {document.type_warning && (
           <span className="block text-xs text-amber-700">
             Looks like: {label(DOCUMENT_TYPE_LABELS, document.type_warning)}

@@ -417,6 +417,37 @@ Done (with a script; imports merged and rewritten everywhere):
 Results: backend 598 passed; frontend 240 passed (34 files); build OK; snapshot 102 known, 0 unexplained; walk 0
 failures.
 
+## Step 6b: frontend behaviour changes (section 4 items)
+
+Done:
+- Admin: the audit log page, its route, its sidebar link and `useAuditLog` removed; the Suspend / Reactivate buttons,
+  the "Account" column (`is_active`) and `suspendUser` / `reactivateUser` removed.
+- Find a CA: the "Why this CA" box, the match score, the "Same city" badge, the "Prices for your filings" line and the
+  greying of CAs offering none removed. The card still shows the chosen service's price and the typical-fee hint.
+- Consent gate removed: `AcceptTermsGate`, `termsAccepted`, `acceptTerms` (auth.jsx, routes.jsx, api.js). The signup
+  terms checkbox stays.
+- Settings: the two notification settings pages (per-type switches) are replaced by `pages/SettingsPage.jsx`, one
+  "Email me my notifications" switch (GET/PUT `/api/v1/auth/settings` `{email_notifications}`), at `/business/settings`
+  and `/ca/settings`. The sidebar label stays "Notification settings", which is what the emails tell people to open.
+- Regulatory admin page: tabs "Changes" (every change, with "Sent <time> · N business(es) told" or "Not sent to
+  anyone") and "Sources" (unchanged, Scan now says "N change(s) found"). No Approve / Reject.
+- New `pages/business/RegulatoryUpdatesPage.jsx` at `/business/updates` and `/ca/updates`, sidebar link "Regulatory
+  updates" for both roles; keyword-only changes carry the badge "Found by keywords: read the article". The change card
+  is shared with the admin page (`RegulatoryChangeCard` in components/shared.jsx).
+- Auth texts that described removed behaviour: the login messages for ACCOUNT_INACTIVE (suspended) and
+  TOO_MANY_REQUESTS (429) removed; "If this email has an account ... at most one code a minute" notices now say
+  "We sent a new code to this email." (resend / forgot now answer 404 or 409 for unknown or verified emails, and the
+  page shows that error).
+- Style pass over the frontend: task ids (CO5, MA17, ...) and paths of deleted files (backend/app/routes/...,
+  schemas/..., context/..., Swagger, docs/...) removed from comments; unused imports dropped; imports sorted.
+
+Results: backend 598 passed; frontend 235 passed (35 files); build OK; snapshot 102 known, 0 unexplained; walk 0
+failures. The new pages are covered by frontend tests against the real response shapes; clicking through them in a
+browser is listed for the user at the end.
+
+Uncertain: the tray link of a regulatory notification still opens `/business/compliance` (a backend value; changing
+it to the new page would be a behaviour change section 4 does not list).
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -512,3 +543,12 @@ failures.
 | test_worker.py::test_jobs_run_inside_app_context | adapted: internal rename (calls `run_job` in a thread instead of `AppScheduler`; same assertion); new test_the_worker_has_its_four_jobs checks the 4 ids and schedules | Q5 answer (not section 4) |
 | test_app_factory.py::test_api_root_redirects_to_the_docs | renamed test_api_root_redirects_to_the_health_check; expects Location `/api/health`; the "`/` is not in the OpenAPI paths" check removed (there is no OpenAPI spec any more) | flask-smorest removed (sections 1 and 6), Q4 answer (redirect to /api/health) |
 | every frontend test file | imports updated to the merged modules; api/client, lib/* and context/AuthProvider tests moved to api.test.js, lib.test.js, auth.test.jsx (no assertion changed) | step 6 file merges (import paths only) |
+| MarketplacePage.test.jsx::ranks for my filings: prices, same city, why this CA, and greyed CAs offering none | deleted | marketplace: matching score, match_reasons, my_prices, same_city and the ranking removed |
+| auth.test.jsx::consent > asks a user from before consent once, then shows the app | deleted | auth: accept-terms endpoint and consent gate removed |
+| auth.test.jsx::consent > does not ask a user who already accepted | renamed "login > goes straight to the app, with no consent step"; the login fixture has no terms_accepted; same assertions | auth: consent gate removed |
+| LoginPage.test.jsx::shows a clear message for 403 ACCOUNT_INACTIVE / 429 TOO_MANY_REQUESTS | the two it.each rows deleted (login no longer answers them) | admin: suspend removed; Cross-cutting: rate limiting removed |
+| VerifyEmailPage.test.jsx::sends a new code on request, ResetPasswordPage.test.jsx::can send a new code | expect "We sent a new code to this email." (was "...we sent it a new code") | auth: "always 204" answers and the one-code-per-minute wait removed |
+| AdminUsersPage.test.jsx::admin: suspend and reactivate (2 tests), admin: audit log (1 test) | deleted; the users fixture has no is_active | admin: suspend, reactivate, audit log removed |
+| RegulatoryAdminPage.test.jsx (all 4) | fixtures without status/reviewed_at and with notified_at; one GET without ?status; "approves a change" replaced by "says how many businesses a change was sent to" (and no Approve button); keyword badge text "Found by keywords: read the article" + "Not sent to anyone"; scan text "1 change(s) found." | regulatory: no admin approval; keyword-only changes marked |
+| business/AlertsPage.test.jsx (3 tests) | moved to pages/SettingsPage.test.jsx and rewritten for one switch (PUT body {email_notifications: false}; one checkbox; CA link /ca/settings) | alerts: notification_settings replaced by users.email_notifications and one switch |
+| business/RegulatoryUpdatesPage.test.jsx (new, 2 tests) | added | regulatory: new Regulatory updates page |

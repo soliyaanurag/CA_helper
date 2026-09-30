@@ -9,23 +9,22 @@ import { useQuery } from "@tanstack/react-query";
  *   apiFetch("/api/v1/auth/login", { method: "POST", body: { email, password } })
  *
  * - Every URL is the full path ("/api/v1/..."). The Vite dev server forwards /api
- *   to Flask, so requests go to the page's own origin. Request and response fields
- *   are listed in Swagger at /api/docs.
+ *   to Flask, so requests go to the page's own origin.
  * - Sends `body` as JSON (a FormData body, for file uploads, as it is) and returns the
  *   parsed JSON response (null if there is none). apiDownload() gets a file instead.
  * - Adds `Authorization: Bearer <token>` while someone is logged in.
  * - Throws ApiRequestError (status, code, message) for every error response.
  * - A 401 on a request that carried a token logs the user out (the token expired or
- *   the account was deactivated).
+ *   the account no longer exists).
  * - A request with no answer after REQUEST_TIMEOUT_MS fails with code TIMEOUT, so a
  *   hung server shows a clear message instead of a page that never finishes.
  *
- * Usage, in api/<module>.js:
+ * Usage, in the hooks below:
  *   queryFn: () => apiFetch("/api/v1/<module>/<resource>"),
  */
 
 /**
- * A failed API call, carrying the standard error body (docs/API_CONVENTIONS.md):
+ * A failed API call, carrying the standard error body { error: { code, message } }:
  * switch on `code` (e.g. "INVALID_CREDENTIALS") and show `message`.
  */
 export class ApiRequestError extends Error {
@@ -41,7 +40,7 @@ export class ApiRequestError extends Error {
 export const REQUEST_TIMEOUT_MS = 20_000;
 
 // The logged-in user's token and how to log them out. AuthProvider
-// (context/AuthProvider.jsx) sets both through setAuth() whenever the session changes.
+// (auth.jsx) sets both through setAuth() whenever the session changes.
 let accessToken = null;
 let logout = () => {};
 
@@ -139,8 +138,8 @@ export function useHealth() {
 // --- auth --------------------------------------------------------------------------------------
 
 /**
- * API calls for accounts (backend/app/routes/auth.py): signup, email verification
- * and passwords. Login itself is in context/AuthProvider.jsx, because it changes
+ * API calls for accounts (backend/app/auth.py): signup, email verification
+ * and passwords. Login itself is in auth.jsx, because it changes
  * the session. Every call goes through apiFetch(), so a failure throws
  * ApiRequestError (code, message). Endpoints that answer 204 resolve to null.
  */
@@ -155,22 +154,17 @@ export function signup({ full_name, email, password, role }) {
   return post("/api/v1/auth/signup", { full_name, email, password, role, terms_accepted: true });
 }
 
-/** POST /api/v1/auth/accept-terms: consent from a user who signed up before it was asked */
-export function acceptTerms() {
-  return post("/api/v1/auth/accept-terms");
-}
-
 /** POST /api/v1/auth/verify-email: the 6-digit code emailed at signup */
 export function verifyEmail(email, code) {
   return post("/api/v1/auth/verify-email", { email, code });
 }
 
-/** POST /api/v1/auth/verify-email/resend: emails a new code (at most one a minute) */
+/** POST /api/v1/auth/verify-email/resend: emails a new code */
 export function resendVerificationCode(email) {
   return post("/api/v1/auth/verify-email/resend", { email });
 }
 
-/** POST /api/v1/auth/forgot-password: emails a reset code (at most one a minute) */
+/** POST /api/v1/auth/forgot-password: emails a reset code */
 export function forgotPassword(email) {
   return post("/api/v1/auth/forgot-password", { email });
 }
@@ -188,10 +182,28 @@ export function changePassword(currentPassword, newPassword) {
   });
 }
 
+export const SETTINGS_KEY = ["auth", "settings"];
+
+/** GET /api/v1/auth/settings: { email_notifications } */
+export function useSettings() {
+  return useQuery({
+    queryKey: SETTINGS_KEY,
+    queryFn: () => apiFetch("/api/v1/auth/settings"),
+  });
+}
+
+/** PUT /api/v1/auth/settings: switch the notification emails on or off; returns the settings */
+export function saveSettings(emailNotifications) {
+  return apiFetch("/api/v1/auth/settings", {
+    method: "PUT",
+    body: { email_notifications: emailNotifications },
+  });
+}
+
 // --- onboarding --------------------------------------------------------------------------------
 
 /**
- * All calls to the onboarding backend (backend/app/routes/onboarding.py).
+ * All calls to the onboarding backend (backend/app/onboarding.py).
  * Pages use these functions instead of calling the backend themselves.
  */
 
@@ -259,7 +271,7 @@ export function useGstStates() {
   });
 }
 
-// ON13: reads a GST certificate or PAN card on the server (locally, never stored) and
+// Reads a GST certificate or PAN card on the server (locally, never stored) and
 // returns what it found: { found: { pan?, gstin?, legal_name?, state?, entity_type? } }.
 export function readRegistrationDocument(file) {
   const form = new FormData();
@@ -270,7 +282,7 @@ export function readRegistrationDocument(file) {
 // --- compliance --------------------------------------------------------------------------------
 
 /**
- * All calls to the compliance backend (backend/app/routes/compliance.py).
+ * All calls to the compliance backend (backend/app/compliance.py).
  * Pages use these functions instead of calling the backend themselves.
  */
 
@@ -303,7 +315,7 @@ export function useFilings() {
   return useQuery({ queryKey: FILINGS_KEY, queryFn: fetchFilings });
 }
 
-// --- One filing's page (CO5, CO7, CO8, CO9) -----------------------------------------
+// --- One filing's page ---------------------------------------------------------------------
 
 // Name of one filing in the query cache. The actions below return the updated filing,
 // and FilingPage puts it there.
@@ -375,7 +387,7 @@ export function usePeerInsights(itemId) {
 // --- documents ---------------------------------------------------------------------------------
 
 /**
- * All calls to the documents backend (backend/app/routes/documents.py): the vault and
+ * All calls to the documents backend (backend/app/documents.py): the vault and
  * the links between documents and filings. Pages use these functions instead of
  * calling the backend themselves.
  */
@@ -466,7 +478,7 @@ export async function downloadDocument(document) {
 // --- alerts ------------------------------------------------------------------------------------
 
 /**
- * All calls to the alerts backend (backend/app/routes/alerts.py): the notification
+ * All calls to the alerts backend (backend/app/alerts.py): the notification
  * tray, email settings and the penalty estimator.
  * Pages use these functions instead of calling the backend themselves.
  */
@@ -503,24 +515,7 @@ export function markAllNotificationsRead() {
   return apiFetch("/api/v1/alerts/notifications/read-all", { method: "POST" });
 }
 
-// --- Email settings (AL3) ---------------------------------------------------------------
-
-export const SETTINGS_KEY = ["alerts", "settings"];
-
-// { items: [{ type, email_enabled }], always_emailed: [types] }
-export function useNotificationSettings() {
-  return useQuery({
-    queryKey: SETTINGS_KEY,
-    queryFn: () => apiFetch("/api/v1/alerts/settings"),
-  });
-}
-
-// items: [{ type, email_enabled }]. Returns the saved settings.
-export function saveNotificationSettings(items) {
-  return apiFetch("/api/v1/alerts/settings", { method: "PUT", body: { items } });
-}
-
-// --- Penalty estimates (AL5) --------------------------------------------------------------
+// --- Penalty estimates ---------------------------------------------------------------------
 
 // One filing's estimate. taxDue ("" or an amount) adds the interest.
 export function usePenaltyEstimate(itemId, taxDue, enabled) {
@@ -544,7 +539,7 @@ export function usePenaltyExposure(enabled) {
 // --- marketplace -------------------------------------------------------------------------------
 
 /**
- * All calls to the marketplace backend (backend/app/routes/marketplace.py).
+ * All calls to the marketplace backend (backend/app/marketplace.py).
  * Pages use these functions instead of calling the backend themselves.
  */
 
@@ -638,7 +633,7 @@ export function saveCaServices(items) {
   return apiFetch("/api/v1/marketplace/ca-services", { method: "PUT", body: { items } });
 }
 
-// --- Engagements (a business working with a CA) ---
+// --- Engagements (a business working with a CA) --------------------------------------------
 
 // Names in the query cache. Pages refresh them after an action.
 export const MY_ENGAGEMENTS_KEY = ["marketplace", "my-engagements"];
@@ -705,7 +700,7 @@ export function engagementAction(engagementId, action, body) {
   });
 }
 
-// --- Pro-bono queue (MA16) ---
+// --- Pro-bono queue ------------------------------------------------------------------------
 
 export const PRO_BONO_KEY = ["marketplace", "pro-bono"];
 export const PRO_BONO_QUEUE_KEY = ["marketplace", "pro-bono-queue"];
@@ -756,7 +751,7 @@ export function acceptProBonoRequest(requestId) {
 // --- caWorkspace -------------------------------------------------------------------------------
 
 /**
- * API calls for the ca_workspace module (backend/app/routes/ca_workspace.py): the CA's
+ * API calls for the ca_workspace module (backend/app/ca_workspace.py): the CA's
  * clients, a client's workspace, the batch view, document requests and "mark filed".
  * Every call goes through apiFetch(), so failures are ApiRequestError (code, message).
  */
@@ -833,7 +828,7 @@ export function caMarkFiled(businessId, itemId, acknowledgementNo, file) {
   );
 }
 
-// --- The business side: its CAs' open requests (to-dos) ----------------------------
+// --- The business side: its CAs' open requests (to-dos) ------------------------------------
 
 /**
  * GET /api/v1/ca-workspace/document-requests[?compliance_item_id=]: the business's open
@@ -858,32 +853,29 @@ export function fulfilDocumentRequest(requestId, documentId) {
 
 // --- regulatory --------------------------------------------------------------------------------
 
-/**
- * All calls to the regulatory monitor (backend/app/routes/regulatory.py). Admins only.
- */
-
-// Names in the query cache; the page refreshes them after an action.
+// Names in the query cache; the pages refresh them after an action.
 export const REGULATORY_CHANGES_KEY = ["regulatory", "changes"];
 export const NEWS_SOURCES_KEY = ["regulatory", "sources"];
 
-// Changes found in the news, newest first. `status` is "pending", "approved" or "rejected".
-// Each: { id, change_type, summary, form_codes, affected_categories, dates, status,
-// article_title, article_url, source_name, published_at, match_count, ... }
-export function useRegulatoryChanges(status) {
+// A change found in the news: { id, change_type, summary, form_codes,
+// affected_categories, dates, created_at, notified_at, article_title, article_url,
+// published_at, source_name, match_count }. affected_categories.extracted_by is
+// "keywords" when Gemini did not read the article (then nobody was told).
+
+// Business and CA: the changes about my forms, newest first.
+export function useRegulatoryUpdates() {
   return useQuery({
-    queryKey: [...REGULATORY_CHANGES_KEY, status],
-    queryFn: () => apiFetch("/api/v1/admin/regulatory/changes?status=" + status),
+    queryKey: ["regulatory", "updates"],
+    queryFn: () => apiFetch("/api/v1/regulatory/updates"),
   });
 }
 
-// Approve a change: the affected businesses and their CAs are told.
-export function approveChange(changeId) {
-  return apiFetch(`/api/v1/admin/regulatory/changes/${changeId}/approve`, { method: "POST" });
-}
-
-// Reject a change: nobody is told.
-export function rejectChange(changeId) {
-  return apiFetch(`/api/v1/admin/regulatory/changes/${changeId}/reject`, { method: "POST" });
+// Admin: every change found in the news, newest first.
+export function useRegulatoryChanges() {
+  return useQuery({
+    queryKey: REGULATORY_CHANGES_KEY,
+    queryFn: () => apiFetch("/api/v1/admin/regulatory/changes"),
+  });
 }
 
 // The news sources: [{ id, name, url, kind: "rss" | "html", enabled }].
@@ -913,7 +905,7 @@ export function scanNewsNow() {
 // --- assistant ---------------------------------------------------------------------------------
 
 /**
- * All calls to the AI assistant backend (backend/app/routes/assistant.py).
+ * All calls to the AI assistant backend (backend/app/assistant.py).
  * Pages use these functions instead of calling the backend themselves.
  */
 
@@ -1011,27 +1003,4 @@ export function verifyCa(caId) {
 
 export function rejectCa(caId, reason) {
   return apiFetch("/api/v1/admin/cas/" + caId + "/reject", { method: "POST", body: { reason } });
-}
-
-// Suspend an account (it cannot log in); the reason is optional and kept in the audit log.
-export function suspendUser(userId, reason) {
-  return apiFetch("/api/v1/admin/users/" + userId + "/suspend", {
-    method: "POST",
-    body: { reason: reason || null },
-  });
-}
-
-export function reactivateUser(userId) {
-  return apiFetch("/api/v1/admin/users/" + userId + "/reactivate", { method: "POST" });
-}
-
-/**
- * GET /api/v1/admin/audit-log?page=: { items: [{ id, admin_name, action, target_type,
- * target_id, target_name, details, created_at }], page, page_size, total }, newest first.
- */
-export function useAuditLog(page) {
-  return useQuery({
-    queryKey: ["admin", "audit-log", page],
-    queryFn: () => apiFetch("/api/v1/admin/audit-log?page=" + page),
-  });
 }

@@ -42,7 +42,7 @@ import {
 
 // --- CaProfilePage -----------------------------------------------------------------------------
 
-// The same rules as CaProfileInputSchema in backend/app/schemas/marketplace.py.
+// The same rules as the checks in backend/app/marketplace.py.
 const profileSchema = z.object({
   membership_no: z.string().regex(/^[0-9]{6}$/, "Enter your 6-digit ICAI membership number."),
   cop_number: z.string().trim().min(1, "Enter your Certificate of Practice number.").max(20),
@@ -448,7 +448,7 @@ function firstFile(files) {
 
 // --- CaServicesPage ----------------------------------------------------------------------------
 
-// The same limits as CaServicePriceSchema in backend/app/schemas/marketplace.py.
+// The same limits as the checks in backend/app/marketplace.py.
 const MIN_PRICE = 1;
 const MAX_PRICE = 1000000;
 const PRICE_ERROR = "Enter a price from 1 to 10,00,000.";

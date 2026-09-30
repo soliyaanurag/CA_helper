@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from "react";
 
-import { acceptTerms as sendAcceptTerms, apiFetch, setAuth } from "@/api";
+import { apiFetch, setAuth } from "@/api";
 import { clearSession, loadSession, saveSession } from "@/lib";
 
 // --- AuthProvider ------------------------------------------------------------------------------
@@ -9,7 +9,7 @@ import { clearSession, loadSession, saveSession } from "@/lib";
 /**
  * Holds the session (token + user) and hands it to the API client (setAuth), so
  * apiFetch() sends the token with every request and ends the session on a 401
- * (expired/invalid token, or the account was deactivated).
+ * (expired or invalid token, or the account no longer exists).
  * The route guards (RequireRole) then send the user to /login: after an expired
  * session they remember the page for the next login, after the Log out button they
  * do not (`loggedOutOnPurpose`).
@@ -41,35 +41,21 @@ export function AuthProvider({ children }) {
       method: "POST",
       body: { email, password },
     });
-    // termsAccepted: false for a user who signed up before consent was asked (asked once).
-    const next = {
-      accessToken: data.access_token,
-      user: data.user,
-      termsAccepted: data.terms_accepted,
-    };
+    const next = { accessToken: data.access_token, user: data.user };
     saveSession(next);
     setLoggedOutOnPurpose(false);
     setSession(next);
     return data.user;
   }, []);
 
-  const acceptTerms = useCallback(async () => {
-    await sendAcceptTerms();
-    const next = { ...loadSession(), termsAccepted: true };
-    saveSession(next);
-    setSession(next);
-  }, []);
-
   const value = useMemo(
     () => ({
       user: session?.user ?? null,
-      termsAccepted: session?.termsAccepted,
       login,
       logout,
-      acceptTerms,
       loggedOutOnPurpose,
     }),
-    [session, login, logout, acceptTerms, loggedOutOnPurpose],
+    [session, login, logout, loggedOutOnPurpose],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;
@@ -83,8 +69,6 @@ export function AuthProvider({ children }) {
  * - login(email, password): calls the login endpoint and returns the user; throws
  *   ApiRequestError (e.g. code INVALID_CREDENTIALS) on failure;
  * - logout(): the Log out button;
- * - termsAccepted: false for a user who signed up before consent was asked (then
- *   RequireRole shows the consent step once); acceptTerms() records it;
  * - loggedOutOnPurpose: true after logout() until the next login (the route guard
  *   then does not remember the page for the next login).
  */

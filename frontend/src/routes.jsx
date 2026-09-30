@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
 
-import { errorMessage } from "@/api";
 import { useAuth } from "@/auth";
 import { AssistantPage, AssistantWidget } from "@/components/assistant";
-import { FormCard, NotificationBell } from "@/components/shared";
+import { NotificationBell } from "@/components/shared";
 import { Button } from "@/components/ui";
 import { cn, ROLE_HOME, USER_ROLE_LABELS } from "@/lib";
 import {
@@ -18,14 +16,13 @@ import {
   TermsPage,
   VerifyEmailPage,
 } from "@/pages/AuthPages";
+import { SettingsPage } from "@/pages/SettingsPage";
 import {
-  AdminAuditLogPage,
   AdminCaDetailPage,
   AdminDashboardPage,
   AdminUsersPage,
   RegulatoryAdminPage,
 } from "@/pages/admin/AdminPages";
-import { AlertsPage } from "@/pages/business/AlertsPage";
 import { CompliancePage } from "@/pages/business/CalendarPage";
 import { BusinessDashboardPage } from "@/pages/business/DashboardPage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
@@ -38,7 +35,7 @@ import {
   TypicalFeesPage,
 } from "@/pages/business/FindCaPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
-import { CaAlertsPage } from "@/pages/ca/CaAlertsPage";
+import { RegulatoryUpdatesPage } from "@/pages/business/RegulatoryUpdatesPage";
 import { CaBatchesPage, CaClientPage, CaWorkspacePage } from "@/pages/ca/ClientsPage";
 import { CaDashboardPage } from "@/pages/ca/DashboardPage";
 import { CaEngagementsPage, CaProBonoPage } from "@/pages/ca/EngagementsPage";
@@ -62,7 +59,8 @@ export const NAV = {
     { label: "Typical fees", path: "/business/fees" },
     { label: "My engagements", path: "/business/engagements" },
     { label: "Pro-bono help", path: "/business/pro-bono" },
-    { label: "Notification settings", path: "/business/alerts" },
+    { label: "Regulatory updates", path: "/business/updates" },
+    { label: "Notification settings", path: "/business/settings" },
     { label: "AI assistant", path: "/business/assistant" },
   ],
   ca: [
@@ -73,13 +71,13 @@ export const NAV = {
     { label: "Pro-bono queue", path: "/ca/pro-bono" },
     { label: "My clients", path: "/ca/clients" },
     { label: "Deadline batches", path: "/ca/batches" },
-    { label: "Notification settings", path: "/ca/alerts" },
+    { label: "Regulatory updates", path: "/ca/updates" },
+    { label: "Notification settings", path: "/ca/settings" },
   ],
   admin: [
     { label: "Dashboard", path: "/admin" },
     { label: "Users & CAs", path: "/admin/users" },
     { label: "Regulatory news", path: "/admin/regulatory" },
-    { label: "Audit log", path: "/admin/audit" },
   ],
 };
 
@@ -127,7 +125,8 @@ export const appRoutes = [
     { path: "engagements", element: <MyEngagementsPage /> },
     { path: "pro-bono", element: <ProBonoPage /> },
     { path: "fees", element: <TypicalFeesPage /> },
-    { path: "alerts", element: <AlertsPage /> },
+    { path: "updates", element: <RegulatoryUpdatesPage /> },
+    { path: "settings", element: <SettingsPage /> },
     { path: "assistant", element: <AssistantPage /> },
   ]),
   roleArea("ca", [
@@ -139,14 +138,14 @@ export const appRoutes = [
     { path: "clients", element: <CaWorkspacePage /> },
     { path: "clients/:businessId", element: <CaClientPage /> },
     { path: "batches", element: <CaBatchesPage /> },
-    { path: "alerts", element: <CaAlertsPage /> },
+    { path: "updates", element: <RegulatoryUpdatesPage /> },
+    { path: "settings", element: <SettingsPage /> },
   ]),
   roleArea("admin", [
     { index: true, element: <AdminDashboardPage /> },
     { path: "users", element: <AdminUsersPage /> },
     { path: "cas/:caId", element: <AdminCaDetailPage /> },
     { path: "regulatory", element: <RegulatoryAdminPage /> },
-    { path: "audit", element: <AdminAuditLogPage /> },
   ]),
   { path: "*", element: <NotFoundPage /> },
 ];
@@ -226,12 +225,11 @@ export function AppShell({ role, nav }) {
  * - Not logged in -> /login, and back here after logging in; except after the Log out
  *   button, when the next login goes to that role's home.
  * - Logged in with another role -> that role's own home.
- * - Signed up before consent was asked -> the consent step first (once).
  * The backend checks the role again on every request; this only keeps users
  * from landing on pages that would fail.
  */
 export function RequireRole({ role, children }) {
-  const { user, loggedOutOnPurpose, termsAccepted } = useAuth();
+  const { user, loggedOutOnPurpose } = useAuth();
   const location = useLocation();
 
   if (!user) {
@@ -240,9 +238,6 @@ export function RequireRole({ role, children }) {
   }
   if (user.role !== role) {
     return <Navigate to={ROLE_HOME[user.role]} replace />;
-  }
-  if (termsAccepted === false) {
-    return <AcceptTermsGate />; // asked once, for accounts from before consent
   }
   return children;
 }
@@ -261,59 +256,6 @@ export function PublicLayout() {
       <main className="mx-auto max-w-5xl p-8">
         <Outlet />
       </main>
-    </div>
-  );
-}
-
-// --- AcceptTermsGate ---------------------------------------------------------------------------
-
-/**
- * Shown once, instead of the app, to a user who signed up before we asked for consent
- * (RequireRole renders it while `termsAccepted` is false).
- */
-export function AcceptTermsGate() {
-  const { acceptTerms, logout } = useAuth();
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  async function onAgree() {
-    setError(null);
-    setSaving(true);
-    try {
-      await acceptTerms();
-    } catch (acceptError) {
-      setError(errorMessage(acceptError));
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="p-8">
-      <FormCard
-        title="Our Terms and Privacy Policy"
-        description="Before you continue, please read and accept how CA Helper stores and protects your data."
-      >
-        <Link
-          to="/terms"
-          target="_blank"
-          className="text-sm text-primary underline-offset-4 hover:underline"
-        >
-          Read the Terms and Privacy Policy
-        </Link>
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <div className="flex gap-2">
-          <Button onClick={onAgree} disabled={saving}>
-            {saving ? "Saving..." : "I agree"}
-          </Button>
-          <Button variant="outline" onClick={logout}>
-            Log out
-          </Button>
-        </div>
-      </FormCard>
     </div>
   );
 }

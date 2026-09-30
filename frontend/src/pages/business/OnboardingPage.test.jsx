@@ -226,7 +226,7 @@ describe("business profile page", () => {
   });
 });
 
-describe("fill in from a document (ON13)", () => {
+describe("fill in from a document", () => {
   it("puts the values found in a GST certificate into the form", async () => {
     loginAs("business");
     const fetchMock = fakeApi({

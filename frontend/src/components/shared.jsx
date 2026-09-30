@@ -8,10 +8,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   NOTIFICATIONS_KEY,
-  saveNotificationSettings,
-  SETTINGS_KEY,
   useNotifications,
-  useNotificationSettings,
   useUnreadCount,
 } from "@/api";
 import {
@@ -29,13 +26,15 @@ import {
   cn,
   COMPLIANCE_STATUS_LABELS,
   ENGAGEMENT_STATUS_LABELS,
+  ENTITY_TYPE_LABELS,
   expiresInText,
   filingFormLabel,
+  FORM_LABELS,
   formatDate,
   formatDateTime,
   formatRupees,
+  GST_SCHEME_LABELS,
   label,
-  NOTIFICATION_TYPE_LABELS,
 } from "@/lib";
 
 // --- FormField ---------------------------------------------------------------------------------
@@ -110,7 +109,7 @@ export function StatusBadge({ status }) {
 // --- Stars -------------------------------------------------------------------------------------
 
 /**
- * Star ratings (MA17).
+ * Star ratings.
  *
  *   <Stars stars={4} />                      ★★★★☆   (screen readers: "4 out of 5 stars")
  *   <RatingSummary average={4.5} count={12} />   ★ 4.5 (12 ratings) · or "No ratings yet"
@@ -503,90 +502,97 @@ function BellIcon() {
   );
 }
 
-// --- NotificationSettings ----------------------------------------------------------------------
+// --- RegulatoryChangeCard ----------------------------------------------------------------------
 
-// One line under each switch: what the emails are.
-const HELP = {
-  deadline_reminder: "7, 3 and 1 day before a filing is due.",
-  overdue: "Once, when a filing's due date has passed and it is not marked filed.",
-  document_request: "When a CA asks for a document, or a requested document arrives.",
-  regulatory_update: "When a rule or due date that affects you changes.",
+const CHANGE_TYPE_LABELS = {
+  due_date_extension: "Due date extension",
+  rate_change: "Rate change",
+  new_rule: "New rule",
+  other: "Other",
 };
 
-/**
- * Email on/off per notification type (business and CA settings pages). Every
- * notification still appears in the tray (the bell); this only decides the emails.
- * Engagement and account emails are always sent, so they get no switch.
- */
-export function NotificationSettings() {
-  const settings = useNotificationSettings();
-  const queryClient = useQueryClient();
-  const [error, setError] = useState(null);
-  const [savingType, setSavingType] = useState(null);
-
-  async function toggle(item) {
-    setError(null);
-    setSavingType(item.type);
-    try {
-      const saved = await saveNotificationSettings([
-        { type: item.type, email_enabled: !item.email_enabled },
-      ]);
-      queryClient.setQueryData(SETTINGS_KEY, saved);
-    } catch (failure) {
-      setError(errorMessage(failure));
-    } finally {
-      setSavingType(null);
-    }
+// "GSTR-3B, GSTR-1"
+function formsText(formCodes) {
+  const names = [];
+  for (const code of formCodes) {
+    names.push(label(FORM_LABELS, code));
   }
+  return names.join(", ");
+}
 
+// Who the change is for, e.g. "GST scheme: Regular (QRMP) · States: Maharashtra".
+function whoText(affected) {
+  const parts = [];
+  if (affected.gst_schemes) {
+    const names = [];
+    for (const code of affected.gst_schemes) names.push(label(GST_SCHEME_LABELS, code));
+    parts.push("GST scheme: " + names.join(", "));
+  }
+  if (affected.entity_types) {
+    const names = [];
+    for (const code of affected.entity_types) names.push(label(ENTITY_TYPE_LABELS, code));
+    parts.push("Business type: " + names.join(", "));
+  }
+  if (affected.states) {
+    parts.push("States: " + affected.states.join(", "));
+  }
+  if (parts.length === 0) {
+    return "Everyone with an open filing of these forms";
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * One change found in the news, with its article (the admin page and the Regulatory
+ * updates page). `children` is shown at the bottom.
+ */
+export function RegulatoryChangeCard({ change, children }) {
+  const dates = change.dates;
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-semibold">Notification settings</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Emails</CardTitle>
-          <CardDescription>
-            Every notification appears under the bell. Choose which ones are also emailed to you.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {settings.isPending && <p className="text-sm text-muted-foreground">Loading...</p>}
-          {settings.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              {errorMessage(settings.error)}
-            </p>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>{label(CHANGE_TYPE_LABELS, change.change_type)}</Badge>
+          <Badge variant="secondary">{formsText(change.form_codes)}</Badge>
+          {change.affected_categories.extracted_by === "keywords" && (
+            <Badge variant="outline">Found by keywords: read the article</Badge>
           )}
-          {settings.isSuccess && (
+        </div>
+        <CardTitle className="pt-2 text-base">{change.summary}</CardTitle>
+        <CardDescription>
+          From{" "}
+          <a href={change.article_url} target="_blank" rel="noreferrer" className="underline">
+            {change.article_title}
+          </a>{" "}
+          ({change.source_name}
+          {change.published_at ? ", " + formatDateTime(change.published_at) : ""})
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <dl className="grid gap-1 sm:grid-cols-[10rem_1fr]">
+          <dt className="text-muted-foreground">For</dt>
+          <dd>{whoText(change.affected_categories)}</dd>
+          {dates.period && (
             <>
-              {settings.data.items.map((item) => (
-                <label key={item.type} className="flex items-start gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={item.email_enabled}
-                    disabled={savingType !== null}
-                    onChange={() => toggle(item)}
-                  />
-                  <span>
-                    {label(NOTIFICATION_TYPE_LABELS, item.type)}
-                    <span className="block text-xs text-muted-foreground">{HELP[item.type]}</span>
-                  </span>
-                </label>
-              ))}
-              <ul className="space-y-1 border-t pt-4 text-sm text-muted-foreground">
-                {settings.data.always_emailed.map((type) => (
-                  <li key={type}>{label(NOTIFICATION_TYPE_LABELS, type)}: always emailed</li>
-                ))}
-              </ul>
+              <dt className="text-muted-foreground">Period</dt>
+              <dd>{dates.period}</dd>
             </>
           )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
+          {dates.old_due_date && (
+            <>
+              <dt className="text-muted-foreground">Old due date</dt>
+              <dd>{formatDate(dates.old_due_date)}</dd>
+            </>
           )}
-        </CardContent>
-      </Card>
-    </div>
+          {dates.new_due_date && (
+            <>
+              <dt className="text-muted-foreground">New due date</dt>
+              <dd>{formatDate(dates.new_due_date)}</dd>
+            </>
+          )}
+        </dl>
+        {children}
+      </CardContent>
+    </Card>
   );
 }

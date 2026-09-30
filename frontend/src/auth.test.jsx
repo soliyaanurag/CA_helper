@@ -111,33 +111,11 @@ describe("session", () => {
   });
 });
 
-describe("consent", () => {
-  it("asks a user from before consent once, then shows the app", async () => {
-    const user = testUser("business");
-    const fetchMock = fakeApi({
-      "POST /api/v1/auth/login": [200, { access_token: "t", user, terms_accepted: false }],
-      "POST /api/v1/auth/accept-terms": [204],
-      "GET /api/v1/compliance/dashboard": [200, { message: "Welcome, Test business" }],
-    });
-    renderApp("/login");
-    const person = userEvent.setup();
-    await person.type(screen.getByLabelText("Email"), user.email);
-    await person.type(screen.getByLabelText("Password"), "secret");
-    await person.click(screen.getByRole("button", { name: "Log in" }));
-
-    await person.click(await screen.findByRole("button", { name: "I agree" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "Welcome, Test business" }),
-    ).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([path]) => path === "/api/v1/auth/accept-terms")).toBe(true);
-    expect(loadSession().termsAccepted).toBe(true);
-  });
-
-  it("does not ask a user who already accepted", async () => {
+describe("login", () => {
+  it("goes straight to the app, with no consent step", async () => {
     const user = testUser("business");
     fakeApi({
-      "POST /api/v1/auth/login": [200, { access_token: "t", user, terms_accepted: true }],
+      "POST /api/v1/auth/login": [200, { access_token: "t", user }],
       "GET /api/v1/compliance/dashboard": [200, { message: "Welcome, Test business" }],
     });
     renderApp("/login");

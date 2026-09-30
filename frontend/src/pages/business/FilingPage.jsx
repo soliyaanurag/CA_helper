@@ -118,7 +118,7 @@ function Header({ page }) {
   );
 }
 
-// --- What being late may cost (AL5) ------------------------------------------------------
+// --- What being late may cost --------------------------------------------------------------
 
 // Shown on every penalty figure: the rules are not checked against official sources yet.
 const PENDING_LABEL = "Estimate (rules pending verification)";
@@ -184,7 +184,7 @@ function PenaltyFigures({ estimate }) {
   );
 }
 
-// --- How the filing gets done: path, CA, mark filed (CO8, CO9) -------------------------
+// --- How the filing gets done: path, CA, mark filed ----------------------------------------
 
 function HowToFile({ page, onUpdated }) {
   const item = page.filing;
@@ -345,7 +345,7 @@ function MarkFiledForm({ page, onUpdated }) {
 }
 
 /**
- * DO8: what the acknowledgement file showed when it was read (locally, with OCR).
+ * What the acknowledgement file showed when it was read (locally, with OCR).
  * Verified: the form, period, number and date match this filing. Otherwise the list
  * says what did not match; the filing stays "Filed".
  */
@@ -429,7 +429,7 @@ function Filed({ page, onUpdated }) {
   );
 }
 
-// --- Documents to have ready (CO7) ------------------------------------------------------
+// --- Documents to have ready ---------------------------------------------------------------
 
 function Checklist({ page, onUpdated }) {
   const item = page.filing;
@@ -730,7 +730,7 @@ function AddDocument({ item, entryKey, links, onAdded, onCancel }) {
   );
 }
 
-// --- How similar businesses file it (CO13) ----------------------------------------------
+// --- How similar businesses file it --------------------------------------------------------
 
 function PeerInsights({ item }) {
   const peers = usePeerInsights(item.id);
@@ -779,7 +779,7 @@ function PeerPath({ title, figures }) {
   );
 }
 
-// --- Documents the CA asked for (CW4) -------------------------------------------------
+// --- Documents the CA asked for ------------------------------------------------------------
 
 function CaRequests({ page }) {
   const item = page.filing;
@@ -890,7 +890,7 @@ function AnswerRequest({ request, what, onAnswered }) {
   );
 }
 
-// --- What the form is and how to file it (CO6) -----------------------------------------
+// --- What the form is and how to file it ---------------------------------------------------
 
 function Guide({ page }) {
   const [tab, setTab] = useState("instructions");

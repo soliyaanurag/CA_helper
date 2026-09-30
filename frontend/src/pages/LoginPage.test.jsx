@@ -34,13 +34,7 @@ describe("login form", () => {
 
   it.each([
     [401, "INVALID_CREDENTIALS", "Wrong email or password."],
-    [
-      403,
-      "ACCOUNT_INACTIVE",
-      "This account is suspended. Contact the CA Helper team if you think this is a mistake.",
-    ],
     [403, "EMAIL_NOT_VERIFIED", "Your email is not verified yet."],
-    [429, "TOO_MANY_REQUESTS", "Too many login attempts. Wait a minute and try again."],
   ])("shows a clear message for %i %s", async (status, code, message) => {
     fakeApi({ "POST /api/v1/auth/login": apiError(status, code) });
     renderApp("/login");

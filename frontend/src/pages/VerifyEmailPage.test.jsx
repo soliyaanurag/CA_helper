@@ -62,7 +62,7 @@ describe("verify email page", () => {
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Send a new code" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("we sent it a new code");
+    expect(await screen.findByRole("status")).toHaveTextContent("We sent a new code to this email.");
     expect(sentBody(fetchMock, RESEND_URL)).toEqual({ email: "asha@example.com" });
   });
 

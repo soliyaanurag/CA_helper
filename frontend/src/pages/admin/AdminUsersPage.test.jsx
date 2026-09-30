@@ -60,7 +60,6 @@ describe("admin: Users & CAs", () => {
               full_name: "Meera Shah",
               email: "meera@example.com",
               role: "ca",
-              is_active: true,
               email_verified: true,
               created_at: "2026-09-27T04:30:00Z",
             },
@@ -164,99 +163,5 @@ describe("admin dashboard", () => {
     expect(rate).toHaveTextContent("25%");
     expect(rate).toHaveTextContent("5 of 20 filings due so far were not filed on time");
     expect(within(rate).getByText("Overdue").nextSibling).toHaveTextContent("4");
-  });
-});
-
-describe("admin: suspend and reactivate", () => {
-  const PAGE = (items) => [200, { items, page: 1, page_size: 20, total: items.length }];
-  const person = (fields) => ({
-    id: "u2",
-    full_name: "Ravi Kumar",
-    email: "ravi@example.com",
-    role: "business",
-    is_active: true,
-    email_verified: true,
-    created_at: "2026-09-20T04:30:00Z",
-    ...fields,
-  });
-
-  it("suspends an account with a reason", async () => {
-    loginAs("admin");
-    vi.spyOn(window, "prompt").mockReturnValue(" Fake documents ");
-    const fetchMock = fakeApi({
-      "GET /api/v1/admin/cas?status=pending": [200, []],
-      "GET /api/v1/admin/users": PAGE([person()]),
-      "POST /api/v1/admin/users/u2/suspend": [200, person({ is_active: false })],
-    });
-    const user = userEvent.setup();
-    renderApp("/admin/users");
-
-    await user.click(await screen.findByRole("tab", { name: "All users" }));
-    const row = (await screen.findByText("ravi@example.com")).closest("tr");
-    expect(row).toHaveTextContent("Active");
-    await user.click(within(row).getByRole("button", { name: "Suspend" }));
-
-    const call = fetchMock.mock.calls.find(([url]) => url === "/api/v1/admin/users/u2/suspend");
-    expect(JSON.parse(call[1].body)).toEqual({ reason: "Fake documents" });
-    vi.restoreAllMocks();
-  });
-
-  it("reactivates a suspended account, and never offers to suspend yourself", async () => {
-    const me = loginAs("admin");
-    const fetchMock = fakeApi({
-      "GET /api/v1/admin/cas?status=pending": [200, []],
-      "GET /api/v1/admin/users": PAGE([
-        person({ is_active: false }),
-        person({ id: me.id, full_name: "Test admin", email: "admin@demo.local", role: "admin" }),
-      ]),
-      "POST /api/v1/admin/users/u2/reactivate": [200, person()],
-    });
-    const user = userEvent.setup();
-    renderApp("/admin/users");
-
-    await user.click(await screen.findByRole("tab", { name: "All users" }));
-    const row = (await screen.findByText("ravi@example.com")).closest("tr");
-    expect(row).toHaveTextContent("Suspended");
-    await user.click(within(row).getByRole("button", { name: "Reactivate" }));
-    const mine = screen.getByText("admin@demo.local").closest("tr");
-    expect(within(mine).queryByRole("button")).not.toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([url]) => url === "/api/v1/admin/users/u2/reactivate")).toBe(
-      true,
-    );
-  });
-});
-
-describe("admin: audit log", () => {
-  it("lists admin actions with their details", async () => {
-    loginAs("admin");
-    fakeApi({
-      "GET /api/v1/admin/audit-log?page=1": [
-        200,
-        {
-          items: [
-            {
-              id: "a1",
-              admin_name: "Admin One",
-              action: "user.suspend",
-              target_type: "user",
-              target_id: "u2",
-              target_name: "Ravi Kumar",
-              details: { reason: "Fake documents", cancelled_requests: 2 },
-              created_at: "2026-09-28T04:30:00Z",
-            },
-          ],
-          page: 1,
-          page_size: 20,
-          total: 1,
-        },
-      ],
-    });
-    renderApp("/admin/audit");
-
-    const row = (await screen.findByText("Suspended an account")).closest("tr");
-    expect(row).toHaveTextContent("Admin One");
-    expect(row).toHaveTextContent("Ravi Kumar");
-    expect(row).toHaveTextContent("Reason: Fake documents · Requests cancelled: 2");
-    expect(screen.getByRole("link", { name: "Audit log" })).toHaveAttribute("href", "/admin/audit");
   });
 });

@@ -4,97 +4,80 @@ import { describe, expect, it } from "vitest";
 
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
 
-// /admin/regulatory: review changes found in the news, and manage the sources (RE1, RE4).
+// /admin/regulatory: the changes found in the news, and the news sources.
 
 const CHANGES = "/api/v1/admin/regulatory/changes";
 
-const PENDING = {
+const CHANGE = {
   id: "0b8f4c1e-2d3a-4e5f-8a6b-7c8d9e0f1a2b",
   change_type: "due_date_extension",
   summary: "GSTR-3B for September 2026 can be filed until 31 October 2026.",
   form_codes: ["gstr_3b"],
   affected_categories: { extracted_by: "ai", gst_schemes: ["regular_qrmp"] },
   dates: { new_due_date: "2026-10-31", period: "September 2026" },
-  status: "pending",
   created_at: "2026-09-28T02:00:00+00:00",
-  reviewed_at: null,
+  notified_at: "2026-09-28T02:00:00+00:00",
   article_title: "GSTR-3B due date extended for September 2026",
   article_url: "https://news.example.com/a/1",
   published_at: "2026-09-28T04:30:00+00:00",
   source_name: "TaxGuru: GST news",
-  match_count: 0,
+  match_count: 3,
 };
 
 function routes(extra) {
   return {
-    [`GET ${CHANGES}?status=pending`]: [200, [PENDING]],
-    [`GET ${CHANGES}?status=approved`]: [200, []],
-    [`GET ${CHANGES}?status=rejected`]: [200, []],
+    [`GET ${CHANGES}`]: [200, [CHANGE]],
     ...extra,
   };
 }
 
-function calledWith(fetchMock, key) {
-  let found = false;
-  for (const [path, init] of fetchMock.mock.calls) {
-    const method = init && init.method ? init.method : "GET";
-    if (`${method} ${path}` === key) {
-      found = true;
-    }
-  }
-  return found;
-}
-
 describe("regulatory news page", () => {
-  it("shows a pending change with its article and who it is for", async () => {
+  it("shows a change with its article and who it is for", async () => {
     loginAs("admin");
     fakeApi(routes({}));
     renderApp("/admin/regulatory");
 
-    expect(await screen.findByText(PENDING.summary)).toBeInTheDocument();
+    expect(await screen.findByText(CHANGE.summary)).toBeInTheDocument();
     expect(screen.getByText("Due date extension")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: PENDING.article_title })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: CHANGE.article_title })).toHaveAttribute(
       "href",
-      PENDING.article_url,
+      CHANGE.article_url,
     );
     expect(screen.getByText("GST scheme: Regular (quarterly, QRMP)")).toBeInTheDocument();
     expect(screen.getByText("September 2026")).toBeInTheDocument();
   });
 
-  it("approves a change", async () => {
+  it("says how many businesses a change was sent to", async () => {
     loginAs("admin");
-    const fetchMock = fakeApi(
-      routes({
-        [`POST ${CHANGES}/${PENDING.id}/approve`]: [
-          200,
-          { ...PENDING, status: "approved", match_count: 3 },
-        ],
-      }),
-    );
+    fakeApi(routes({}));
     renderApp("/admin/regulatory");
-    const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Approve and notify" }));
-
-    expect(calledWith(fetchMock, `POST ${CHANGES}/${PENDING.id}/approve`)).toBe(true);
+    expect(await screen.findByText(/3 business\(es\) told/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve and notify" })).not.toBeInTheDocument();
   });
 
   it("says when a change was found without AI", async () => {
     loginAs("admin");
     fakeApi(
       routes({
-        [`GET ${CHANGES}?status=pending`]: [
+        [`GET ${CHANGES}`]: [
           200,
-          [{ ...PENDING, affected_categories: { extracted_by: "keywords" } }],
+          [
+            {
+              ...CHANGE,
+              affected_categories: { extracted_by: "keywords" },
+              notified_at: null,
+              match_count: 0,
+            },
+          ],
         ],
       }),
     );
     renderApp("/admin/regulatory");
 
-    expect(
-      await screen.findByText("Found by keywords (no AI): read the article"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Found by keywords: read the article")).toBeInTheDocument();
     expect(screen.getByText("Everyone with an open filing of these forms")).toBeInTheDocument();
+    expect(screen.getByText("Not sent to anyone")).toBeInTheDocument();
   });
 
   it("lists the sources and runs a scan", async () => {
@@ -129,7 +112,7 @@ describe("regulatory news page", () => {
     await user.click(screen.getByRole("button", { name: "Scan now" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "4 new article(s), 1 change(s) to review.",
+      "4 new article(s), 1 change(s) found.",
     );
   });
 });
