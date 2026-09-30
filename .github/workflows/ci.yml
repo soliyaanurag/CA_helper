@@ -48,7 +48,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r backend/requirements.txt
 
-      # The OCR program (app/utils/ocr.py), as in the backend Docker image.
+      # The OCR program (app/ocr.py), as in the backend Docker image.
       - name: Install Tesseract
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
 

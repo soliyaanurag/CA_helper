@@ -448,6 +448,37 @@ browser is listed for the user at the end.
 Uncertain: the tray link of a regulatory notification still opens `/business/compliance` (a backend value; changing
 it to the new page would be a behaviour change section 4 does not list).
 
+## Step 7: the rest (eval, demo seed, README)
+
+Done:
+- `eval/*/evaluate.py` and `run_eval.py`: `from app import assistant` / `onboarding` / `regulatory` (no `_service`
+  aliases), run instructions are `docker compose exec backend python ../eval/<x>/evaluate.py`, stale paths and task
+  ids removed from the docstrings; the eval READMEs' run commands likewise (datasets untouched).
+- Every eval run, and compared with the **old code** (tag `before-simplify`, run in a throwaway container with the
+  old requirements, same dev database, then removed):
+
+  | Eval | new code | old code |
+  |---|---|---|
+  | OCR (local) | 95.9% (71/74), same 3 misses | 95.9% (71/74) |
+  | NIC `--keywords-only` | top-1 35.0%, top-3 72.5%, shortlist 85.0% | identical |
+  | Regulatory `--keywords-only` | precision 100% (7/7), recall 100% (7/7), forms and type 7/7 | identical |
+  | Assistant `--keywords-only` | retrieval 76.2% (16/21), out of scope 1/3, ask a CA 1/1 | identical |
+
+  The Gemini quota was used up (429), so `flask assistant ingest` could not embed; for the assistant comparison the
+  chunks were loaded once with zero vectors (word search does not use them) and deleted afterwards. **Note:**
+  eval/README.md records 18/21 for word search on 29 Sep; today both the old and the new code give 16/21, so the
+  difference is not from this work (probably content changed since, e.g. PRs #34/#35).
+- `demo_seed.py`: already stores the files in the database (through `documents.attach_document`) and has no
+  suspend or audit data; only its comments and one CLI message named `make seed` (now `flask seed`).
+- `make`/`conda` mentions in backend comments and the FIELD_ENCRYPTION_KEY help text now name the Docker commands.
+- README rewritten: what it is, `docker compose up` + first-time `db upgrade` / `seed` / `seed-demo`, other commands,
+  the demo script (suspend and audit log steps replaced by Scan now; Regulatory updates and Notification settings
+  added), a short team workflow and troubleshooting. `db upgrade` needs the migration of step 8.
+- Swagger / OpenAPI mentions removed from README, comments, `.env.example`, the CI comment and the PR template (which
+  now lists the Docker test commands). `docs/old-CLAUDE.md` keeps its old text on purpose (archived copy).
+
+Results: backend 598 passed; frontend 235 passed; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |

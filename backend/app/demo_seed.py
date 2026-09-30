@@ -1,7 +1,7 @@
-"""Demo data for a 10-minute walk through every flow: `flask seed-demo` (make seed-demo).
+"""Demo data for a 10-minute walk through every flow: `flask seed-demo`.
 
 Everything here is fictional (names, PAN, GSTIN, phone numbers, files). Run it after
-`make seed` (it runs the normal seed first). It adds, once:
+`flask seed` (it runs the normal seed first). It adds, once:
 
 - 14 businesses, all logging in with DEMO_BUSINESS_PASSWORD:
   10 micro proprietorships on regular GST (monthly or quarterly), so the peer insights
@@ -377,7 +377,7 @@ def seed_demo_data() -> str:
         )
     if demo_ca is None or None in sample_cas:
         return (
-            "Run `make seed` with DEMO_CA_EMAIL set first (the demo CA and sample CAs are needed)."
+            "Run `flask seed` with DEMO_CA_EMAIL set first (the demo CA and sample CAs are needed)."
         )
 
     today = today_in_india()

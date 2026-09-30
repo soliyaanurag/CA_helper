@@ -1,9 +1,9 @@
 """Assistant evaluation over questions.md: answers, cited sources and a results table to score.
 
 Every question in questions.md (the main table and the out-of-scope table) is sent to
-assistant_service.answer_question(), the function the chat API uses (ask() adds only the
+assistant.answer_question(), the function the chat API uses (ask() adds only the
 history). The user context is category-level only, the same text user_context() gives a
-business owner who has not registered yet: no name, PAN, GSTIN or amount (CLAUDE.md rule 1).
+business owner who has not registered yet: no name, PAN, GSTIN or amount.
 Nothing is saved in the database.
 
 Writes, next to this file:
@@ -16,11 +16,10 @@ questions have no expected source ("n/a"); for them the table shows whether anyt
 "AI answer" is "no" when Gemini did not write the answer (no key, quota, error, or nothing
 found): then the assistant shows the passages it found instead, so read those rows with care.
 
-Needs the knowledge base (make assistant-ingest) and GEMINI_API_KEY. Two Gemini requests per
+Needs the knowledge base (`docker compose exec backend flask --app app assistant ingest`) and GEMINI_API_KEY. Two Gemini requests per
 question (the search and the answer); --delay waits between questions (default 8 s) to stay
-under the free tier's per-minute limit. Run from the repo root:
-    make assistant-eval
-    conda run -n ca-helper python eval/assistant/run_eval.py [--delay 8]
+under the free tier's per-minute limit. Run in the backend container:
+    docker compose exec backend python ../eval/assistant/run_eval.py [--delay 8]
 """
 
 import argparse
@@ -75,12 +74,12 @@ def evaluate(questions: list[dict], delay: float) -> list[dict]:
     """Ask every question; returns one result row per question."""
     rows = []
     with app_context():
-        from app import assistant as assistant_service
+        from app import assistant
 
         for index, item in enumerate(questions):
             if index > 0 and delay > 0:
                 time.sleep(delay)
-            result = assistant_service.answer_question(item["question"], CONTEXT)
+            result = assistant.answer_question(item["question"], CONTEXT)
             cited = []
             for citation in result["citations"]:
                 if citation["source_path"] not in cited:
@@ -147,7 +146,7 @@ def write_markdown(rows: list[dict]) -> None:
     lines = [
         "# Assistant evaluation results",
         "",
-        f"Run on {today:%d %b %Y} with `make assistant-eval` (`eval/assistant/run_eval.py`) "
+        f"Run on {today:%d %b %Y} with `eval/assistant/run_eval.py` "
         "over `questions.md`. Every answer and its cited sources are in `results.csv`.",
         "",
         "- **Cited correctly** (automatic): the expected source is among the cited sources. "

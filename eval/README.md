@@ -12,13 +12,13 @@ anonymised data only (fake names, fake but correctly formatted PAN/GSTIN, no rea
 
 Each folder's README describes its file format. Each script (`eval/<folder>/evaluate.py`) calls the **same service
 functions as the app** and prints a small results table; `eval/common.py` holds the shared helpers (the import
-path, the app context, the table). Run them from the repo root:
+path, the app context, the table). Run them in the backend container (`docker compose up` first):
 
 ```bash
-conda run -n ca-helper python eval/ocr/evaluate.py                       # no database, no Gemini
-conda run -n ca-helper python eval/nic/evaluate.py [--keywords-only]      # database (make infra, make seed)
-conda run -n ca-helper python eval/assistant/evaluate.py [--keywords-only]  # + make assistant-ingest
-conda run -n ca-helper python eval/regulatory/evaluate.py [--keywords-only]
+docker compose exec backend python ../eval/ocr/evaluate.py                       # no database, no Gemini
+docker compose exec backend python ../eval/nic/evaluate.py [--keywords-only]      # database (docker compose up; flask --app app seed)
+docker compose exec backend python ../eval/assistant/evaluate.py [--keywords-only]  # + flask --app app assistant ingest
+docker compose exec backend python ../eval/regulatory/evaluate.py [--keywords-only]
 ```
 
 Without `--keywords-only` the scripts use Gemini when `GEMINI_API_KEY` is set; when Gemini fails (quota), the app's

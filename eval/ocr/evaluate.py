@@ -1,10 +1,10 @@
 """OCR evaluation: how many labelled fields our local OCR reads correctly.
 
-For each file in samples/, the same code as an upload runs: app/utils/ocr.py reads the
-text, then app/utils/document_text.py finds the fields. A field counts as correct when it
+For each file in samples/, the same code as an upload runs: app/ocr.py reads the
+text, then app/ocr.py finds the fields. A field counts as correct when it
 equals labels.csv (form, month, quarter and financial_year: when it is among those found).
-Needs no database and no Gemini. Run from the repo root:
-    conda run -n ca-helper python eval/ocr/evaluate.py
+Needs no database and no Gemini. Run in the backend container:
+    docker compose exec backend python ../eval/ocr/evaluate.py
 """
 
 import csv
@@ -57,7 +57,7 @@ def _correct(found, expected: str) -> bool:
 
 def main() -> None:
     if not ocr.ocr_available():
-        sys.exit("Tesseract is not installed: run make sync first.")
+        sys.exit("Tesseract is not installed: rebuild the backend image (docker compose build backend).")
 
     labels = {}
     with open(HERE / "labels.csv", encoding="utf-8") as file:

@@ -14,7 +14,7 @@ File: `descriptions.csv` (UTF-8, comma-separated, header row):
 | `labelled_by` | `claude` | who labelled the row |
 | `notes` | | optional |
 
-Script: `evaluate.py` runs `onboarding_service.suggest_nic_codes()` for each description.
+Script: `evaluate.py` runs `onboarding.suggest_nic_codes()` for each description.
 Metrics: top-1 accuracy (first suggestion = expected or acceptable), top-3 accuracy (among the first three) and how
 often the code is in the keyword shortlist (the most Gemini can reach, since it only picks from the shortlist).
 `--keywords-only` measures the fallback without Gemini.

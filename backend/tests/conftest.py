@@ -174,7 +174,7 @@ def auth_headers(app):
 
 @pytest.fixture()
 def legal_rules(database):
-    """The rule thresholds and obligation templates from app/seed.py, as after `make seed`."""
+    """The rule thresholds and obligation templates from app/seed.py, as after `flask seed`."""
     seed_rule_thresholds()
     seed_obligation_templates()
     database.session.commit()

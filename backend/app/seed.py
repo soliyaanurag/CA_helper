@@ -1,4 +1,4 @@
-"""Development seed data and the `flask seed` command (make seed).
+"""Development seed data and the `flask seed` command.
 
 Demo users, one per role, come from DEMO_* variables in .env:
 
@@ -14,7 +14,7 @@ sample CAs get prices so some typical price ranges show up. The legal rule
 thresholds, the obligation templates and the penalty rules of the 7 forms are seeded too,
 each with its official source; the values not confirmed yet are marked TODO_VERIFY
 (docs/TODO_VERIFY.md). These three seeds also update rows seeded earlier, so a corrected
-value reaches every database on the next `make seed` / `make sync`.
+value reaches every database on the next `flask seed`.
 The official NIC activity codes are loaded from content/reference/nic_2008.csv, and the
 regulatory monitor's news sources are added.
 

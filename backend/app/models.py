@@ -126,7 +126,7 @@ class FormCode(StrEnum):
 
 KEY_HELP = (
     "Generate one with:\n"
-    "  conda run -n ca-helper python -c "
+    "  docker compose exec backend python -c "
     '"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"\n'
     "and put it in .env as FIELD_ENCRYPTION_KEY=... (see .env.example)."
 )
