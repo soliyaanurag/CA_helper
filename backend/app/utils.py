@@ -98,6 +98,32 @@ def validation_error(errors: dict, location: str = "json") -> ApiError:
     return ApiError(422, "VALIDATION_ERROR", "Some fields are invalid.", {location: errors})
 
 
+PAGE_SIZE_DEFAULT = 20
+PAGE_SIZE_MAX = 100
+
+
+def read_page_args(errors: dict) -> tuple[int, int]:
+    """?page= (from 1) and ?page_size= (1 to 100, default 20) of a list endpoint. A wrong
+    value is added to `errors` (the caller raises the 422 with its other query errors)."""
+    numbers = {}
+    for name, default, largest in (("page", 1, None), ("page_size", PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX)):
+        text = request.args.get(name)
+        numbers[name] = default
+        if text is None:
+            continue
+        try:
+            value = int(text)
+        except ValueError:
+            errors[name] = ["Not a valid integer."]
+            continue
+        if largest is None and value < 1:
+            errors[name] = ["Must be greater than or equal to 1."]
+        elif largest is not None and not 1 <= value <= largest:
+            errors[name] = [f"Must be greater than or equal to 1 and less than or equal to {largest}."]
+        numbers[name] = value
+    return numbers["page"], numbers["page_size"]
+
+
 def iso(value) -> str | None:
     """A date or datetime as ISO text for JSON, e.g. "2026-10-13" (None stays None)."""
     return value.isoformat() if value is not None else None

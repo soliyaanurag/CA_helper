@@ -276,6 +276,16 @@ working, stop and ask.
 - No test changed.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.4 documents (done)
+- Plain Flask; the vault routes do the work (upload with optional link, list with filters + pages, download for
+  the owner or an allowed CA, delete unless proof, link, unlink). `documents_to_dicts` gives the same JSON.
+- `utils.read_page_args` reads ?page= / ?page_size= with the old rules and messages (used by every paged list).
+- Kept for other modules: `add_document`, `get_document`, `read_document`, `remove_document`,
+  `verify_acknowledgement`, `document_ids_for_filings`, `attach_document`, `documents_by_filing` (still rows,
+  for ca_workspace's schema until it is converted), `GENERAL_KEY`.
+- No test changed. demo_walk.py now also links, unlinks and deletes a vault document.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |

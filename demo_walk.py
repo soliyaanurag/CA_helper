@@ -158,6 +158,18 @@ def main():
     if doc_id:
         r = c.get(f"/api/v1/documents/{doc_id}/file", headers=B)
         check("vault download", r.status_code == 200 and r.data.startswith(b"%PDF"), r.status_code)
+        q2 = next(i for i in items if i["form_code"] == "gstr_1" and i["period_label"].startswith("Q2"))
+        r = c.post(f"/api/v1/documents/{doc_id}/links", headers=B, json={"compliance_item_id": q2["id"]})
+        links = r.get_json().get("links", []) if r.is_json else []
+        check("vault link to a filing", r.status_code == 200 and len(links) == 1, r.data[:300])
+        if links:
+            r = c.delete(f"/api/v1/documents/links/{links[0]['id']}", headers=B)
+            check("vault unlink", r.status_code == 204, r.data[:200])
+    r = c.post("/api/v1/documents", headers=B, content_type="multipart/form-data",
+               data={"doc_type": "invoice", "file": (io.BytesIO(pdf_of("Invoice 7")), "inv.pdf", "application/pdf")})
+    if r.status_code == 201:
+        r = c.delete(f"/api/v1/documents/{r.get_json()['id']}", headers=B)
+        check("vault delete", r.status_code == 204, r.data[:200])
 
     # 5. Find a CA -> request (the demo CA)
     CA = login(os.environ["DEMO_CA_EMAIL"], os.environ["DEMO_CA_PASSWORD"])

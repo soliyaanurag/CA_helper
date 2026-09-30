@@ -214,7 +214,7 @@ BLUEPRINTS = [
     marketplace.blp,
     admin.blp,
     alerts.blp,
-    documents.blp,
+    documents.bp,
     regulatory.blp,
     assistant.blp,
 ]
