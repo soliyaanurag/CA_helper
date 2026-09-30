@@ -1,11 +1,7 @@
 """POST /api/v1/auth/forgot-password and /reset-password."""
 
-from datetime import timedelta
-
 import pytest
-from sqlalchemy import update
 
-from app.models import EmailOtp
 from tests.conftest import TEST_PASSWORD, emailed_code
 
 FORGOT_URL = "/api/v1/auth/forgot-password"
@@ -53,15 +49,8 @@ def test_forgot_password_for_an_unknown_email_is_404(client, mailbox):
     assert mailbox == []
 
 
-def test_forgot_password_sends_at_most_one_code_a_minute(client, database, owner, mailbox):
+def test_forgot_password_sends_a_new_code_each_time(client, database, owner, mailbox):
     forgot(client)
-    forgot(client)
-    assert len(mailbox) == 1
-
-    database.session.execute(
-        update(EmailOtp).values(created_at=EmailOtp.created_at - timedelta(minutes=2))
-    )
-    database.session.commit()
     forgot(client)
 
     assert len(mailbox) == 2

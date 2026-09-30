@@ -214,6 +214,36 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 - Checks: backend 604 passed; frontend 240; build OK; snapshot unchanged (99 known); walk 0 failures; worker jobs
   listed; `flask db` works.
 
+## Step 4: Per module, plain Flask (in progress)
+
+### Q4 (step 4): Swagger UI / OpenAPI tests
+Plain Flask routes are not in the flask-smorest OpenAPI spec, and step 5 removes flask-smorest, the OpenAPI
+settings and the CI step (plan sections 1 and 6). Three tests check that part and would fail:
+test_app_factory.py::test_openapi_spec_lists_health_and_every_tag, ::test_swagger_ui_is_served,
+::test_api_root_redirects_to_the_docs (GET / redirects to /api/docs). Section 4 does not list them.
+Validation errors: kept exactly as today (422 VALIDATION_ERROR, "Some fields are invalid.", `details` with the
+invalid fields), so those 13 tests stay unchanged.
+**Answer (Anurag):** delete the two Swagger/OpenAPI tests (log them under "flask-smorest removed (sections 1 and 6)");
+keep GET / as a redirect, now to /api/health, and adapt that test; in step 7 remove the Swagger mentions from
+README, comments and CLAUDE.md. **Standing rule:** no working feature may break; before every commit all backend
+and frontend tests, `npm run build`, the snapshot compare and demo_walk.py must pass; if a feature would stop
+working, stop and ask.
+
+### 4.1 auth (done)
+- Plain Flask (`bp = Blueprint("auth", ...)`, `@bp.post(...)`), plain `if` checks with the same rules and the same
+  422 shape (`utils.validation_error`), `user_to_dict`. `__init__` registers plain blueprints with
+  `app.register_blueprint` until step 5.
+- Section 4: no password rehash, no wrong-guess counter (`email_otps.attempts` column removed), no
+  one-code-per-minute wait (resend / forgot always send a new code), no `POST /auth/accept-terms`, no
+  `terms_accepted` in the login response (the frontend gate only shows when it is exactly `false`, so login keeps
+  working until step 6 removes the gate code). Codes still expire after 10 minutes and work once.
+- Small differences from marshmallow (not features): unknown JSON fields are ignored instead of 422; the email
+  format check is a simple regex; OTP_EXPIRED says "This code has expired. Ask for a new one." (no more "or was
+  entered wrongly too many times").
+- `utils.needs_rehash` deleted (no caller).
+- Snapshot: + `terms_accepted` gone from POST /auth/login (3 roles). 102 known, 0 unexplained.
+- Checks: backend 597 passed; frontend 240; build OK; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -292,3 +322,11 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_documents_vault.py::test_the_owner_downloads_the_decrypted_file | checks `documents.content` is encrypted instead of the file on disk | documents: files stored in documents.content |
 | test_marketplace_engagements.py `_add_document` helper | `content=encrypt_bytes(...)` instead of a storage key | documents: files stored in documents.content |
 | conftest.py `upload_dir` fixture | deleted | documents: UPLOAD_DIR and the upload folder go |
+| test_auth_verify_email.py::test_a_wrong_code_is_refused_and_counted | renamed test_a_wrong_code_is_refused; the `attempts == 1` check removed | auth: wrong-guess counter removed |
+| test_auth_verify_email.py::test_the_code_stops_working_after_too_many_wrong_guesses | deleted | auth: wrong-guess counter removed |
+| test_auth_verify_email.py::test_resend_sends_at_most_one_code_a_minute | rewritten as test_resend_sends_a_new_code_right_away | auth: one-code-per-minute wait removed |
+| test_auth_password_reset.py::test_forgot_password_sends_at_most_one_code_a_minute | rewritten as test_forgot_password_sends_a_new_code_each_time | auth: one-code-per-minute wait removed |
+| test_auth_login.py::test_outdated_hash_is_rehashed_on_login | deleted | auth: password rehash removed |
+| test_auth_login.py::test_login_says_whether_the_terms_were_accepted, test_accept_terms_records_consent_once | deleted | auth: accept-terms endpoint and consent gate removed |
+| test_app_factory.py::test_openapi_spec_lists_health_and_every_tag, test_swagger_ui_is_served | deleted | flask-smorest removed (sections 1 and 6), Q4 |
+| test_auth_me_and_permissions.py::test_openapi_marks_login_and_health_public_and_the_rest_protected (+ its PUBLIC_AUTH_PATHS list) | deleted. **Flag:** a third OpenAPI test Q4 did not name; same reason (nothing uses /api/openapi.json) | flask-smorest removed (sections 1 and 6), Q4 |

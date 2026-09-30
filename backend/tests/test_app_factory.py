@@ -11,23 +11,6 @@ def test_every_blueprint_is_registered(app):
     assert set(app.blueprints) >= EXPECTED_BLUEPRINTS
 
 
-def test_openapi_spec_lists_health_and_every_tag(client):
-    response = client.get("/api/openapi.json")
-
-    assert response.status_code == 200
-    spec = response.get_json()
-    assert spec["info"]["title"] == "CA Helper API"
-    assert "/api/health" in spec["paths"]
-    assert {tag["name"] for tag in spec["tags"]} >= EXPECTED_BLUEPRINTS
-
-
-def test_swagger_ui_is_served(client):
-    response = client.get("/api/docs")
-
-    assert response.status_code == 200
-    assert b"swagger-ui" in response.data
-
-
 def test_unknown_url_returns_standard_error(client):
     response = client.get("/api/does-not-exist")
 

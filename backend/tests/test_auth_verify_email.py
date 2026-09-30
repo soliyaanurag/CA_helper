@@ -5,7 +5,6 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select, update
 
-from app.auth import OTP_MAX_ATTEMPTS
 from app.models import EmailOtp, User
 from tests.conftest import emailed_code
 
@@ -60,23 +59,12 @@ def test_the_emailed_code_verifies_the_email_and_login_works(client, database, s
     assert login.status_code == 200
 
 
-def test_a_wrong_code_is_refused_and_counted(client, database, signed_up):
+def test_a_wrong_code_is_refused(client, database, signed_up):
     response = verify(client, wrong(signed_up))
 
     assert response.status_code == 400
     assert error_code(response) == "OTP_INVALID"
-    assert database.session.scalar(select(EmailOtp)).attempts == 1
     assert verify(client, signed_up).status_code == 204  # the right code still works
-
-
-def test_the_code_stops_working_after_too_many_wrong_guesses(client, signed_up):
-    for _ in range(OTP_MAX_ATTEMPTS):
-        assert error_code(verify(client, wrong(signed_up))) == "OTP_INVALID"
-
-    response = verify(client, signed_up)
-
-    assert response.status_code == 400
-    assert error_code(response) == "OTP_EXPIRED"
 
 
 def test_an_expired_code_is_refused(client, database, signed_up):
@@ -128,11 +116,11 @@ def test_resend_emails_a_new_code_that_replaces_the_old_one(client, database, si
     assert verify(client, new_code).status_code == 204
 
 
-def test_resend_sends_at_most_one_code_a_minute(client, signed_up, mailbox):
+def test_resend_sends_a_new_code_right_away(client, signed_up, mailbox):
     response = client.post(RESEND_URL, json={"email": EMAIL})
 
     assert response.status_code == 204
-    assert len(mailbox) == 1  # only the signup email
+    assert len(mailbox) == 2  # the signup email and the new code
 
 
 def test_resend_for_an_unknown_or_verified_email_is_an_error(client, make_user, mailbox):

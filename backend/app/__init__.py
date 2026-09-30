@@ -207,7 +207,7 @@ def health():
 # /api/openapi.json stay unversioned.
 API_PREFIX = "/api/v1"
 BLUEPRINTS = [
-    auth.blp,
+    auth.bp,
     onboarding.blp,
     compliance.blp,
     ca_workspace.blp,
@@ -238,7 +238,11 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     api.register_blueprint(health_blp)
     for blp in BLUEPRINTS:
-        api.register_blueprint(blp, url_prefix=API_PREFIX)
+        # Until every feature is plain Flask, flask-smorest registers its own blueprints.
+        if isinstance(blp, Blueprint):
+            api.register_blueprint(blp, url_prefix=API_PREFIX)
+        else:
+            app.register_blueprint(blp, url_prefix=API_PREFIX)
 
     # The API has no pages of its own, so its bare root opens the API docs instead of
     # a 404. A plain Flask route, so it stays out of the OpenAPI spec.

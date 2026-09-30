@@ -1,11 +1,7 @@
 """POST /api/v1/auth/login and the authenticate() service."""
 
-from datetime import UTC, datetime
-
-from argon2 import PasswordHasher
 from flask_jwt_extended import decode_token
 
-from app import auth as auth_service
 from app.models import UserRole
 from tests.conftest import TEST_PASSWORD
 
@@ -73,38 +69,8 @@ def test_unverified_user_with_wrong_password_gets_invalid_credentials(client, ma
     assert response.status_code == 401
 
 
-def test_outdated_hash_is_rehashed_on_login(client, make_user):
-    weak_hash = PasswordHasher(time_cost=1, memory_cost=8, parallelism=1).hash(TEST_PASSWORD)
-    user = make_user(email="old@example.com", password_hash=weak_hash)
-
-    assert login(client, "old@example.com").status_code == 200
-
-    assert user.password_hash != weak_hash
-    assert not auth_service.needs_rehash(user.password_hash)
-    assert login(client, "old@example.com").status_code == 200
-
-
 def test_invalid_body_is_a_validation_error(client, database):
     response = client.post(LOGIN_URL, json={"email": ""})
 
     assert response.status_code == 422
     assert set(response.get_json()["error"]["details"]["json"]) == {"email", "password"}
-
-
-def test_login_says_whether_the_terms_were_accepted(client, make_user):
-    make_user(email="old@example.com")  # signed up before the consent step
-    make_user(email="new@example.com", terms_accepted_at=datetime.now(UTC))
-
-    old = login(client, "old@example.com").get_json()
-    new = login(client, "new@example.com").get_json()
-
-    assert (old["terms_accepted"], new["terms_accepted"]) == (False, True)
-
-
-def test_accept_terms_records_consent_once(client, make_user, auth_headers, database):
-    user = make_user(email="old@example.com")
-
-    response = client.post("/api/v1/auth/accept-terms", headers=auth_headers(user))
-
-    assert response.status_code == 204
-    assert login(client, "old@example.com").get_json()["terms_accepted"] is True

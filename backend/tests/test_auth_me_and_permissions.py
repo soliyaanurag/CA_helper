@@ -82,24 +82,3 @@ def test_role_is_checked_against_the_database_not_the_token(
     response = client.get("/api/v1/admin/dashboard", headers=headers)
 
     assert response.status_code == 403
-
-
-PUBLIC_AUTH_PATHS = [
-    "/api/v1/auth/signup",
-    "/api/v1/auth/verify-email",
-    "/api/v1/auth/verify-email/resend",
-    "/api/v1/auth/login",
-    "/api/v1/auth/forgot-password",
-    "/api/v1/auth/reset-password",
-]
-
-
-def test_openapi_marks_login_and_health_public_and_the_rest_protected(client):
-    spec = client.get("/api/openapi.json").get_json()
-
-    assert spec["security"] == [{"bearerAuth": []}]
-    for path in PUBLIC_AUTH_PATHS:
-        assert spec["paths"][path]["post"]["security"] == [], path
-    assert spec["paths"]["/api/health"]["get"]["security"] == []
-    assert "security" not in spec["paths"]["/api/v1/auth/me"]["get"]
-    assert "security" not in spec["paths"]["/api/v1/auth/change-password"]["post"]

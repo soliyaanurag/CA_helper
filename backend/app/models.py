@@ -230,8 +230,6 @@ class EmailOtp(BaseModel):
     purpose: Mapped[str] = mapped_column(String(50))
     code_hash: Mapped[str] = mapped_column(String(255))  # argon2 hash of the 6 digits
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # Wrong guesses so far; the code stops working at auth_service.OTP_MAX_ATTEMPTS.
-    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

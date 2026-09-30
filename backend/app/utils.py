@@ -17,7 +17,7 @@ from typing import Any
 import marshmallow as ma
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from flask import current_app, Flask
+from flask import Flask, current_app, request
 from flask_jwt_extended import get_current_user, verify_jwt_in_request
 from jinja2 import Template
 from marshmallow import fields, Schema, validate
@@ -83,6 +83,21 @@ def register_error_handlers(app: Flask) -> None:
         return error_body(error.code, error.message, error.details), error.status
 
 
+# The message of a required field that was not sent.
+MISSING = "Missing data for required field."
+
+
+def json_body() -> dict:
+    """The request's JSON object ({} when the body is empty or not a JSON object)."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def validation_error(errors: dict, location: str = "json") -> ApiError:
+    """The 422 answer for invalid fields: details {location: {field: [message]}}."""
+    return ApiError(422, "VALIDATION_ERROR", "Some fields are invalid.", {location: errors})
+
+
 # --- pagination --------------------------------------------------------------------------
 
 
@@ -119,10 +134,6 @@ def verify_password(password_hash: str, password: str) -> bool:
         return _hasher.verify(password_hash, password)
     except (VerificationError, InvalidHashError):
         return False
-
-
-def needs_rehash(password_hash: str) -> bool:
-    return _hasher.check_needs_rehash(password_hash)
 
 
 # --- email -------------------------------------------------------------------------
