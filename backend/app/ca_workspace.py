@@ -48,12 +48,6 @@ from marshmallow import fields, post_load, Schema, validate, ValidationError
 from sqlalchemy import select
 
 from app import alerts, compliance, documents, marketplace, onboarding, regulatory
-from app.compliance import (
-    FilingDetailItemSchema,
-    MarkFiledFileSchema,
-    MarkFiledFormSchema,
-    TickedChecklistEntrySchema,
-)
 from app.models import (
     ComplianceStatus,
     db,
@@ -61,6 +55,7 @@ from app.models import (
     DocumentRequestStatus,
     DocumentType,
     EntityType,
+    FilingPath,
     FormCode,
     GstScheme,
     ItrForm,
@@ -83,6 +78,61 @@ from app.utils import (
 
 
 # --- Request and response shapes ---------------------------------------------------------
+
+
+# The filing shapes (the same as the compliance pages).
+
+
+class ComplianceItemSchema(Schema):
+    """One filing, e.g. GSTR-3B for Apr 2026, due 2026-05-20."""
+
+    id = fields.UUID(required=True)
+    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
+    fy = fields.String(required=True, metadata={"description": 'Financial year, e.g. "2026-27"'})
+    period_label = fields.String(
+        required=True, metadata={"description": '"Apr 2026", "Q1 2026-27"'}
+    )
+    period_start = fields.Date(required=True)
+    period_end = fields.Date(required=True)
+    due_date = fields.Date(required=True)
+    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
+    filing_path = fields.String(validate=validate.OneOf(list(FilingPath)), allow_none=True)
+
+
+class ChecklistEntrySchema(Schema):
+    """One document to have ready, from content/forms/<FORM>/checklist.yaml."""
+
+    key = fields.String(required=True)
+    label = fields.String(required=True)
+    required = fields.Boolean(required=True)
+    help = fields.String(allow_none=True)
+
+
+class TickedChecklistEntrySchema(ChecklistEntrySchema):
+    ticked = fields.Boolean(required=True)
+
+
+class FilingDetailItemSchema(ComplianceItemSchema):
+    filed_at = fields.DateTime(allow_none=True)
+    acknowledgement_no = fields.String(allow_none=True)
+
+
+class MarkFiledFormSchema(Schema):
+    """POST /compliance/items/<id>/mark-filed (multipart/form-data), the text part."""
+
+    acknowledgement_no = fields.String(load_default=None, validate=validate.Length(max=50))
+
+    @post_load
+    def _clean(self, data: dict, **kwargs) -> dict:
+        if data["acknowledgement_no"] is not None:
+            data["acknowledgement_no"] = data["acknowledgement_no"].strip().upper() or None
+        return data
+
+
+class MarkFiledFileSchema(Schema):
+    """The optional acknowledgement file (PDF, JPG or PNG)."""
+
+    file = fields.Raw(load_default=None, metadata={"type": "string", "format": "binary"})
 
 
 # The business page shapes (the same as GET /onboarding/business).

@@ -209,7 +209,7 @@ API_PREFIX = "/api/v1"
 BLUEPRINTS = [
     auth.bp,
     onboarding.bp,
-    compliance.blp,
+    compliance.bp,
     ca_workspace.blp,
     marketplace.blp,
     admin.blp,

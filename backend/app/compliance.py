@@ -1,55 +1,10 @@
-"""Request and response shapes for /api/v1/compliance/...
+"""Filings: which forms a business must file and when, the calendar, the filing page
+(checklist, path, mark filed), the dashboard numbers, peer insights and the overdue job.
 
-Business logic for compliance: due dates, creating filings, the filings list and the dashboard.
-
-financial_year_start(day) -> date                   1 April of the financial year of `day`
-periods_of_year(frequency, fy_start) -> list        the months / quarters / year of one FY
-due_date(template, period_end, quarter, audit)      when one filing is due (CO2)
-sync_filings(business_id, profile, today) -> dict  match this FY's filings to the profile (CO3)
-create_filings(business_id, profile, today) -> int  the same for a new business (count added)
-list_filings(business, filters) -> list             one business's filings, soonest first (CO4)
-get_dashboard(user, business) -> dict               home page numbers: next deadline, counts (CO12)
-get_form_content(form_code) -> dict                 explanation, instructions, checklist (CO6)
-get_filing(business, item_id) -> dict               one filing with its content and checklist (CO5)
-choose_path(business, item_id, path) -> dict        "self" or "ca" (CO8)
-set_checklist_tick(business, item_id, key, ticked)  tick / untick one checklist entry (CO7, CO10)
-mark_filed(business, user, item_id, ack_no, upload) the business filed it itself (CO9)
-unmark_filed(business, item_id) -> dict             undo a mistaken "mark as filed"
-get_acknowledgement(business, item_id)              the uploaded acknowledgement file
-checklist_with_ticks(filing) -> list                the checklist with ticks (used by ca_workspace)
-checklist_progress(filing) -> dict                  required ready / total and what is missing
-mark_filed_by_ca(business, ca_user, item_id, ...)   the CA filed it (CW5; no commit)
-checklist_keys(form_code) -> list                   a form's checklist keys (used by documents)
-tick_checklist_entry(filing, key)                   tick an entry a document answers (documents)
-filings_by_acknowledgement(doc_ids) -> dict         filings whose acknowledgement these are
-get_filings_by_ids(ids) -> dict                     filings by id (used by marketplace)
-mark_filings_with_ca(ids)                           set filings to "With CA" (used by marketplace)
-mark_overdue_filings(today) -> int                  worker job: late filings -> "overdue" (CO11)
-list_unfiled_filings_due_by(day) -> list            not-filed filings due by a date (used by alerts)
-peer_insights(business, item_id) -> dict            how similar businesses file this form (CO13)
-form_name(form_code, fy) / filing_name(filing)      display names (24Q is Form 138 from 2026-27)
-filing_stats(today) -> dict                         filings by status and the overdue rate (admin)
-
-How forms and due dates work: each row of `obligation_templates` says which
-businesses a form applies to (`applicability`, matched against the regulatory
-profile) and when it is due (`due_date_rule`). The rows are data, seeded in
-app/seed.py; no legal date is written in this file (CLAUDE.md rule 3).
-
-HTTP routes for compliance: /api/v1/compliance/... (business role only).
-
-    GET  /compliance/dashboard                   home page numbers (CO12)
-    GET  /compliance/items                       the business's filings, soonest due first (CO4)
-    GET  /compliance/items/<id>                  one filing's page (CO5)
-    POST /compliance/items/<id>/path             file it myself / with a CA (CO8)
-    POST /compliance/items/<id>/checklist        tick or untick a document (CO7)
-    POST /compliance/items/<id>/mark-filed       filed it myself, with the acknowledgement (CO9)
-    POST /compliance/items/<id>/unmark-filed     undo a mistaken "mark as filed"
-    GET  /compliance/items/<id>/acknowledgement  the uploaded acknowledgement file
-    GET  /compliance/items/<id>/peer-insights    how similar businesses file it (CO13)
-    GET  /compliance/forms/<form_code>           a form's explanation, instructions, checklist (CO6)
-
-Routes stay thin: parse input (app/schemas/), call one service function, serialize
-the result. No queries and no db.session here (docs/PATTERNS.md, "Foundations").
+Each row of `obligation_templates` says which businesses a form applies to
+(`applicability`, matched against the regulatory profile) and when it is due
+(`due_date_rule`). The rows are data, seeded in app/seed.py; no legal date is written
+in this file.
 """
 
 import calendar
@@ -60,9 +15,7 @@ from datetime import date
 from zoneinfo import ZoneInfo
 
 import yaml
-from flask import send_file
-from flask_smorest import Blueprint
-from marshmallow import fields, post_load, Schema, validate
+from flask import Blueprint, jsonify, request, send_file
 from sqlalchemy import delete, or_, select
 
 from app import documents, onboarding
@@ -71,7 +24,6 @@ from app.models import (
     ComplianceItem,
     ComplianceItemDocument,
     ComplianceStatus,
-    db,
     DocumentRequest,
     DocumentType,
     EngagementItem,
@@ -81,183 +33,65 @@ from app.models import (
     ObligationTemplate,
     RegulatoryProfile,
     ReminderLog,
-    today_in_india,
     User,
     UserRole,
+    db,
+    today_in_india,
     utcnow,
 )
 from app.utils import (
+    MISSING,
+    REPO_ROOT,
     ApiError,
     current_business,
     current_business_or_none,
     current_user,
-    ErrorSchema,
+    iso,
+    json_body,
     login_required,
-    REPO_ROOT,
     roles_required,
+    validation_error,
 )
 
-
-# --- Request and response shapes ---------------------------------------------------------
-
-
-class ComplianceItemSchema(Schema):
-    """One filing, e.g. GSTR-3B for Apr 2026, due 2026-05-20."""
-
-    id = fields.UUID(required=True)
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    fy = fields.String(required=True, metadata={"description": 'Financial year, e.g. "2026-27"'})
-    period_label = fields.String(
-        required=True, metadata={"description": '"Apr 2026", "Q1 2026-27"'}
-    )
-    period_start = fields.Date(required=True)
-    period_end = fields.Date(required=True)
-    due_date = fields.Date(required=True)
-    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
-    filing_path = fields.String(validate=validate.OneOf(list(FilingPath)), allow_none=True)
-
-
-class ItemListArgsSchema(Schema):
-    """GET /compliance/items filters (CO4); all optional."""
-
-    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)))
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)))
-    due_from = fields.Date(metadata={"description": "Due on or after this date"})
-    due_to = fields.Date(metadata={"description": "Due on or before this date"})
-
-
-class ComplianceDashboardSchema(Schema):
-    """The business home page (CO12)."""
-
-    message = fields.String(required=True, metadata={"description": "Welcome text"})
-    registered = fields.Boolean(required=True, metadata={"description": "Business registered?"})
-    next_deadline = fields.Nested(ComplianceItemSchema, allow_none=True, required=True)
-    due_this_month = fields.Integer(
-        required=True, metadata={"description": "Not filed, due later this month"}
-    )
-    overdue = fields.Integer(required=True, metadata={"description": "Not filed, due date passed"})
-    with_ca = fields.Integer(required=True, metadata={"description": "A CA is working on them"})
-
-
-class ChecklistEntrySchema(Schema):
-    """One document to have ready, from content/forms/<FORM>/checklist.yaml."""
-
-    key = fields.String(required=True)
-    label = fields.String(required=True)
-    required = fields.Boolean(required=True)
-    help = fields.String(allow_none=True)
-
-
-class FormContentSchema(Schema):
-    """GET /compliance/forms/<form_code> (CO6). The texts are Markdown."""
-
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    status = fields.String(required=True, metadata={"description": "TODO, DRAFT or DONE"})
-    explanation = fields.String(required=True)
-    instructions = fields.String(required=True)
-    checklist = fields.List(fields.Nested(ChecklistEntrySchema), required=True)
-
-
-class TickedChecklistEntrySchema(ChecklistEntrySchema):
-    ticked = fields.Boolean(required=True)
-
-
-class FilingDetailItemSchema(ComplianceItemSchema):
-    filed_at = fields.DateTime(allow_none=True)
-    acknowledgement_no = fields.String(allow_none=True)
-
-
-class VerificationSchema(Schema):
-    """What the acknowledgement file shows, read locally with OCR (DO8)."""
-
-    verified = fields.Boolean(required=True)
-    problems = fields.List(
-        fields.String(), required=True, metadata={"description": "What did not match"}
-    )
-    acknowledgement_no = fields.String(
-        allow_none=True, metadata={"description": "The number found"}
-    )
-    filing_date = fields.String(
-        allow_none=True, metadata={"description": "The date found, YYYY-MM-DD"}
-    )
-
-
-class AcknowledgementSchema(Schema):
-    filename = fields.String(required=True)
-    uploaded_at = fields.DateTime(required=True)
-    verification = fields.Nested(VerificationSchema, required=True)
-
-
-class FilingDetailSchema(Schema):
-    """GET /compliance/items/<id> (CO5): the filing page."""
-
-    filing = fields.Nested(FilingDetailItemSchema, required=True)
-    form_name = fields.String(required=True, metadata={"description": 'e.g. "GSTR-3B (monthly)"'})
-    content_status = fields.String(required=True, metadata={"description": "TODO, DRAFT or DONE"})
-    explanation = fields.String(required=True, metadata={"description": "Markdown"})
-    instructions = fields.String(required=True, metadata={"description": "Markdown"})
-    checklist = fields.List(fields.Nested(TickedChecklistEntrySchema), required=True)
-    acknowledgement = fields.Nested(AcknowledgementSchema, allow_none=True, required=True)
-
-
-class ChoosePathSchema(Schema):
-    """POST /compliance/items/<id>/path (CO8)."""
-
-    path = fields.String(validate=validate.OneOf(list(FilingPath)), required=True)
-
-
-class ChecklistTickSchema(Schema):
-    """POST /compliance/items/<id>/checklist (CO7)."""
-
-    key = fields.String(required=True, validate=validate.Length(1, 50))
-    ticked = fields.Boolean(required=True)
-
-
-class MarkFiledFormSchema(Schema):
-    """POST /compliance/items/<id>/mark-filed (multipart/form-data), the text part."""
-
-    acknowledgement_no = fields.String(load_default=None, validate=validate.Length(max=50))
-
-    @post_load
-    def _clean(self, data: dict, **kwargs) -> dict:
-        if data["acknowledgement_no"] is not None:
-            data["acknowledgement_no"] = data["acknowledgement_no"].strip().upper() or None
-        return data
-
-
-class MarkFiledFileSchema(Schema):
-    """The optional acknowledgement file (PDF, JPG or PNG)."""
-
-    file = fields.Raw(load_default=None, metadata={"type": "string", "format": "binary"})
-
-
-class PeerPathSchema(Schema):
-    count = fields.Integer(required=True, metadata={"description": "Filed filings on this path"})
-    share_pct = fields.Integer(allow_none=True, metadata={"description": "Of all filed, %"})
-    on_time_pct = fields.Integer(allow_none=True, metadata={"description": "Filed on time, %"})
-
-
-class PeerInsightsSchema(Schema):
-    """GET /compliance/items/<id>/peer-insights (CO13)."""
-
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    scope = fields.String(
-        required=True,
-        metadata={"description": '"segment" (same entity type and MSME tier), "overall" or "none"'},
-    )
-    entity_type = fields.String(required=True)
-    msme_tier = fields.String(allow_none=True)
-    min_businesses = fields.Integer(required=True)
-    business_count = fields.Integer(required=True)
-    filing_count = fields.Integer(required=True)
-    self = fields.Nested(PeerPathSchema, allow_none=True, required=True)
-    ca = fields.Nested(PeerPathSchema, allow_none=True, required=True)
-
-
-# --- Logic -------------------------------------------------------------------------------
-
-
 log = logging.getLogger(__name__)
+
+bp = Blueprint("compliance", __name__)
+
+# Filings in these states are done; a profile change never removes them.
+DONE_STATUSES = (ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED)
+
+# A group's peer figures are shown only when at least this many businesses have filed the
+# form (fewer would say little and could point at one business). A product rule.
+MIN_PEER_BUSINESSES = 10
+
+
+# --- JSON shapes -------------------------------------------------------------------------
+
+
+def filing_to_dict(filing: ComplianceItem) -> dict:
+    """One filing, e.g. GSTR-3B for Apr 2026, due 2026-05-20."""
+    return {
+        "id": str(filing.id),
+        "form_code": filing.form_code,
+        "fy": filing.fy,
+        "period_label": filing.period_label,
+        "period_start": iso(filing.period_start),
+        "period_end": iso(filing.period_end),
+        "due_date": iso(filing.due_date),
+        "status": filing.status,
+        "filing_path": filing.filing_path,
+    }
+
+
+def filing_detail_to_dict(filing: ComplianceItem) -> dict:
+    """A filing with when it was filed and its acknowledgement (ARN) number."""
+    result = filing_to_dict(filing)
+    result["filed_at"] = iso(filing.filed_at)
+    result["acknowledgement_no"] = filing.acknowledgement_no
+    return result
+
+
+# --- Periods and due dates ---------------------------------------------------------------
 
 
 def financial_year_start(day: date) -> date:
@@ -351,10 +185,6 @@ def _applies_to(template: ObligationTemplate, profile: RegulatoryProfile) -> boo
         if getattr(profile, field) not in allowed_values:
             return False
     return True
-
-
-# Filings in these states are done; a profile change never removes them.
-DONE_STATUSES = (ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED)
 
 
 def _status_for(due: date, today: date) -> ComplianceStatus:
@@ -462,7 +292,7 @@ def list_filings(
 ) -> list[ComplianceItem]:
     """The business's live filings, the soonest due first.
 
-    Optional filters (CO4): one status, one form, and due dates from / to (inclusive).
+    Optional filters: one status, one form, and due dates from / to (inclusive).
     """
     stmt = select(ComplianceItem).where(
         ComplianceItem.business_id == business.id
@@ -481,11 +311,11 @@ def list_filings(
 
 
 def get_dashboard(user: User, business=None, today: date | None = None) -> dict:
-    """The business home page: a welcome, the next deadline and three counts (CO12).
+    """The business home page: a welcome, the next deadline and three counts.
 
     Counted among filings that are not filed yet: due later this month, overdue (due
     date passed, whatever their status) and with a CA. Before registration only the
-    welcome is filled in. The penalty estimate comes with the penalty rules (AL4, AL5).
+    welcome is filled in. The penalty estimate comes with the penalty rules.
     """
     if today is None:
         today = today_in_india()
@@ -516,7 +346,7 @@ def get_dashboard(user: User, business=None, today: date | None = None) -> dict:
     return result
 
 
-# --- Form content (CO6) --------------------------------------------------------------
+# --- Form content ------------------------------------------------------------------------
 # Every form has a folder of human-written files (content/README.md):
 #   explanation.md, instructions.md  Markdown with a small front matter block (form, status)
 #   checklist.yaml                   the documents to have ready: key, label, required, help
@@ -590,7 +420,7 @@ def get_form_content(form_code) -> dict:
     }
 
 
-# --- The filing page (CO5, CO7, CO8, CO9, CO10) --------------------------------------
+# --- The filing page ---------------------------------------------------------------------
 
 # Filings the business itself can still work on: choose a path, mark filed.
 SELF_FILEABLE_STATUSES = (
@@ -599,14 +429,6 @@ SELF_FILEABLE_STATUSES = (
     ComplianceStatus.READY,
     ComplianceStatus.OVERDUE,
 )
-
-
-def _own_filing(business, item_id) -> ComplianceItem:
-    """One filing of this business. 404 FILING_NOT_FOUND for anyone else's."""
-    filing = db.session.get(ComplianceItem, item_id)
-    if filing is None or filing.business_id != business.id:
-        raise ApiError(404, "FILING_NOT_FOUND", "This filing was not found.")
-    return filing
 
 
 def _ticked_keys(filing: ComplianceItem) -> set:
@@ -618,7 +440,7 @@ def _ticked_keys(filing: ComplianceItem) -> set:
 
 
 def _refresh_status(filing: ComplianceItem, today: date) -> None:
-    """Work out a not-started filing's status again (CO10). Does not commit.
+    """Work out a not-started filing's status again. Does not commit.
 
     Past its due date: overdue. Otherwise from the checklist: nothing ticked yet ->
     upcoming; some ticked but a required document missing -> docs pending; every
@@ -650,56 +472,29 @@ def _template_name(filing: ComplianceItem) -> str:
     return db.session.get(ObligationTemplate, filing.template_id).name
 
 
-def get_filing(business, item_id) -> dict:
-    """One filing with everything its page shows: dates, status, path, the form's
-    explanation and instructions, the checklist with ticks, and the acknowledgement."""
-    filing = _own_filing(business, item_id)
+def filing_page(filing: ComplianceItem) -> dict:
+    """Everything the filing page shows: dates, status, path, the form's explanation and
+    instructions, the checklist with ticks, and the acknowledgement."""
     content = get_form_content(filing.form_code)
-    checklist = checklist_with_ticks(filing)
     acknowledgement = None
     if filing.acknowledgement_document_id is not None:
         # Only the stored metadata: the file itself is not opened for the page.
         document = documents.get_document(filing.acknowledgement_document_id)
         acknowledgement = {
             "filename": document.original_filename,
-            "uploaded_at": document.created_at,
-            # Why it is (not) verified, from the fields OCR read when it was uploaded (DO8).
+            "uploaded_at": iso(document.created_at),
+            # Why it is (not) verified, from the fields OCR read when it was uploaded.
             "verification": documents.verify_acknowledgement(document, filing),
         }
     return {
-        "filing": filing,
+        "filing": filing_detail_to_dict(filing),
         "form_name": _template_name(filing),
         "content_status": content["status"],
         "explanation": content["explanation"],
         "instructions": content["instructions"],
-        "checklist": checklist,
+        "checklist": checklist_with_ticks(filing),
         "acknowledgement": acknowledgement,
     }
-
-
-def choose_path(business, item_id, path: FilingPath) -> dict:
-    """The business decides to file it itself ("self") or with a CA ("ca") (CO8).
-
-    409 FILING_LOCKED once a CA has it or it is filed.
-    """
-    filing = _own_filing(business, item_id)
-    if filing.status not in SELF_FILEABLE_STATUSES:
-        raise ApiError(409, "FILING_LOCKED", "This filing is already with a CA or filed.")
-    filing.filing_path = path
-    db.session.commit()
-    return get_filing(business, item_id)
-
-
-def set_checklist_tick(business, item_id, key: str, ticked: bool) -> dict:
-    """Tick (or untick) one checklist entry, then update the filing's status (CO7, CO10).
-
-    A tick is a row in checklist_ticks; unticking deletes it (CLAUDE.md rule 6).
-    422 UNKNOWN_CHECKLIST_KEY for a key that is not in the form's checklist.
-    """
-    filing = _own_filing(business, item_id)
-    _set_tick(filing, key, ticked)
-    db.session.commit()
-    return get_filing(business, item_id)
 
 
 def _set_tick(filing: ComplianceItem, key: str, ticked: bool) -> None:
@@ -722,31 +517,13 @@ def _set_tick(filing: ComplianceItem, key: str, ticked: bool) -> None:
     _refresh_status(filing, today_in_india())
 
 
-def mark_filed(business, user: User, item_id, acknowledgement_no=None, upload=None) -> dict:
-    """The business filed it itself on the government portal (CO9).
-
-    Optional: the acknowledgement (ARN) number and the acknowledgement file, which is
-    stored encrypted. 409 FILING_WITH_CA (the CA marks it), 409 ALREADY_FILED.
-    Storage errors for the file (FILE_TYPE_NOT_ALLOWED, FILE_TOO_LARGE) pass through.
-    """
-    filing = _own_filing(business, item_id)
-    if filing.status == ComplianceStatus.WITH_CA:
-        raise ApiError(409, "FILING_WITH_CA", "Your CA is handling this filing.")
-    if filing.status not in SELF_FILEABLE_STATUSES:
-        raise ApiError(409, "ALREADY_FILED", "This filing is already marked as filed.")
-    _record_filed(filing, user.id, user, FilingPath.SELF, acknowledgement_no, upload)
-    db.session.commit()
-    log.info("Filing %s marked filed by its business", filing.id)
-    return get_filing(business, item_id)
-
-
 def _record_filed(filing, owner_id, uploader: User, path, acknowledgement_no, upload) -> None:
     """Status "filed" with the optional ARN and acknowledgement file (owned by the business
     owner, uploaded by `uploader`). Does not commit.
 
     With a file, the acknowledgement is read locally (documents, OCR) and, when it
     shows this form, period, a number and a filing date, the filing becomes
-    "filed_verified" (CO10, DO8). An ARN found in the file fills an empty ARN.
+    "filed_verified". An ARN found in the file fills an empty ARN.
     """
     document = None
     if upload is not None:  # stored first: a refused file changes nothing
@@ -769,37 +546,7 @@ def _record_filed(filing, owner_id, uploader: User, path, acknowledgement_no, up
         filing.acknowledgement_no = filing.acknowledgement_no or result["acknowledgement_no"]
 
 
-def unmark_filed(business, item_id) -> dict:
-    """Undo "mark as filed" (a mistake): the status is worked out again and the
-    acknowledgement is removed. Only for filings the business marked itself;
-    409 NOT_SELF_FILED otherwise.
-    """
-    filing = _own_filing(business, item_id)
-    if filing.status not in DONE_STATUSES or filing.filing_path != FilingPath.SELF:
-        raise ApiError(409, "NOT_SELF_FILED", "Only a filing you marked as filed can be undone.")
-    old_document_id = filing.acknowledgement_document_id
-    filing.acknowledgement_document_id = None
-    if old_document_id is not None:
-        db.session.flush()  # the filing lets go of the file before the file is deleted
-        documents.remove_document(old_document_id)
-    filing.acknowledgement_no = None
-    filing.filed_at = None
-    filing.verified_at = None
-    filing.status = ComplianceStatus.UPCOMING
-    _refresh_status(filing, today_in_india())
-    db.session.commit()
-    return get_filing(business, item_id)
-
-
-def get_acknowledgement(business, item_id):
-    """(document, bytes) of the filing's acknowledgement. 404 ACKNOWLEDGEMENT_MISSING."""
-    filing = _own_filing(business, item_id)
-    if filing.acknowledgement_document_id is None:
-        raise ApiError(404, "ACKNOWLEDGEMENT_MISSING", "No acknowledgement was uploaded.")
-    return documents.read_document(filing.acknowledgement_document_id)
-
-
-# --- Used by the ca_workspace module (CW3, CW5, CW6, CW7) ------------------------------
+# --- For other modules -------------------------------------------------------------------
 
 
 def checklist_with_ticks(filing: ComplianceItem) -> list[dict]:
@@ -824,13 +571,13 @@ def checklist_progress(filing: ComplianceItem) -> dict:
 
 
 def mark_filed_by_ca(business, ca_user: User, item_id, acknowledgement_no=None, upload=None):
-    """The CA of an active engagement filed it (CW5): like mark_filed, with the path "ca".
+    """The CA of an active engagement filed it: like mark_filed, with the path "ca".
     The acknowledgement belongs to the business owner; the CA is its uploader. Does not
     commit; the caller checks the CA's access first.
 
     409 ALREADY_FILED; 409 FILING_NOT_WITH_CA unless the filing is "With CA".
     """
-    filing = _own_filing(business, item_id)
+    filing = own_filing(business, item_id)
     if filing.status in DONE_STATUSES:
         raise ApiError(409, "ALREADY_FILED", "This filing is already marked as filed.")
     if filing.status != ComplianceStatus.WITH_CA:
@@ -840,7 +587,7 @@ def mark_filed_by_ca(business, ca_user: User, item_id, acknowledgement_no=None, 
     return filing
 
 
-# --- Used by the documents module (the vault, DO6) ------------------------------------
+# --- Used by the documents module ------------------------------------------------------
 
 
 def checklist_keys(form_code) -> list[str]:
@@ -868,7 +615,7 @@ def filings_by_acknowledgement(document_ids) -> dict:
     return filings
 
 
-# --- Used by the marketplace module (engagements) ------------------------------------
+# --- Used by the marketplace module ----------------------------------------------------
 
 
 def get_filings_by_ids(filing_ids) -> dict:
@@ -889,7 +636,7 @@ def mark_filings_with_ca(filing_ids) -> None:
         filing.filing_path = FilingPath.CA
 
 
-# --- Used by the alerts module (reminders) --------------------------------------------
+# --- Used by the alerts module ---------------------------------------------------------
 
 
 def list_unfiled_filings_due_by(day: date) -> list[ComplianceItem]:
@@ -916,7 +663,7 @@ def business_ids_with_open_filings(form_codes) -> set:
     return set(db.session.scalars(stmt))
 
 
-# --- Worker job (CO11) ---------------------------------------------------------------
+# --- The overdue job (run by the worker) -------------------------------------------------
 
 # The business still has to act on filings in these states, so they turn "overdue" once
 # the due date has passed. A filing "With CA" keeps that status: the CA is handling it,
@@ -985,11 +732,7 @@ def filing_name(filing) -> str:
     return f"{form_name(filing.form_code, filing.fy)} ({filing.period_label})"
 
 
-# --- Peer insights (CO13) and the admin's numbers (AD5) --------------------------------
-
-# A group's figures are shown only when at least this many businesses have filed the form
-# (fewer would say little and could point at one business). A product rule, not a legal one.
-MIN_PEER_BUSINESSES = 10
+# --- Peer insights and the admin's numbers --------------------------------------------
 
 
 def filed_on_time(filing: ComplianceItem) -> bool:
@@ -998,73 +741,62 @@ def filed_on_time(filing: ComplianceItem) -> bool:
     return filed_day <= filing.due_date
 
 
-def _path_figures(filings, total: int) -> dict:
-    on_time = sum(1 for filing in filings if filed_on_time(filing))
-    return {
-        "count": len(filings),
-        "share_pct": round(len(filings) * 100 / total) if total else None,
-        "on_time_pct": round(on_time * 100 / len(filings)) if filings else None,
-    }
+def peer_insights(business, filing: ComplianceItem) -> dict:
+    """How businesses like this one file this form: the share filed by the business itself
+    and through a CA, and how often each path was on time.
 
-
-def _figures(form_code, business_ids=None) -> dict | None:
-    """Self-filed vs via a CA, and each path's on-time rate, over the filed filings of
-    `form_code` (of `business_ids`, or of every business). None below MIN_PEER_BUSINESSES."""
-    stmt = select(ComplianceItem).where(
-        ComplianceItem.form_code == form_code,
-        ComplianceItem.status.in_(DONE_STATUSES),
-        ComplianceItem.filed_at.is_not(None),
-    )
-    if business_ids is not None:
-        stmt = stmt.where(ComplianceItem.business_id.in_(business_ids))
-    filings = list(db.session.scalars(stmt))
-    businesses = {filing.business_id for filing in filings}
-    if len(businesses) < MIN_PEER_BUSINESSES:
-        return None
-    self_filed = [f for f in filings if f.filing_path == FilingPath.SELF]
-    with_ca = [f for f in filings if f.filing_path == FilingPath.CA]
-    total = len(self_filed) + len(with_ca)
-    return {
-        "business_count": len(businesses),
-        "filing_count": total,
-        "self": _path_figures(self_filed, total),
-        "ca": _path_figures(with_ca, total),
-    }
-
-
-def peer_insights(business, item_id) -> dict:
-    """How businesses like this one file this form (CO13): the share filed by the business
-    itself and through a CA, and how often each path was on time.
-
-    Segment: the same entity type and MSME tier. Shown only with at least
-    MIN_PEER_BUSINESSES businesses; otherwise the figures over every business
+    The group is the businesses with the same entity type and MSME tier ("segment"), shown
+    only when at least MIN_PEER_BUSINESSES of them filed the form; otherwise every business
     ("overall"), or nothing ("none") when even those are too few.
     """
-    filing = _own_filing(business, item_id)
     tier = onboarding.get_msme_tier(business)
-    scope = "none"
-    figures = None
+    groups = []
     if tier is not None:
-        segment = onboarding.business_ids_in_segment(business.entity_type, tier)
-        figures = _figures(filing.form_code, segment)
-        if figures is not None:
-            scope = "segment"
-    if figures is None:
-        figures = _figures(filing.form_code)
-        if figures is not None:
-            scope = "overall"
-    return {
+        groups.append(("segment", onboarding.business_ids_in_segment(business.entity_type, tier)))
+    groups.append(("overall", None))
+
+    result = {
         "form_code": filing.form_code,
-        "scope": scope,
+        "scope": "none",
         "entity_type": business.entity_type,
         "msme_tier": tier,
         "min_businesses": MIN_PEER_BUSINESSES,
-        **(figures or {"business_count": 0, "filing_count": 0, "self": None, "ca": None}),
+        "business_count": 0,
+        "filing_count": 0,
+        "self": None,
+        "ca": None,
     }
+    for scope, business_ids in groups:
+        stmt = select(ComplianceItem).where(
+            ComplianceItem.form_code == filing.form_code,
+            ComplianceItem.status.in_(DONE_STATUSES),
+            ComplianceItem.filed_at.is_not(None),
+        )
+        if business_ids is not None:
+            stmt = stmt.where(ComplianceItem.business_id.in_(business_ids))
+        filed = list(db.session.scalars(stmt))
+        businesses = {item.business_id for item in filed}
+        if len(businesses) < MIN_PEER_BUSINESSES:
+            continue
+        paths = {
+            "self": [item for item in filed if item.filing_path == FilingPath.SELF],
+            "ca": [item for item in filed if item.filing_path == FilingPath.CA],
+        }
+        total = len(paths["self"]) + len(paths["ca"])
+        result.update(scope=scope, business_count=len(businesses), filing_count=total)
+        for name, items in paths.items():
+            on_time = sum(1 for item in items if filed_on_time(item))
+            result[name] = {
+                "count": len(items),
+                "share_pct": round(len(items) * 100 / total) if total else None,
+                "on_time_pct": round(on_time * 100 / len(items)) if items else None,
+            }
+        break
+    return result
 
 
 def filing_stats(today: date | None = None) -> dict:
-    """For the admin dashboard (AD5): live filings by status, and the overdue rate: of the
+    """For the admin dashboard: live filings by status, and the overdue rate: of the
     filings whose due date has passed, the share not filed on time (still unfiled, or filed
     after the due date), in percent (None before anything was due)."""
     today = today or today_in_india()
@@ -1089,111 +821,171 @@ def filing_stats(today: date | None = None) -> dict:
 # --- Routes ------------------------------------------------------------------------------
 
 
-blp = Blueprint(
-    "compliance",
-    __name__,
-    description="Obligations, compliance calendar, item pages and home dashboard",
-)
+def own_filing(business, item_id) -> ComplianceItem:
+    """One filing of this business. 404 FILING_NOT_FOUND for anyone else's."""
+    filing = db.session.get(ComplianceItem, item_id)
+    if filing is None or filing.business_id != business.id:
+        raise ApiError(404, "FILING_NOT_FOUND", "This filing was not found.")
+    return filing
 
-NOT_FOUND = "BUSINESS_NOT_FOUND (register first), FILING_NOT_FOUND"
 
-
-# The business home page: next deadline and counts (just the welcome before registering).
-@blp.route("/compliance/dashboard", methods=["GET"])
+@bp.get("/compliance/dashboard")
 @roles_required(UserRole.BUSINESS)
-@blp.response(200, ComplianceDashboardSchema)
-def get_dashboard_view():
-    return get_dashboard(current_user(), current_business_or_none())
+def dashboard():
+    """The business home page: next deadline and counts (just the welcome before registering)."""
+    result = get_dashboard(current_user(), current_business_or_none())
+    if result["next_deadline"] is not None:
+        result["next_deadline"] = filing_to_dict(result["next_deadline"])
+    return jsonify(result)
 
 
-# The logged-in business sees its filings, optionally filtered.
-@blp.route("/compliance/items", methods=["GET"])
+@bp.get("/compliance/items")
 @roles_required(UserRole.BUSINESS)
-@blp.arguments(ItemListArgsSchema, location="query")
-@blp.response(200, ComplianceItemSchema(many=True))
-@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND (register first)")
-def list_items(filters):
-    return list_filings(current_business(), **filters)
+def list_items():
+    """The business's filings, soonest due first, optionally filtered by status, form and
+    due dates (from / to, inclusive)."""
+    errors = {}
+    filters = {}
+    status = request.args.get("status")
+    if status is not None:
+        if status not in list(ComplianceStatus):
+            errors["status"] = [f"Must be one of: {', '.join(ComplianceStatus)}."]
+        filters["status"] = status
+    form_code = request.args.get("form_code")
+    if form_code is not None:
+        if form_code not in list(FormCode):
+            errors["form_code"] = [f"Must be one of: {', '.join(FormCode)}."]
+        filters["form_code"] = form_code
+    for field in ("due_from", "due_to"):
+        text = request.args.get(field)
+        if text is not None:
+            try:
+                filters[field] = date.fromisoformat(text)
+            except ValueError:
+                errors[field] = ["Not a valid date."]
+    if errors:
+        raise validation_error(errors, "query")
+    filings = list_filings(current_business(), **filters)
+    return jsonify([filing_to_dict(filing) for filing in filings])
 
 
-# One filing's page: dates, status, the form's texts, the checklist and the acknowledgement.
-@blp.route("/compliance/items/<uuid:item_id>", methods=["GET"])
+@bp.get("/compliance/items/<uuid:item_id>")
 @roles_required(UserRole.BUSINESS)
-@blp.response(200, FilingDetailSchema)
-@blp.alt_response(404, schema=ErrorSchema, description=NOT_FOUND)
 def get_item(item_id):
-    return get_filing(current_business(), item_id)
+    return jsonify(filing_page(own_filing(current_business(), item_id)))
 
 
-# The business chooses: file it myself ("self") or with a CA ("ca").
-@blp.route("/compliance/items/<uuid:item_id>/path", methods=["POST"])
+@bp.post("/compliance/items/<uuid:item_id>/path")
 @roles_required(UserRole.BUSINESS)
-@blp.arguments(ChoosePathSchema)
-@blp.response(200, FilingDetailSchema)
-@blp.alt_response(409, schema=ErrorSchema, description="FILING_LOCKED (with a CA or filed)")
-def choose_path_view(data, item_id):
-    return choose_path(current_business(), item_id, data["path"])
+def choose_path(item_id):
+    """The business files it itself ("self") or with a CA ("ca")."""
+    path = json_body().get("path")
+    if path is None:
+        raise validation_error({"path": [MISSING]})
+    if path not in list(FilingPath):
+        raise validation_error({"path": [f"Must be one of: {', '.join(FilingPath)}."]})
+    filing = own_filing(current_business(), item_id)
+    if filing.status not in SELF_FILEABLE_STATUSES:
+        raise ApiError(409, "FILING_LOCKED", "This filing is already with a CA or filed.")
+    filing.filing_path = path
+    db.session.commit()
+    return jsonify(filing_page(filing))
 
 
-# Tick or untick one document of the checklist; the status follows.
-@blp.route("/compliance/items/<uuid:item_id>/checklist", methods=["POST"])
+@bp.post("/compliance/items/<uuid:item_id>/checklist")
 @roles_required(UserRole.BUSINESS)
-@blp.arguments(ChecklistTickSchema)
-@blp.response(200, FilingDetailSchema)
-@blp.alt_response(422, schema=ErrorSchema, description="UNKNOWN_CHECKLIST_KEY")
-def tick_checklist(data, item_id):
-    return set_checklist_tick(
-        current_business(), item_id, data["key"], data["ticked"]
-    )
+def tick_checklist(item_id):
+    """Tick or untick one document of the checklist; the status follows."""
+    data = json_body()
+    errors = {}
+    key = data.get("key")
+    if key is None:
+        errors["key"] = [MISSING]
+    elif not isinstance(key, str) or not 1 <= len(key) <= 50:
+        errors["key"] = ["Length must be between 1 and 50."]
+    ticked = data.get("ticked")
+    if ticked is None:
+        errors["ticked"] = [MISSING]
+    elif not isinstance(ticked, bool):
+        errors["ticked"] = ["Not a valid boolean."]
+    if errors:
+        raise validation_error(errors)
+    filing = own_filing(current_business(), item_id)
+    _set_tick(filing, key, ticked)
+    db.session.commit()
+    return jsonify(filing_page(filing))
 
 
-# The business filed it itself: optional ARN and acknowledgement file (multipart/form-data).
-@blp.route("/compliance/items/<uuid:item_id>/mark-filed", methods=["POST"])
+@bp.post("/compliance/items/<uuid:item_id>/mark-filed")
 @roles_required(UserRole.BUSINESS)
-@blp.arguments(MarkFiledFormSchema, location="form")
-@blp.arguments(MarkFiledFileSchema, location="files")
-@blp.response(200, FilingDetailSchema)
-@blp.alt_response(409, schema=ErrorSchema, description="FILING_WITH_CA, ALREADY_FILED")
-def mark_filed_view(form, files, item_id):
-    return mark_filed(
-        current_business(), current_user(), item_id, form["acknowledgement_no"], files["file"]
-    )
+def mark_filed(item_id):
+    """The business filed it itself on the government portal (multipart/form-data): an
+    optional ARN and an optional acknowledgement file, stored encrypted."""
+    acknowledgement_no = request.form.get("acknowledgement_no")
+    if acknowledgement_no is not None:
+        if len(acknowledgement_no) > 50:
+            raise validation_error(
+                {"acknowledgement_no": ["Longer than maximum length 50."]}, "form"
+            )
+        acknowledgement_no = acknowledgement_no.strip().upper() or None
+    business = current_business()
+    user = current_user()
+    filing = own_filing(business, item_id)
+    if filing.status == ComplianceStatus.WITH_CA:
+        raise ApiError(409, "FILING_WITH_CA", "Your CA is handling this filing.")
+    if filing.status not in SELF_FILEABLE_STATUSES:
+        raise ApiError(409, "ALREADY_FILED", "This filing is already marked as filed.")
+    upload = request.files.get("file")
+    _record_filed(filing, user.id, user, FilingPath.SELF, acknowledgement_no, upload)
+    db.session.commit()
+    log.info("Filing %s marked filed by its business", filing.id)
+    return jsonify(filing_page(filing))
 
 
-# Undo a mistaken "mark as filed".
-@blp.route("/compliance/items/<uuid:item_id>/unmark-filed", methods=["POST"])
+@bp.post("/compliance/items/<uuid:item_id>/unmark-filed")
 @roles_required(UserRole.BUSINESS)
-@blp.response(200, FilingDetailSchema)
-@blp.alt_response(409, schema=ErrorSchema, description="NOT_SELF_FILED")
-def unmark_filed_view(item_id):
-    return unmark_filed(current_business(), item_id)
+def unmark_filed(item_id):
+    """Undo a mistaken "mark as filed": the status is worked out again and the
+    acknowledgement is deleted. Only for filings the business marked itself."""
+    filing = own_filing(current_business(), item_id)
+    if filing.status not in DONE_STATUSES or filing.filing_path != FilingPath.SELF:
+        raise ApiError(409, "NOT_SELF_FILED", "Only a filing you marked as filed can be undone.")
+    old_document_id = filing.acknowledgement_document_id
+    filing.acknowledgement_document_id = None
+    if old_document_id is not None:
+        db.session.flush()  # the filing lets go of the file before the file is deleted
+        documents.remove_document(old_document_id)
+    filing.acknowledgement_no = None
+    filing.filed_at = None
+    filing.verified_at = None
+    filing.status = ComplianceStatus.UPCOMING
+    _refresh_status(filing, today_in_india())
+    db.session.commit()
+    return jsonify(filing_page(filing))
 
 
-# The acknowledgement file the business uploaded.
-@blp.route("/compliance/items/<uuid:item_id>/acknowledgement", methods=["GET"])
+@bp.get("/compliance/items/<uuid:item_id>/acknowledgement")
 @roles_required(UserRole.BUSINESS)
-@blp.response(200, description="The acknowledgement file (PDF, JPG or PNG)")
-@blp.alt_response(404, schema=ErrorSchema, description="ACKNOWLEDGEMENT_MISSING")
-def get_acknowledgement_view(item_id):
-    document, data = get_acknowledgement(current_business(), item_id)
+def get_acknowledgement(item_id):
+    """The acknowledgement file the business uploaded."""
+    filing = own_filing(current_business(), item_id)
+    if filing.acknowledgement_document_id is None:
+        raise ApiError(404, "ACKNOWLEDGEMENT_MISSING", "No acknowledgement was uploaded.")
+    document, data = documents.read_document(filing.acknowledgement_document_id)
     return send_file(
         io.BytesIO(data), mimetype=document.mime_type, download_name=document.original_filename
     )
 
 
-# How businesses like this one file this form: themselves or through a CA, and on time (CO13).
-@blp.route("/compliance/items/<uuid:item_id>/peer-insights", methods=["GET"])
+@bp.get("/compliance/items/<uuid:item_id>/peer-insights")
 @roles_required(UserRole.BUSINESS)
-@blp.response(200, PeerInsightsSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="BUSINESS_NOT_FOUND, FILING_NOT_FOUND")
 def get_peer_insights(item_id):
-    return peer_insights(current_business(), item_id)
+    business = current_business()
+    return jsonify(peer_insights(business, own_filing(business, item_id)))
 
 
-# A form's explanation, self-filing instructions and document checklist (any logged-in user).
-@blp.route("/compliance/forms/<string:form_code>", methods=["GET"])
+@bp.get("/compliance/forms/<string:form_code>")
 @login_required
-@blp.response(200, FormContentSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="FORM_NOT_FOUND")
 def get_form(form_code):
-    return get_form_content(form_code)
+    """A form's explanation, self-filing instructions and document checklist."""
+    return jsonify(get_form_content(form_code))

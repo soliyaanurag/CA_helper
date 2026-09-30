@@ -261,6 +261,21 @@ working, stop and ask.
 - demo_walk.py now also edits the business (checks the What-changed keys), asks for NIC suggestions and saves one.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.3 compliance (done)
+- Plain Flask; the routes do the work (choose path, tick, mark filed, undo, acknowledgement download); the
+  service functions only the routes used (`get_filing`, `choose_path`, `set_checklist_tick`, `mark_filed`,
+  `unmark_filed`, `get_acknowledgement`) are gone. `filing_to_dict`, `filing_detail_to_dict`, `filing_page`.
+- Section 4: peer insights is one function `peer_insights(business, filing)` with the same rule (segment = entity
+  type + MSME tier with >= 10 businesses, else overall, else none) and the same JSON.
+- Kept for other modules and the tests (section 7 names): `get_dashboard` (still returns the next deadline as a
+  row; the route turns it into JSON), `list_filings`, `sync_filings`, `create_filings`, `checklist_*`,
+  `mark_filed_by_ca`, `filings_by_acknowledgement`, `get_filings_by_ids`, `mark_filings_with_ca`,
+  `list_unfiled_filings_due_by`, `business_ids_with_open_filings`, `mark_overdue_filings`, `filing_stats`,
+  `form_name`, `filing_name`, `FORM_FOLDERS`, `DONE_STATUSES`, `RENAMED_FORMS`.
+- Until ca_workspace is converted, the six filing schemas it inherits from live in ca_workspace.py.
+- No test changed.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
