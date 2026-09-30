@@ -4,7 +4,7 @@ import io
 
 import pytest
 
-from app.models import AdminAuditLog, CaProfile, Document
+from app.models import CaProfile, Document
 from app.models.enums import UserRole
 from app.models.marketplace import CaVerificationStatus
 
@@ -113,7 +113,7 @@ def test_verifying_needs_the_certificate(client, ca, admin_headers):
     assert response.get_json()["error"]["code"] == "CERTIFICATE_MISSING"
 
 
-def test_an_admin_verifies_a_ca_who_is_emailed_and_logged(
+def test_an_admin_verifies_a_ca_who_is_emailed(
     client, ca, admin_headers, database, mailbox
 ):
     _, headers, profile_id = ca
@@ -124,8 +124,6 @@ def test_an_admin_verifies_a_ca_who_is_emailed_and_logged(
     assert response.get_json()["verification_status"] == "verified"
     assert response.get_json()["verified_at"] is not None
     assert mailbox[-1]["Subject"] == "Your CA Helper profile is verified"
-    log = database.session.query(AdminAuditLog).one()
-    assert (log.action, str(log.target_id)) == ("ca_profile.verify", profile_id)
 
 
 def test_rejecting_needs_a_reason_the_ca_then_sees(client, ca, admin_headers, mailbox):

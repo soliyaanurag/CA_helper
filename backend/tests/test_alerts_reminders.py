@@ -166,17 +166,6 @@ def test_switched_off_emails_still_reach_the_tray(business, database, mailbox):
     assert "due in 3 days" not in mailbox[0].get_content()
 
 
-def test_a_deactivated_owner_gets_nothing(business, database, mailbox):
-    owner = database.session.get(User, business.user_id)
-    owner.is_active = False
-    database.session.commit()
-
-    send_reminders(date(2026, 10, 6))
-
-    assert database.session.query(Notification).count() == 0
-    assert mailbox == []
-
-
 def test_the_ca_of_an_active_engagement_is_reminded_too(business, make_user, database, mailbox):
     seed_service_catalog()
     ca_user = make_user(role=UserRole.CA, full_name="Meera Shah")

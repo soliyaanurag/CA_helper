@@ -77,7 +77,7 @@ class Login(MethodView):
     @blp.arguments(LoginSchema)
     @blp.response(200, LoginResponseSchema)
     @blp.alt_response(401, schema=ErrorSchema, description="INVALID_CREDENTIALS")
-    @blp.alt_response(403, schema=ErrorSchema, description="ACCOUNT_INACTIVE, EMAIL_NOT_VERIFIED")
+    @blp.alt_response(403, schema=ErrorSchema, description="EMAIL_NOT_VERIFIED")
     def post(self, data):
         user = auth_service.authenticate(data["email"], data["password"])
         return {

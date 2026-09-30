@@ -137,7 +137,6 @@ def test_range_counts_only_listed_cas_and_current_prices(
         add_ca({gst: price})
     add_ca({gst: "1"}, status=CaVerificationStatus.PENDING)
     add_ca({gst: "1"}, status=CaVerificationStatus.REJECTED)
-    add_ca({gst: "1"}, user_fields={"is_active": False})
     dropped = add_ca({gst: "1"})
     row = database.session.query(CaService).join(CaProfile).filter_by(user_id=dropped.id).one()
     database.session.delete(row)

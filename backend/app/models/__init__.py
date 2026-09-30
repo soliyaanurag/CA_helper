@@ -13,13 +13,11 @@
     ca_workspace.py  DocumentRequest
     regulatory.py    NewsSource, NewsArticle, RegulatoryChange, RegulatoryChangeMatch
     assistant.py     KbChunk, ChatMessage
-    admin.py         AdminAuditLog
 
 Every model is imported here, so Alembic (`make migration`) sees every table.
 Import a new model here when you add its file.
 """
 
-from app.models.admin import AdminAuditLog
 from app.models.alerts import Notification, NotificationSetting, PenaltyRule, ReminderLog
 from app.models.assistant import ChatMessage, KbChunk
 from app.models.ca_workspace import DocumentRequest
@@ -45,7 +43,6 @@ from app.models.regulatory import (
 from app.models.user import User
 
 __all__ = [
-    "AdminAuditLog",
     "Business",
     "CaProfile",
     "CaService",

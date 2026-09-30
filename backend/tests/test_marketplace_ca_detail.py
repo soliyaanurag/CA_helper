@@ -123,9 +123,8 @@ def test_lists_offered_services_in_catalog_order_with_ranges(
     [
         {"status": CaVerificationStatus.PENDING},
         {"status": CaVerificationStatus.REJECTED},
-        {"user_fields": {"is_active": False}},
     ],
-    ids=["pending", "rejected", "deactivated"],
+    ids=["pending", "rejected"],
 )
 def test_unlisted_cas_are_not_found(client, business_headers, add_ca, kwargs):
     profile = add_ca(**kwargs)

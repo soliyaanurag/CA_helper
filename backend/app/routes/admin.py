@@ -8,9 +8,6 @@
     GET  /admin/cas/<id>/certificate       the Certificate of Practice file (admins only)
     POST /admin/cas/<id>/verify            verify the CA
     POST /admin/cas/<id>/reject            reject with a reason
-    POST /admin/users/<id>/suspend         suspend an account (AD4)
-    POST /admin/users/<id>/reactivate      let it log in again
-    GET  /admin/audit-log?page=            every admin action, newest first (AD8)
 
 Routes stay thin: parse input (app/schemas/), call one service function, serialize
 the result. No queries and no db.session here (docs/PATTERNS.md, "Foundations").
@@ -31,11 +28,7 @@ from app.schemas.admin import (
     AdminStatsSchema,
     AdminUserArgsSchema,
     AdminUserPageSchema,
-    AdminUserSchema,
-    AuditLogArgsSchema,
-    AuditLogPageSchema,
     RejectCaInputSchema,
-    SuspendUserInputSchema,
 )
 from app.services import admin_service
 from app.utils.decorators import current_user, roles_required
@@ -109,31 +102,3 @@ def verify_ca(ca_id):
 @blp.response(200, AdminCaSchema)
 def reject_ca(data, ca_id):
     return admin_service.reject_ca(current_user(), ca_id, data["reason"].strip())
-
-
-@blp.route("/admin/users/<uuid:user_id>/suspend", methods=["POST"])
-@roles_required(UserRole.ADMIN)
-@blp.arguments(SuspendUserInputSchema)
-@blp.response(200, AdminUserSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="USER_NOT_FOUND")
-@blp.alt_response(409, schema=ErrorSchema, description="CANNOT_SUSPEND_SELF, ALREADY_SUSPENDED")
-def suspend_user(data, user_id):
-    reason = data["reason"].strip() if data["reason"] else None
-    return admin_service.suspend_user(current_user(), user_id, reason or None)
-
-
-@blp.route("/admin/users/<uuid:user_id>/reactivate", methods=["POST"])
-@roles_required(UserRole.ADMIN)
-@blp.response(200, AdminUserSchema)
-@blp.alt_response(404, schema=ErrorSchema, description="USER_NOT_FOUND")
-@blp.alt_response(409, schema=ErrorSchema, description="NOT_SUSPENDED")
-def reactivate_user(user_id):
-    return admin_service.reactivate_user(current_user(), user_id)
-
-
-@blp.route("/admin/audit-log", methods=["GET"])
-@roles_required(UserRole.ADMIN)
-@blp.arguments(AuditLogArgsSchema, location="query")
-@blp.response(200, AuditLogPageSchema)
-def list_audit_log(args):
-    return admin_service.list_audit_log(args["page"], args["page_size"])

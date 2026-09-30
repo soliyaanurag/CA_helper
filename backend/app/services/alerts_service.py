@@ -110,7 +110,7 @@ def notify(
         user_id=user.id, type=notification_type, title=title, body=body, link=link
     )
     db.session.add(notification)
-    if email and user.is_active and wants_email(user.id, notification_type):
+    if email and wants_email(user.id, notification_type):
         queue_email(user.email, title, "notification", name=user.full_name, title=title, body=body)
     return notification
 
@@ -297,8 +297,6 @@ def send_reminders(today: date | None = None) -> int:
                 (ca_user, f"{business.legal_name}: {title}", f"/ca/clients/{business.id}")
             )
         for user, user_title, link in recipients:
-            if not user.is_active:
-                continue
             notify(user, notification_type, user_title, body, link)
             if wants_email(user.id, notification_type):
                 emails.setdefault(user.id, (user, []))[1].append((user_title, body))

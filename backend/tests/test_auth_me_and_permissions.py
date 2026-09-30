@@ -49,10 +49,10 @@ def test_me_with_expired_token_is_401(client, make_user):
     assert response.get_json()["error"]["code"] == "TOKEN_EXPIRED"
 
 
-def test_token_of_deactivated_user_is_401(client, make_user, auth_headers, database):
+def test_token_of_a_user_that_no_longer_exists_is_401(client, make_user, auth_headers, database):
     user = make_user()
     headers = auth_headers(user)
-    user.is_active = False
+    database.session.delete(user)
     database.session.commit()
 
     response = client.get(ME_URL, headers=headers)

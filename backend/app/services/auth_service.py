@@ -9,9 +9,8 @@ reset_password(email, code, new_password)             sets a new password with t
 change_password(user, current_password, new_password) for a logged-in user
 accept_terms(user)                                    records consent (for accounts from before it)
 list_users(role, search, page, page_size) / count_users_by_role()   for the admin screens
-get_user_for_admin(user_id) / set_user_active(user, active)          suspend / reactivate (AD4)
 issue_access_token(user) -> str                       JWT for a logged-in user
-get_active_user(user_id) -> User | None               used by the JWT user loader
+get_user(user_id) -> User | None                      used by the JWT user loader
 normalize_email(email) -> str
 
 One-time codes (table `email_otps`): 6 random digits, stored as an argon2 hash,
@@ -56,18 +55,12 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def _is_live(user: User | None) -> bool:
-    """True for an existing account that is not suspended."""
-    return user is not None and user.is_active
-
-
-def _live_user_by_email(email: str) -> User | None:
-    user = db.session.scalar(select(User).where(User.email == normalize_email(email)))
-    return user if _is_live(user) else None
+def _user_by_email(email: str) -> User | None:
+    return db.session.scalar(select(User).where(User.email == normalize_email(email)))
 
 
 def _user_by_email_or_404(email: str) -> User:
-    user = _live_user_by_email(email)
+    user = _user_by_email(email)
     if user is None:
         raise ApiError(404, "USER_NOT_FOUND", "No account uses this email.")
     return user
@@ -167,7 +160,7 @@ def verify_email(email: str, code: str) -> None:
 
     409 EMAIL_ALREADY_VERIFIED; otherwise the errors of _use_code().
     """
-    user = _live_user_by_email(email)
+    user = _user_by_email(email)
     if user is not None and user.email_verified_at is not None:
         raise ApiError(409, "EMAIL_ALREADY_VERIFIED", "This email is already verified. Log in.")
     _use_code(user, OtpPurpose.VERIFY_EMAIL, code)
@@ -199,20 +192,12 @@ def authenticate(email: str, password: str) -> User:
     """Return the user for these credentials, or raise ApiError.
 
     401 INVALID_CREDENTIALS for an unknown email or a wrong password (the same
-    error for both); 403 ACCOUNT_INACTIVE for a deactivated or deleted account;
-    403 EMAIL_NOT_VERIFIED until the user has entered their emailed code. The
-    account state is revealed only to someone who knows the password.
+    error for both); 403 EMAIL_NOT_VERIFIED until the user has entered their emailed code.
     Rehashes the password if argon2's parameters changed since it was stored.
     """
     user = db.session.scalar(select(User).where(User.email == normalize_email(email)))
     if user is None or not verify_password(user.password_hash, password):
         raise ApiError(401, "INVALID_CREDENTIALS", "Wrong email or password.")
-    if not _is_live(user):
-        raise ApiError(
-            403,
-            "ACCOUNT_INACTIVE",
-            "This account is suspended. Contact the CA Helper team if you think this is a mistake.",
-        )
     if user.email_verified_at is None:
         raise ApiError(403, "EMAIL_NOT_VERIFIED", "Verify your email before logging in.")
 
@@ -230,14 +215,13 @@ def issue_access_token(user: User) -> str:
     return create_access_token(identity=str(user.id), additional_claims={"role": user.role})
 
 
-def get_active_user(user_id: str) -> User | None:
-    """The user with this id if they may still use the app (active, not deleted), else None."""
+def get_user(user_id: str) -> User | None:
+    """The user with this id, or None."""
     try:
         key = uuid.UUID(user_id)
     except (TypeError, ValueError):
         return None
-    user = db.session.get(User, key)
-    return user if _is_live(user) else None
+    return db.session.get(User, key)
 
 
 # --- Passwords --------------------------------------------------------------------
@@ -270,7 +254,7 @@ def reset_password(email: str, code: str, new_password: str) -> None:
     The code proves the user owns the email, so an unverified email becomes
     verified too. Errors: those of _use_code().
     """
-    user = _live_user_by_email(email)
+    user = _user_by_email(email)
     _use_code(user, OtpPurpose.RESET_PASSWORD, code)
     user.password_hash = hash_password(new_password)
     if user.email_verified_at is None:
@@ -318,28 +302,6 @@ def list_users(role: UserRole | None, search: str | None, page: int, page_size: 
         stmt = stmt.where(User.full_name.ilike(pattern) | User.email.ilike(pattern))
     result = db.paginate(stmt, page=page, per_page=page_size, error_out=False)
     return {"items": result.items, "page": page, "page_size": page_size, "total": result.total}
-
-
-def get_user_for_admin(user_id) -> User:
-    """An account by id. 404 USER_NOT_FOUND."""
-    user = db.session.get(User, user_id)
-    if user is None:
-        raise ApiError(404, "USER_NOT_FOUND", "This account was not found.")
-    return user
-
-
-def set_user_active(user: User, active: bool) -> None:
-    """Suspend (False) or reactivate (True) an account (AD4). A suspended user cannot log in,
-    and any token they still hold stops working at once (jwt_handlers). Does not commit."""
-    user.is_active = active
-
-
-def names_of(user_ids) -> dict:
-    """{user id: full name} for these accounts (the audit log shows who did what)."""
-    if len(user_ids) == 0:
-        return {}
-    stmt = select(User.id, User.full_name).where(User.id.in_(user_ids))
-    return dict(db.session.execute(stmt).all())
 
 
 def count_users_by_role() -> dict:

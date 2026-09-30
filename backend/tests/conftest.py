@@ -6,7 +6,7 @@ Fixtures:
     database  test database with every table created (once per session). Every
               row is deleted after each test, so tests never see each other's
               data. Request it in any test that touches the DB.
-    make_user    factory: make_user(role=UserRole.CA, is_active=False) -> User (needs `database`);
+    make_user    factory: make_user(role=UserRole.CA, full_name="Asha") -> User (needs `database`);
                  the user's email is verified unless you pass email_verified_at=None
     auth_headers auth_headers(user) -> {"Authorization": "Bearer <access token>"}
     mailbox      emails "sent" during the test (list of EmailMessage); emptied before each test

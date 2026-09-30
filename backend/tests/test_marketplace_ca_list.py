@@ -48,11 +48,10 @@ def names(response):
     return [item["full_name"] for item in response.get_json()["items"]]
 
 
-def test_lists_only_verified_cas_with_live_accounts(client, business, auth_headers, add_ca):
+def test_lists_only_verified_cas(client, business, auth_headers, add_ca):
     add_ca("Verified CA")
     add_ca("Pending CA", status=CaVerificationStatus.PENDING)
     add_ca("Rejected CA", status=CaVerificationStatus.REJECTED)
-    add_ca("Deactivated CA", user_fields={"is_active": False})
 
     response = client.get(URL, headers=auth_headers(business))
 

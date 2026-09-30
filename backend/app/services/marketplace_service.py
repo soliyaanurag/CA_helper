@@ -65,8 +65,7 @@ commit; completion adds a tray entry only. The emails themselves are unchanged a
 sent (engagement emails are transactional, not in the notification settings).
 
 For the admin module: list_cas_for_admin, get_ca_for_admin, certificate_document_id,
-set_verification, count_cas_by_status, count_open_engagements, cancel_open_requests_of_ca
-(a suspended CA's requested and quoted engagements are cancelled; businesses are told).
+set_verification, count_cas_by_status, count_open_engagements.
 
 Verification: a new profile is `pending` until an admin checks it (the Certificate of
 Practice must be uploaded first). A new certificate sends it back to `pending`. If a verified or
@@ -134,13 +133,12 @@ MAX_EXPERIENCE_YEARS_COUNTED = 10  # 25 years count as 10, so experience never o
 
 
 def _only_listed_cas(stmt):
-    """Keep verified CA profiles with live accounts: the CAs businesses may see.
+    """Keep verified CA profiles: the CAs businesses may see.
 
     `stmt` must already join CaProfile and User.
     """
     return stmt.where(
         CaProfile.verification_status == CaVerificationStatus.VERIFIED,
-        User.is_active,
     )
 
 
@@ -309,18 +307,6 @@ def count_cas_by_status() -> dict:
     for status in db.session.scalars(select(CaProfile.verification_status)):
         counts[status] += 1
     return counts
-
-
-def ca_names(profile_ids) -> dict:
-    """{CA profile id: the CA's name} (the admin audit log)."""
-    if len(profile_ids) == 0:
-        return {}
-    stmt = (
-        select(CaProfile.id, User.full_name)
-        .join(User, CaProfile.user_id == User.id)
-        .where(CaProfile.id.in_(profile_ids))
-    )
-    return dict(db.session.execute(stmt).all())
 
 
 def count_open_engagements() -> int:
@@ -1377,36 +1363,6 @@ def active_ca_users_by_filing(filing_ids) -> dict:
     for filing_id, user in db.session.execute(stmt):
         users[filing_id] = user
     return users
-
-
-# --- Used by the admin module (AD4) ---------------------------------------------------
-
-
-def cancel_open_requests_of_ca(user: User) -> int:
-    """A CA's account is suspended: their unanswered requests and open quotes are
-    cancelled, and each business is told (tray + email) to choose another CA. Active
-    engagements are kept. Returns how many were cancelled. Does not commit."""
-    ca = _find_profile(user)
-    if ca is None:
-        return 0
-    stmt = select(Engagement).where(
-        Engagement.ca_profile_id == ca.id,
-        Engagement.status.in_([EngagementStatus.REQUESTED, EngagementStatus.QUOTED]),
-    )
-    engagements = list(db.session.scalars(stmt))
-    for engagement in engagements:
-        engagement.status = EngagementStatus.CANCELLED
-        business = onboarding_service.get_business(engagement.business_id)
-        alerts_service.notify(
-            db.session.get(User, business.user_id),
-            NotificationType.ENGAGEMENT_UPDATE,
-            "Your CA request was cancelled",
-            f"{user.full_name} is no longer available on CA Helper, so your request was "
-            'cancelled. You can ask another CA in "Find a CA".',
-            "/business/marketplace",
-            email=True,
-        )
-    return len(engagements)
 
 
 # --- Used by the ca_workspace module (CW2 to CW7) -------------------------------------

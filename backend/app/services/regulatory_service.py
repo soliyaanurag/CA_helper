@@ -559,7 +559,7 @@ def approve_change(admin: User, change_id) -> dict:
                 change_id=change.id, business_id=business["id"], notified_at=utcnow()
             )
         )
-        owner = auth_service.get_active_user(str(business["user_id"]))
+        owner = auth_service.get_user(str(business["user_id"]))
         if owner is not None:
             alerts_service.notify(
                 owner,

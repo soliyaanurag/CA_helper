@@ -6,7 +6,7 @@ returns the standard error body (app/errors.py) with one of these codes:
     401 AUTH_REQUIRED     no token sent
     401 TOKEN_INVALID     malformed token or bad signature
     401 TOKEN_EXPIRED     token past its expiry
-    401 ACCOUNT_INACTIVE  valid token, but the user was deactivated or deleted
+    401 ACCOUNT_INACTIVE  valid token, but the account no longer exists
 
 Any 401 makes the frontend log out.
 """
@@ -16,7 +16,7 @@ from flask_jwt_extended import JWTManager
 
 from app.errors import error_body
 from app.models import User
-from app.services.auth_service import get_active_user
+from app.services.auth_service import get_user
 
 
 def _error(code: str, message: str):
@@ -29,11 +29,11 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
     @jwt.user_lookup_loader
     def load_user(_header: dict, payload: dict) -> User | None:
         # Returning None triggers user_lookup_error_loader below.
-        return get_active_user(payload["sub"])
+        return get_user(payload["sub"])
 
     @jwt.user_lookup_error_loader
-    def user_not_active(_header: dict, _payload: dict):
-        return _error("ACCOUNT_INACTIVE", "This account is inactive. Please log in again.")
+    def user_not_found(_header: dict, _payload: dict):
+        return _error("ACCOUNT_INACTIVE", "This account no longer exists. Please log in again.")
 
     @jwt.unauthorized_loader
     def missing_token(_reason: str):

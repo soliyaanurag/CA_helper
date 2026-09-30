@@ -116,6 +116,17 @@ Checks (all inside the containers):
   branch of the late fee and the three seeded "20" values (the source texts that cite them are unchanged).
 - Checks: backend 621 passed; frontend 240; build OK; snapshot no differences; walk 0 failures.
 
+### 2.5b Suspend/reactivate and the audit log (done)
+- Removed: `users.is_active`, table `admin_audit_log` (models/admin.py), `POST /admin/users/<id>/suspend`,
+  `/reactivate`, `GET /admin/audit-log`, their schemas, `auth_service.get_user_for_admin/set_user_active/names_of`,
+  `marketplace_service.cancel_open_requests_of_ca` and `ca_names`, login's 403 ACCOUNT_INACTIVE, the
+  `is_active` checks in reminders, notifications and the CA list.
+- `auth_service.get_active_user` -> `get_user(user_id)`; the JWT loader still answers 401 ACCOUNT_INACTIVE (existing
+  code) for a token whose user no longer exists.
+- The frontend still has the suspend buttons and the audit log page until step 6.
+- Snapshot: only section 4 differences: `/admin/audit-log` gone (404), `is_active` gone from `/admin/users` items.
+- Checks: backend 608 passed; frontend 240; build OK; walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -167,3 +178,12 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_schema_constraints.py::test_an_unknown_enum_value_is_refused_even_in_raw_sql | deleted (generated enum CHECK) | Cross-cutting: no generated CHECKs |
 | test_regulatory_monitor.py (5 asserts) | `x.value == "..."` -> `x == "..."` (loaded values are str) | Cross-cutting: enums -> String columns |
 | test_alerts_penalties.py::test_a_nil_return_uses_its_own_daily_fee | deleted | Cross-cutting: `is_nil_return` and the nil-return fee removed |
+| test_admin_users.py: test_a_suspended_user_cannot_log_in_or_use_a_token, test_reactivate_lets_them_log_in_again, test_suspend_checks, test_suspending_twice_is_refused, test_a_suspended_ca_leaves_the_marketplace_and_open_requests_are_cancelled, test_only_admins_suspend[2], test_audit_log_lists_actions_newest_first, test_audit_log_is_for_admins | deleted (the file keeps the two AD5 filing-stats tests) | admin: suspend, reactivate, audit log removed |
+| test_admin_ca_verification.py::test_an_admin_verifies_a_ca_who_is_emailed_and_logged | renamed ..._is_emailed; the audit-log assertion removed | admin: audit log removed |
+| test_alerts_reminders.py::test_a_deactivated_owner_gets_nothing | deleted | admin: suspend removed |
+| test_auth_login.py::test_inactive_user_is_rejected, test_inactive_user_with_wrong_password_gets_invalid_credentials | deleted | admin: suspend removed |
+| test_auth_me_and_permissions.py::test_token_of_deactivated_user_is_401 | rewritten as test_token_of_a_user_that_no_longer_exists_is_401 (same 401 ACCOUNT_INACTIVE) | admin: suspend removed |
+| test_auth_password_reset.py::test_forgot_password_for_an_unknown_email_is_404 | the suspended-account case removed | admin: suspend removed |
+| test_marketplace_ca_list.py::test_lists_only_verified_cas_with_live_accounts | renamed test_lists_only_verified_cas; deactivated case removed | admin: suspend removed |
+| test_marketplace_ca_detail.py::test_unlisted_cas_are_not_found[deactivated] | parameter removed | admin: suspend removed |
+| test_marketplace_services.py::test_range_counts_only_listed_cas_and_current_prices | deactivated-user case removed | admin: suspend removed |

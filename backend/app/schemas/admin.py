@@ -41,7 +41,6 @@ class AdminUserSchema(Schema):
     full_name = fields.String(required=True)
     email = fields.String(required=True)
     role = fields.String(validate=validate.OneOf(list(UserRole)), required=True)
-    is_active = fields.Boolean(required=True)
     email_verified = fields.Function(lambda user: user.email_verified_at is not None)
     created_at = fields.DateTime(required=True)
 
@@ -84,28 +83,3 @@ def _not_blank(value: str) -> None:
 
 class RejectCaInputSchema(Schema):
     reason = fields.String(required=True, validate=[validate.Length(1, 500), _not_blank])
-
-
-class SuspendUserInputSchema(Schema):
-    """POST /admin/users/<id>/suspend: an optional reason, kept in the audit log."""
-
-    reason = fields.String(load_default=None, validate=validate.Length(max=500))
-
-
-class AuditLogArgsSchema(PageArgsSchema):
-    pass
-
-
-class AuditLogEntrySchema(Schema):
-    id = fields.UUID(required=True)
-    admin_name = fields.String(allow_none=True)
-    action = fields.String(required=True, metadata={"description": 'e.g. "user.suspend"'})
-    target_type = fields.String(required=True, metadata={"description": '"user", "ca_profile"'})
-    target_id = fields.UUID(allow_none=True)
-    target_name = fields.String(allow_none=True)
-    details = fields.Dict(allow_none=True)
-    created_at = fields.DateTime(required=True)
-
-
-class AuditLogPageSchema(PageSchema):
-    items = fields.List(fields.Nested(AuditLogEntrySchema), required=True)
