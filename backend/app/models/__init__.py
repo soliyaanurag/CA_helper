@@ -7,7 +7,7 @@
     onboarding.py    Business, RegulatoryProfile, NicCode, RuleThreshold
     compliance.py    ObligationTemplate, ComplianceItem, ChecklistTick
     documents.py     Document, ComplianceItemDocument
-    alerts.py        Notification, NotificationSetting, ReminderLog, PenaltyRule
+    alerts.py        Notification, ReminderLog, PenaltyRule
     marketplace.py   CaProfile, CatalogService, CaService, Engagement, EngagementItem, Rating,
                      ProBonoRequest
     ca_workspace.py  DocumentRequest
@@ -18,7 +18,7 @@ Every model is imported here, so Alembic (`make migration`) sees every table.
 Import a new model here when you add its file.
 """
 
-from app.models.alerts import Notification, NotificationSetting, PenaltyRule, ReminderLog
+from app.models.alerts import Notification, PenaltyRule, ReminderLog
 from app.models.assistant import ChatMessage, KbChunk
 from app.models.ca_workspace import DocumentRequest
 from app.models.compliance import ChecklistTick, ComplianceItem, ObligationTemplate
@@ -61,7 +61,6 @@ __all__ = [
     "NewsSource",
     "NicCode",
     "Notification",
-    "NotificationSetting",
     "ObligationTemplate",
     "PenaltyRule",
     "ProBonoRequest",

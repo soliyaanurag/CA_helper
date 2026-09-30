@@ -1,7 +1,6 @@
-"""Alert tables: the in-app tray, email preferences, sent reminders and penalty rules.
+"""Alert tables: the in-app tray, sent reminders and penalty rules.
 
     notifications          one tray entry for one user (Notification)
-    notification_settings  a user's email on/off per notification type (NotificationSetting)
     reminder_log           a reminder already sent for a filing (ReminderLog)
     penalty_rules          late fees and interest per form, versioned by dates (PenaltyRule)
 
@@ -16,7 +15,6 @@ from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -59,17 +57,6 @@ class Notification(BaseModel):
         String(300)
     )  # an app path, e.g. "/business/compliance"
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class NotificationSetting(BaseModel):
-    """Whether a user gets emails of one notification type (no row = the default, on)."""
-
-    __tablename__ = "notification_settings"
-    __table_args__ = (UniqueConstraint("user_id", "type"),)
-
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    type: Mapped[str] = mapped_column(String(50))
-    email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 class ReminderLog(BaseModel):

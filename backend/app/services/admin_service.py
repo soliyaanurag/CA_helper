@@ -63,12 +63,13 @@ def verify_ca(admin: User, profile_id) -> dict:
     """Verify a CA (their certificate must be uploaded: 409 CERTIFICATE_MISSING)."""
     profile = marketplace_service.set_verification(profile_id, admin, verified=True, reason=None)
     db.session.commit()
-    send_email(
-        profile.user.email,
-        "Your CA Helper profile is verified",
-        "ca_verified",
-        name=profile.user.full_name,
-    )
+    if profile.user.email_notifications:
+        send_email(
+            profile.user.email,
+            "Your CA Helper profile is verified",
+            "ca_verified",
+            name=profile.user.full_name,
+        )
     log.info("Admin %s verified CA profile %s", admin.id, profile.id)
     return marketplace_service.get_ca_for_admin(profile.id)
 
@@ -77,12 +78,13 @@ def reject_ca(admin: User, profile_id, reason: str) -> dict:
     """Reject a CA with a reason the CA sees (on their profile page and in an email)."""
     profile = marketplace_service.set_verification(profile_id, admin, verified=False, reason=reason)
     db.session.commit()
-    send_email(
-        profile.user.email,
-        "Your CA Helper profile needs a correction",
-        "ca_rejected",
-        name=profile.user.full_name,
-        reason=reason,
-    )
+    if profile.user.email_notifications:
+        send_email(
+            profile.user.email,
+            "Your CA Helper profile needs a correction",
+            "ca_rejected",
+            name=profile.user.full_name,
+            reason=reason,
+        )
     log.info("Admin %s rejected CA profile %s", admin.id, profile.id)
     return marketplace_service.get_ca_for_admin(profile.id)

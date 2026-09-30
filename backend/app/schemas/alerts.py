@@ -5,7 +5,6 @@ from marshmallow import Schema, fields, validate
 from app.models.alerts import NotificationType
 from app.models.enums import FormCode
 from app.schemas.pagination import PageArgsSchema, PageSchema
-from app.services.alerts_service import CONFIGURABLE_TYPES
 
 
 class NotificationSchema(Schema):
@@ -28,23 +27,6 @@ class NotificationArgsSchema(PageArgsSchema):
 
 class UnreadCountSchema(Schema):
     unread = fields.Integer(required=True)
-
-
-class NotificationSettingSchema(Schema):
-    type = fields.String(
-        required=True,
-        validate=validate.OneOf(CONFIGURABLE_TYPES, error="Emails of this type are always sent."),
-    )
-    email_enabled = fields.Boolean(required=True)
-
-
-class NotificationSettingsSchema(Schema):
-    items = fields.List(fields.Nested(NotificationSettingSchema), required=True)
-    always_emailed = fields.List(
-        fields.String(validate=validate.OneOf(list(NotificationType))),
-        dump_only=True,
-        metadata={"description": "Types that are always emailed (no switch)"},
-    )
 
 
 class PenaltyArgsSchema(Schema):

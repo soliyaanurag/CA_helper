@@ -134,6 +134,18 @@ Checks (all inside the containers):
 - Snapshot: only the four removed keys on `/marketplace/cas` (+ the known 2.5b diffs).
 - Checks: backend 604 passed; frontend 240; build OK; walk 0 failures.
 
+### 2.5d One email switch (done)
+- Table `notification_settings` (NotificationSetting) removed; new column `users.email_notifications` (default
+  true). New `GET/PUT /api/v1/auth/settings` `{email_notifications}` (business and CA; admins 403, like before).
+  `GET/PUT /alerts/settings` removed, with CONFIGURABLE_TYPES, ALWAYS_EMAILED_TYPES and `wants_email`.
+- **Decision (plan: "It controls every notification email; code emails (OTP, password) always go out"):** the
+  switch gates every email except the auth code emails and the "password changed" email: notify(email=True)
+  (reminders, overdue, document requests, regulatory updates), the engagement emails (request, accepted, quoted,
+  declined, expired, pro-bono match) and the CA verified/rejected emails. Before, only four types could be switched
+  off and engagement/verification emails always went out. Easy to narrow if this reading is wrong.
+- Snapshot: only section 4 differences (`/alerts/settings` gone, `/auth/settings` new).
+- Checks: backend 604 passed; frontend 240; build OK; walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -195,3 +207,7 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_marketplace_ca_detail.py::test_unlisted_cas_are_not_found[deactivated] | parameter removed | admin: suspend removed |
 | test_marketplace_services.py::test_range_counts_only_listed_cas_and_current_prices | deactivated-user case removed | admin: suspend removed |
 | test_marketplace_engagements.py: test_cas_offering_my_filings_come_first_with_their_prices, test_the_match_score_adds_up_its_reasons, test_the_best_match_comes_first_not_the_most_experienced, test_a_fee_at_or_below_the_typical_fee_earns_points, test_a_good_rating_and_free_slots_earn_points (+ helpers `_reasons`, `_ca_named`) | deleted; replaced by test_the_best_rated_come_first_then_experience_then_name | marketplace: matching score removed, list order rating/experience/name |
+| test_alerts_notifications.py::test_notify_respects_the_email_setting_but_always_adds_to_the_tray | renamed ..._email_switch_...; switch off via /auth/settings -> 2 tray entries, no email | alerts: one email switch |
+| test_alerts_notifications.py::test_tray_and_settings_need_a_login | renamed test_the_tray_needs_a_login; the /alerts/settings case removed | alerts: notification_settings removed |
+| test_alerts_notifications.py: test_settings_default_to_on_with_engagement_emails_always_sent, test_saving_settings_twice_keeps_one_row_per_type, test_engagement_emails_cannot_be_switched_off, test_admins_have_no_settings_page | replaced by test_emails_are_on_by_default, test_switching_emails_off_and_on, test_code_emails_are_sent_even_when_emails_are_off, test_settings_need_a_login, test_admins_have_no_settings_page (all on /api/v1/auth/settings) | alerts: one email switch, new /auth/settings |
+| test_alerts_reminders.py::test_switched_off_emails_still_reach_the_tray | the owner's switch is off -> 2 tray entries, no email (was: one type off, overdue still emailed) | alerts: one email switch |

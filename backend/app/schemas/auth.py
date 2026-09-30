@@ -58,6 +58,10 @@ class UserSchema(Schema):
     role = fields.String(validate=validate.OneOf(list(UserRole)), required=True)
 
 
+class SettingsSchema(Schema):
+    email_notifications = fields.Boolean(required=True)
+
+
 class LoginResponseSchema(Schema):
     access_token = fields.String(required=True)
     user = fields.Nested(UserSchema, required=True)

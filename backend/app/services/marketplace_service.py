@@ -58,8 +58,8 @@ prices would say little and could reveal a single CA's fee.
 
 Tray notifications (AL1): every event that emails someone (request, accept, quote, decline,
 expiry, pro-bono match) also adds a tray entry with alerts_service.notify(), before the
-commit; completion adds a tray entry only. The emails themselves are unchanged and always
-sent (engagement emails are transactional, not in the notification settings).
+commit; completion adds a tray entry only. The emails are sent only when the user's
+`email_notifications` switch is on.
 
 For the admin module: list_cas_for_admin, get_ca_for_admin, certificate_document_id,
 set_verification, count_cas_by_status, count_open_engagements.
@@ -761,14 +761,15 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
     db.session.commit()
     log.info("Engagement %s requested with %d filings", engagement.id, len(chosen))
 
-    send_email(
-        ca.user.email,
-        "New request on CA Helper",
-        "engagement_requested",
-        ca_name=ca.user.full_name,
-        business_name=business.legal_name,
-        filing_count=len(chosen),
-    )
+    if ca.user.email_notifications:
+        send_email(
+            ca.user.email,
+            "New request on CA Helper",
+            "engagement_requested",
+            ca_name=ca.user.full_name,
+            business_name=business.legal_name,
+            filing_count=len(chosen),
+        )
     return _engagement_details(engagement)
 
 
@@ -914,9 +915,12 @@ def _notify_business(engagement: Engagement, title: str, text: str) -> None:
 
 
 def _email_business(engagement: Engagement, subject: str, template: str, **context) -> None:
-    """Email the owner of the engagement's business (call after committing)."""
+    """Email the owner of the engagement's business, if they want emails (call after
+    committing)."""
     business = onboarding_service.get_business(engagement.business_id)
     owner = db.session.get(User, business.user_id)
+    if not owner.email_notifications:
+        return
     ca = db.session.get(CaProfile, engagement.ca_profile_id)
     send_email(
         owner.email,

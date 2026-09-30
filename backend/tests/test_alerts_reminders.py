@@ -17,7 +17,6 @@ from app.models import (
     Engagement,
     EngagementItem,
     Notification,
-    NotificationSetting,
     ReminderLog,
     User,
 )
@@ -150,20 +149,13 @@ def test_filed_filings_get_no_reminder(business, database):
 
 def test_switched_off_emails_still_reach_the_tray(business, database, mailbox):
     owner_id = business.user_id
-    database.session.add(
-        NotificationSetting(
-            user_id=owner_id, type=NotificationType.DEADLINE_REMINDER, email_enabled=False
-        )
-    )
+    database.session.get(User, owner_id).email_notifications = False
     database.session.commit()
 
     send_reminders(date(2026, 10, 19))
 
     assert len(tray_titles(database, owner_id)) == 2
-    # Only the overdue reminder is emailed, as a one-line summary.
-    assert len(mailbox) == 1
-    assert mailbox[0]["Subject"] == "GSTR-1 (Q2 2026-27) is overdue"
-    assert "due in 3 days" not in mailbox[0].get_content()
+    assert mailbox == []
 
 
 def test_the_ca_of_an_active_engagement_is_reminded_too(business, make_user, database, mailbox):

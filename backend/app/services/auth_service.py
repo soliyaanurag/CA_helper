@@ -8,6 +8,7 @@ request_password_reset(email)                         emails a reset code (at mo
 reset_password(email, code, new_password)             sets a new password with that code
 change_password(user, current_password, new_password) for a logged-in user
 accept_terms(user)                                    records consent (for accounts from before it)
+get_settings(user) / save_settings(user, on)          the one "email me" switch
 list_users(role, search, page, page_size) / count_users_by_role()   for the admin screens
 issue_access_token(user) -> str                       JWT for a logged-in user
 get_user(user_id) -> User | None                      used by the JWT user loader
@@ -286,6 +287,18 @@ def accept_terms(user: User) -> None:
         user.terms_accepted_at = utcnow()
     db.session.commit()
     log.info("User %s accepted the terms", user.id)
+
+
+def get_settings(user: User) -> dict:
+    """The user's settings: {"email_notifications": bool}."""
+    return {"email_notifications": user.email_notifications}
+
+
+def save_settings(user: User, email_notifications: bool) -> dict:
+    """Switch notification emails on or off. Emails with a code always go out."""
+    user.email_notifications = email_notifications
+    db.session.commit()
+    return get_settings(user)
 
 
 # --- For the admin module ---------------------------------------------------------------

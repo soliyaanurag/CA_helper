@@ -6,14 +6,12 @@ list_notifications(user, page, page_size) -> dict      the user's tray, newest f
 unread_count(user) -> dict                             {"unread": n}
 mark_read(user, notification_id) -> Notification       one entry read
 mark_all_read(user) -> dict                            every entry read -> {"unread": 0}
-get_settings(user) / save_settings(user, items)        email on/off per type (AL3)
 send_reminders(today) -> int                           worker job: T-7/T-3/T-1/overdue (AL2)
 estimate_penalty(business, item_id, tax_due) -> dict   one filing's late fee + interest (AL5)
 penalty_exposure(business) -> dict                     late fees of all overdue filings (AL5)
 
-Tray entries are always created. Emails from notify() follow the user's settings for
-the CONFIGURABLE_TYPES; engagement and account emails are transactional and always sent
-(marketplace and auth send them themselves).
+Tray entries are always created. Emails from notify() are sent only when the user's
+`email_notifications` switch is on (auth_service.get_settings / save_settings).
 
 Emails and the single commit: notify() and queue_email() do not send at once. They put
 the email in a list on the database session, and the two listeners at the bottom of this
@@ -35,24 +33,13 @@ from sqlalchemy.orm import Session
 
 from app.errors import ApiError
 from app.extensions import db
-from app.models import Notification, NotificationSetting, PenaltyRule, ReminderLog, User
+from app.models import Notification, PenaltyRule, ReminderLog, User
 from app.models.alerts import NotificationType, ReminderKind
 from app.models.base import today_in_india, utcnow
 from app.services import compliance_service, marketplace_service, onboarding_service
 from app.utils.email import send_email
 
 log = logging.getLogger(__name__)
-
-# Types whose emails a user can switch off. The others (engagement updates, account
-# emails) are always emailed: they answer something the user did.
-CONFIGURABLE_TYPES = (
-    NotificationType.DEADLINE_REMINDER,
-    NotificationType.OVERDUE,
-    NotificationType.DOCUMENT_REQUEST,
-    NotificationType.REGULATORY_UPDATE,
-)
-ALWAYS_EMAILED_TYPES = (NotificationType.ENGAGEMENT_UPDATE, NotificationType.ACCOUNT)
-
 
 # --- Emails sent after the commit -------------------------------------------------------
 
@@ -79,19 +66,6 @@ def _drop_queued_emails(session) -> None:
 # --- The tray (AL1) ----------------------------------------------------------------------
 
 
-def wants_email(user_id, notification_type: NotificationType) -> bool:
-    """Whether the user gets emails of this type (no settings row = yes)."""
-    if notification_type not in CONFIGURABLE_TYPES:
-        return True
-    enabled = db.session.scalar(
-        select(NotificationSetting.email_enabled).where(
-            NotificationSetting.user_id == user_id,
-            NotificationSetting.type == notification_type,
-        )
-    )
-    return enabled is None or enabled
-
-
 def notify(
     user: User,
     notification_type: NotificationType,
@@ -101,7 +75,7 @@ def notify(
     email: bool = False,
 ) -> Notification:
     """Add a tray entry for `user`. With email=True, also email it after the caller's
-    commit, unless the user switched this type off. Does not commit.
+    commit, unless the user switched notification emails off. Does not commit.
 
     `link` is an app path such as "/business/compliance/<id>". Never put PAN, GSTIN or
     other sensitive fields in the title or body.
@@ -110,7 +84,7 @@ def notify(
         user_id=user.id, type=notification_type, title=title, body=body, link=link
     )
     db.session.add(notification)
-    if email and wants_email(user.id, notification_type):
+    if email and user.email_notifications:
         queue_email(user.email, title, "notification", name=user.full_name, title=title, body=body)
     return notification
 
@@ -161,38 +135,6 @@ def mark_all_read(user: User) -> dict:
 
 
 # --- Email settings (AL3) ----------------------------------------------------------------
-
-
-def get_settings(user: User) -> dict:
-    """{items: [{type, email_enabled}] for each configurable type, always_emailed: [types]}."""
-    saved = {}
-    for row in db.session.scalars(
-        select(NotificationSetting).where(NotificationSetting.user_id == user.id)
-    ):
-        saved[row.type] = row.email_enabled
-    items = []
-    for notification_type in CONFIGURABLE_TYPES:
-        items.append(
-            {"type": notification_type, "email_enabled": saved.get(notification_type, True)}
-        )
-    return {"items": items, "always_emailed": list(ALWAYS_EMAILED_TYPES)}
-
-
-def save_settings(user: User, items: list[dict]) -> dict:
-    """Save email on/off for the types in `items` (others keep their setting)."""
-    for item in items:
-        row = db.session.scalar(
-            select(NotificationSetting).where(
-                NotificationSetting.user_id == user.id,
-                NotificationSetting.type == item["type"],
-            )
-        )
-        if row is None:
-            row = NotificationSetting(user_id=user.id, type=item["type"])
-            db.session.add(row)
-        row.email_enabled = item["email_enabled"]
-    db.session.commit()
-    return get_settings(user)
 
 
 # --- Reminders (AL2): run by the worker, see backend/worker.py ---------------------------
@@ -298,7 +240,7 @@ def send_reminders(today: date | None = None) -> int:
             )
         for user, user_title, link in recipients:
             notify(user, notification_type, user_title, body, link)
-            if wants_email(user.id, notification_type):
+            if user.email_notifications:
                 emails.setdefault(user.id, (user, []))[1].append((user_title, body))
 
     for user, reminders in emails.values():

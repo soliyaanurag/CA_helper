@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -22,4 +22,6 @@ class User(BaseModel):
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # When the user accepted the terms (set by signup in a later task; empty until then).
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The user's one switch for notification emails (codes and password emails always go out).
+    email_notifications: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 

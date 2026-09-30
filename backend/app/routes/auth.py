@@ -9,6 +9,8 @@
     POST /api/v1/auth/change-password        any logged-in user
     POST /api/v1/auth/accept-terms           any logged-in user (consent for older accounts)
     GET  /api/v1/auth/me                     any logged-in user
+    GET  /api/v1/auth/settings               business or CA: {email_notifications}
+    PUT  /api/v1/auth/settings               save it
 
 Actions without data to return answer 204 (no body); the frontend shows its own
 message. Routes stay thin: parse input, call one service function, serialize.
@@ -24,12 +26,14 @@ from app.schemas.auth import (
     LoginResponseSchema,
     LoginSchema,
     ResetPasswordSchema,
+    SettingsSchema,
     SignupSchema,
     UserSchema,
     VerifyEmailSchema,
 )
 from app.services import auth_service
-from app.utils.decorators import current_user, login_required
+from app.models.enums import UserRole
+from app.utils.decorators import current_user, login_required, roles_required
 
 blp = Blueprint("auth", __name__, description="Signup, email verification, login and passwords")
 
@@ -135,3 +139,18 @@ class Me(MethodView):
     @blp.response(200, UserSchema)
     def get(self):
         return current_user()
+
+
+@blp.route("/auth/settings")
+class Settings(MethodView):
+    @roles_required(UserRole.BUSINESS, UserRole.CA)
+    @blp.response(200, SettingsSchema)
+    def get(self):
+        return auth_service.get_settings(current_user())
+
+    @roles_required(UserRole.BUSINESS, UserRole.CA)
+    @blp.arguments(SettingsSchema)
+    @blp.response(200, SettingsSchema)
+    def put(self, data):
+        """Switch notification emails on or off."""
+        return auth_service.save_settings(current_user(), data["email_notifications"])

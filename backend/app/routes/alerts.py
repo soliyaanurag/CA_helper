@@ -4,8 +4,6 @@
     GET  /alerts/notifications/unread-count    {"unread": n} for the bell
     POST /alerts/notifications/<id>/read       mark one entry read
     POST /alerts/notifications/read-all        mark every entry read
-    GET  /alerts/settings                      my email on/off per type (business, CA)
-    PUT  /alerts/settings                      save them
     GET  /alerts/penalties                     late fees of my overdue filings (business)
     GET  /alerts/penalties/<item_id>?tax_due=  one filing's penalty estimate (business)
 
@@ -24,7 +22,6 @@ from app.schemas.alerts import (
     NotificationArgsSchema,
     NotificationPageSchema,
     NotificationSchema,
-    NotificationSettingsSchema,
     PenaltyArgsSchema,
     PenaltyEstimateSchema,
     PenaltyExposureSchema,
@@ -36,7 +33,7 @@ from app.utils.decorators import current_business, current_user, login_required,
 blp = Blueprint(
     "alerts",
     __name__,
-    description="Notification tray, email settings, reminders and the penalty estimator",
+    description="Notification tray, reminders and the penalty estimator",
 )
 
 
@@ -68,21 +65,6 @@ def mark_read(notification_id):
 @blp.response(200, UnreadCountSchema)
 def mark_all_read():
     return alerts_service.mark_all_read(current_user())
-
-
-@blp.route("/alerts/settings", methods=["GET"])
-@roles_required(UserRole.BUSINESS, UserRole.CA)
-@blp.response(200, NotificationSettingsSchema)
-def get_settings():
-    return alerts_service.get_settings(current_user())
-
-
-@blp.route("/alerts/settings", methods=["PUT"])
-@roles_required(UserRole.BUSINESS, UserRole.CA)
-@blp.arguments(NotificationSettingsSchema)
-@blp.response(200, NotificationSettingsSchema)
-def save_settings(data):
-    return alerts_service.save_settings(current_user(), data["items"])
 
 
 @blp.route("/alerts/penalties", methods=["GET"])
