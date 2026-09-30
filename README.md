@@ -20,13 +20,14 @@ cp .env.example .env        # then fill in the three secrets (each line says how
 docker compose up           # first time: builds the images (a few minutes)
 ```
 
-In a second terminal, the first time only:
+When it is running, open a second terminal in the same folder and run this once (one line): it creates the
+tables, adds the rules, forms, NIC codes and demo users, then the demo data below.
 
 ```bash
-docker compose exec backend flask --app app db upgrade   # create the tables
-docker compose exec backend flask --app app seed         # rules, forms, NIC codes, demo users
-docker compose exec backend flask --app app seed-demo    # optional: the demo data below
+docker compose exec backend sh -c "flask --app app db upgrade && flask --app app seed && flask --app app seed-demo"
 ```
+
+It ends with `Demo data added: 14 businesses`. Run again later, it changes nothing (`Demo data is already there`).
 
 Then open:
 
@@ -38,16 +39,16 @@ Then open:
 
 Other commands:
 
-```bash
-docker compose --profile worker up                              # also the scheduled jobs (only ONE teammate)
-docker compose exec backend pytest                              # backend tests (their own database)
-docker compose exec frontend npm test                           # frontend tests
-docker compose exec frontend npm run build                      # production build check
-docker compose exec backend flask --app app assistant ingest    # AI assistant knowledge base (needs GEMINI_API_KEY)
-docker compose exec backend flask --app app regulatory scan     # read the news sources now
-docker compose exec backend flask --app app reset-db            # empty the database and seed it again
-docker compose up --build                                       # after a change to requirements.txt or package.json
-```
+| What | Command |
+|---|---|
+| Also run the scheduled jobs (only ONE teammate) | `docker compose --profile worker up` |
+| Backend tests (they use their own database) | `docker compose exec backend pytest` |
+| Frontend tests | `docker compose exec frontend npm test` |
+| Production build check | `docker compose exec frontend npm run build` |
+| AI assistant knowledge base (needs `GEMINI_API_KEY`) | `docker compose exec backend flask --app app assistant ingest` |
+| Read the news sources now | `docker compose exec backend flask --app app regulatory scan` |
+| Empty the database and seed it again | `docker compose exec backend flask --app app reset-db` |
+| After a change to `requirements.txt` or `package.json` | `docker compose up --build` |
 
 Without `GEMINI_API_KEY` everything still works: the NIC suggestions, the assistant and the news monitor use
 their keyword fallbacks. The evaluation scripts for the report are in [eval/](eval/README.md).
@@ -58,7 +59,8 @@ their keyword fallbacks. The evaluation scripts for the report are in [eval/](ev
 this financial year, engagements of the demo CA in every status, documents, document requests, notifications,
 ratings, a pro-bono request and a CA waiting for verification. Every name, PAN, GSTIN and file is made up. It
 gives `business@demo.local` a business (Asha Traders) only if that account has none yet. To start again from
-scratch: `flask --app app reset-db`, then `flask --app app seed-demo`.
+scratch: `docker compose exec backend flask --app app reset-db`, then
+`docker compose exec backend flask --app app seed-demo`.
 
 Demo logins: `business@demo.local` (`DemoBusiness#2026`; the other demo businesses are `demo-biz-01@demo.local` to
 `demo-biz-13@demo.local` with the same password), `ca@demo.local` (`DemoCA#2026`), `admin@demo.local`
