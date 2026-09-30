@@ -335,14 +335,12 @@ def _rule_for(form_code, day: date) -> PenaltyRule | None:
     )
 
 
-def _late_fee(rule: PenaltyRule, filing, days_late: int) -> Decimal | None:
-    """A flat fee if the rule has one, else days × the daily fee (the nil-return fee for a
-    nil return, when set), capped at the maximum. None when the amounts are not confirmed."""
+def _late_fee(rule: PenaltyRule, days_late: int) -> Decimal | None:
+    """A flat fee if the rule has one, else days × the daily fee, capped at the maximum.
+    None when the amounts are not confirmed."""
     if rule.flat_late_fee is not None:
         return rule.flat_late_fee
     per_day = rule.late_fee_per_day
-    if filing.is_nil_return and rule.nil_return_late_fee_per_day is not None:
-        per_day = rule.nil_return_late_fee_per_day
     if per_day is None:
         return None
     fee = per_day * days_late
@@ -381,7 +379,7 @@ def _estimate(filing, today: date, tax_due: Decimal | None) -> dict:
     if "TODO_VERIFY" not in rule.source_reference:
         result["label"] = LABEL_VERIFIED
 
-    result["late_fee"] = _late_fee(rule, filing, days_late)
+    result["late_fee"] = _late_fee(rule, days_late)
     if result["late_fee"] is None:
         result["notes"].append("The late fee for this form is not confirmed yet.")
     if rule.annual_interest_rate is None:

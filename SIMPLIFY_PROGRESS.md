@@ -110,6 +110,12 @@ Checks (all inside the containers):
   facts, admin rows, regulatory change rows). StrEnum members still compare and hash equal to their values.
 - Checks: backend 622 passed; frontend 240 passed; build OK; snapshot no differences; demo walk 0 failures.
 
+### 2.5a Unused schema (done)
+- Tables `client_invites` (ClientInvite, InviteStatus) and `ca_notes` (CaNote) removed; nothing used them.
+- `compliance_items.is_nil_return` and `penalty_rules.nil_return_late_fee_per_day` removed, with the nil-return
+  branch of the late fee and the three seeded "20" values (the source texts that cite them are unchanged).
+- Checks: backend 621 passed; frontend 240; build OK; snapshot no differences; walk 0 failures.
+
 ### Q3 (step 2.2): permission to delete/rewrite security tests
 **Answer (Anurag):** approved explicitly for the tests of the protections section 4 removes: rate limits, dummy-hash
 timing, "never reveals", and later the OTP wrong-guess counter, the resend wait, soft delete, suspend/reactivate, the
@@ -160,3 +166,4 @@ audit log, the matching score, per-type email settings and regulatory approval. 
 | test_marketplace_ca_profile.py::test_database_rejects_unknown_codes | deleted (generated code-list CHECK) | Cross-cutting: no generated CHECKs |
 | test_schema_constraints.py::test_an_unknown_enum_value_is_refused_even_in_raw_sql | deleted (generated enum CHECK) | Cross-cutting: no generated CHECKs |
 | test_regulatory_monitor.py (5 asserts) | `x.value == "..."` -> `x == "..."` (loaded values are str) | Cross-cutting: enums -> String columns |
+| test_alerts_penalties.py::test_a_nil_return_uses_its_own_daily_fee | deleted | Cross-cutting: `is_nil_return` and the nil-return fee removed |

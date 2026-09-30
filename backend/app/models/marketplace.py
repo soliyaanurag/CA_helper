@@ -7,7 +7,6 @@ businesses and CAs.
     engagements        one business working with one CA (Engagement)
     engagement_items   the filings an engagement covers, with their prices (EngagementItem)
     ratings            the business's review of a finished engagement (Rating)
-    client_invites     a CA's invitation to an existing client (ClientInvite)
     pro_bono_requests  a business waiting for a pro-bono CA (ProBonoRequest)
 
 `ca_profiles`: a CA's practice profile, shown to businesses once verified.
@@ -271,32 +270,6 @@ class Rating(BaseModel):
     engagement_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("engagements.id"), unique=True)
     stars: Mapped[int] = mapped_column(SmallInteger)
     review: Mapped[str | None] = mapped_column(String(2000))
-
-
-class InviteStatus(StrEnum):
-    """Where a CA's invitation to an existing client stands."""
-
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    EXPIRED = "expired"
-    CANCELLED = "cancelled"
-
-
-class ClientInvite(BaseModel):
-    """A CA's email invitation to an existing client, who must approve the CA's access."""
-
-    __tablename__ = "client_invites"
-
-    ca_profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ca_profiles.id"), index=True)
-    email: Mapped[str] = mapped_column(String(254), index=True)  # normalized, like users.email
-    # SHA-256 of the one-time token in the invitation link; the token itself is never stored.
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    status: Mapped[str] = mapped_column(
-        String(50), default=InviteStatus.PENDING
-    )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # The business that accepted (empty until then).
-    accepted_business_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("businesses.id"))
 
 
 class ProBonoRequestStatus(StrEnum):

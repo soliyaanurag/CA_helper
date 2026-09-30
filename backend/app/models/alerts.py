@@ -94,8 +94,7 @@ class PenaltyRule(BaseModel):
         ),
         CheckConstraint(
             "late_fee_per_day >= 0 AND annual_interest_rate >= 0"
-            " AND (max_late_fee IS NULL OR max_late_fee >= 0)"
-            " AND (nil_return_late_fee_per_day IS NULL OR nil_return_late_fee_per_day >= 0)",
+            " AND (max_late_fee IS NULL OR max_late_fee >= 0)",
             name="amounts_not_negative",
         ),
         CheckConstraint(
@@ -110,8 +109,6 @@ class PenaltyRule(BaseModel):
     # A fixed late fee, charged once however late (e.g. the ITR); used instead of the per-day fee.
     flat_late_fee: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     annual_interest_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))  # percent, e.g. 18
-    # Late fee per day for a nil return, when it differs (empty = same as late_fee_per_day).
-    nil_return_late_fee_per_day: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     source_reference: Mapped[str] = mapped_column(String(500))
     effective_from: Mapped[date] = mapped_column(Date)
     effective_to: Mapped[date | None] = mapped_column(Date)

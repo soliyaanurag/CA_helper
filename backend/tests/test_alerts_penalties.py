@@ -148,15 +148,6 @@ def test_late_fee_is_days_times_the_daily_fee_up_to_the_cap(business_with_filing
     assert capped["late_fee"] == Decimal("150.00")
 
 
-def test_a_nil_return_uses_its_own_daily_fee(business_with_filings, rules, database):
-    rules["gstr_1"].late_fee_per_day = Decimal("10")
-    rules["gstr_1"].nil_return_late_fee_per_day = Decimal("4")
-    item = filing(database, "gstr_1", "Q1 2026-27")
-    item.is_nil_return = True
-    database.session.commit()
-
-    assert estimate(business_with_filings, item)["late_fee"] == Decimal("40.00")
-
 
 def test_a_flat_fee_is_charged_once_however_late(business_with_filings, rules, database):
     rules["gstr_1"].flat_late_fee = Decimal("500")

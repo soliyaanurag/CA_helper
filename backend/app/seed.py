@@ -631,7 +631,6 @@ PENALTY_RULES = [
         FormCode.GSTR_1,
         {
             "late_fee_per_day": "50",
-            "nil_return_late_fee_per_day": "20",
             "max_late_fee": "2000",
             "annual_interest_rate": "0",
         },
@@ -643,7 +642,6 @@ PENALTY_RULES = [
         FormCode.GSTR_3B,
         {
             "late_fee_per_day": "50",
-            "nil_return_late_fee_per_day": "20",
             "max_late_fee": "2000",
             "annual_interest_rate": "18",
         },
@@ -659,7 +657,6 @@ PENALTY_RULES = [
         FormCode.GSTR_4,
         {
             "late_fee_per_day": "50",
-            "nil_return_late_fee_per_day": "20",
             "max_late_fee": "2000",
             "annual_interest_rate": "18",
         },
@@ -691,7 +688,6 @@ PENALTY_RULES = [
 
 PENALTY_COLUMNS = (
     "late_fee_per_day",
-    "nil_return_late_fee_per_day",
     "max_late_fee",
     "flat_late_fee",
     "annual_interest_rate",

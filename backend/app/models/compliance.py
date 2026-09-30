@@ -15,7 +15,6 @@ from datetime import date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -100,7 +99,6 @@ class ComplianceItem(BaseModel):
     )
     # Self-filing or through a CA; empty until the business chooses.
     filing_path: Mapped[str | None] = mapped_column(String(50))
-    is_nil_return: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     filed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     acknowledgement_no: Mapped[str | None] = mapped_column(String(50))  # ARN / ack number
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -9,8 +9,8 @@
     documents.py     Document, ComplianceItemDocument
     alerts.py        Notification, NotificationSetting, ReminderLog, PenaltyRule
     marketplace.py   CaProfile, CatalogService, CaService, Engagement, EngagementItem, Rating,
-                     ClientInvite, ProBonoRequest
-    ca_workspace.py  DocumentRequest, CaNote
+                     ProBonoRequest
+    ca_workspace.py  DocumentRequest
     regulatory.py    NewsSource, NewsArticle, RegulatoryChange, RegulatoryChangeMatch
     assistant.py     KbChunk, ChatMessage
     admin.py         AdminAuditLog
@@ -22,7 +22,7 @@ Import a new model here when you add its file.
 from app.models.admin import AdminAuditLog
 from app.models.alerts import Notification, NotificationSetting, PenaltyRule, ReminderLog
 from app.models.assistant import ChatMessage, KbChunk
-from app.models.ca_workspace import CaNote, DocumentRequest
+from app.models.ca_workspace import DocumentRequest
 from app.models.compliance import ChecklistTick, ComplianceItem, ObligationTemplate
 from app.models.documents import ComplianceItemDocument, Document
 from app.models.email_otp import EmailOtp
@@ -30,7 +30,6 @@ from app.models.marketplace import (
     CaProfile,
     CaService,
     CatalogService,
-    ClientInvite,
     Engagement,
     EngagementItem,
     ProBonoRequest,
@@ -48,13 +47,11 @@ from app.models.user import User
 __all__ = [
     "AdminAuditLog",
     "Business",
-    "CaNote",
     "CaProfile",
     "CaService",
     "CatalogService",
     "ChatMessage",
     "ChecklistTick",
-    "ClientInvite",
     "ComplianceItem",
     "ComplianceItemDocument",
     "Document",
