@@ -34,31 +34,28 @@ import click
 from flask import Flask
 from sqlalchemy import select, text
 
-from app.config import REPO_ROOT
-from app.extensions import db
+from app import onboarding
+from app.auth import normalize_email
 from app.models import (
     CaProfile,
     CaService,
     CatalogService,
+    CaVerificationStatus,
+    db,
+    FormCode,
+    Frequency,
     NewsSource,
+    NewsSourceKind,
     NicCode,
     ObligationTemplate,
     PenaltyRule,
     RuleThreshold,
-    User,
-)
-from app.models.base import utcnow
-from app.models.compliance import Frequency
-from app.models.enums import FormCode, UserRole
-from app.models.marketplace import (  # noqa: F401 (SERVICE_SPECIALIZATIONS: used by tests)
-    SERVICE_SPECIALIZATIONS,
-    CaVerificationStatus,
     ServiceUnit,
+    User,
+    UserRole,
+    utcnow,
 )
-from app.models.regulatory import NewsSourceKind
-from app.services import onboarding_service
-from app.services.auth_service import normalize_email
-from app.utils.passwords import hash_password
+from app.utils import hash_password, REPO_ROOT
 
 log = logging.getLogger(__name__)
 
@@ -746,7 +743,7 @@ def seed_news_sources() -> None:
 def seed_filing_dates() -> None:
     """Give filings created earlier the dates of the rules seeded above (a corrected rule
     would otherwise reach a business's filings only when it edits its profile)."""
-    onboarding_service.resync_all_filings()
+    onboarding.resync_all_filings()
 
 
 # (name, function) in dependency order: users first, other data may refer to them.

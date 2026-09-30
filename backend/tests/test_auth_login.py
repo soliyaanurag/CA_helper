@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 from argon2 import PasswordHasher
 from flask_jwt_extended import decode_token
 
-from app.models.enums import UserRole
-from app.services import auth_service
+from app import auth as auth_service
+from app.models import UserRole
 from tests.conftest import TEST_PASSWORD
 
 LOGIN_URL = "/api/v1/auth/login"

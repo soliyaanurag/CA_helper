@@ -11,11 +11,8 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem, User
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType
-from app.services import compliance_service, documents_service
+from app import compliance as compliance_service, documents as documents_service
+from app.models import Business, ComplianceItem, ComplianceStatus, EntityType, User, UserRole
 
 ITEMS = "/api/v1/compliance/items"
 PDF = b"%PDF-1.4 acknowledgement"

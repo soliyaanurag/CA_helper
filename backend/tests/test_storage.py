@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.errors import ApiError
-from app.utils import storage
+from app import utils as storage
+from app.utils import ApiError
 
 PDF = b"%PDF-1.4 a tiny test file"
 PNG = b"\x89PNG\r\n\x1a\n rest of a png"

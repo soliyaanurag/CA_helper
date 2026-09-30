@@ -35,7 +35,7 @@ def main() -> None:
     rows = []
     with app_context() as context:
         from app.models import NewsArticle
-        from app.services import regulatory_service
+        from app import regulatory as regulatory_service
 
         if keywords_only:
             context.app.config["GEMINI_API_KEY"] = ""

@@ -7,9 +7,8 @@ import logging
 
 import pytest
 
-from app.errors import ApiError
-from app.utils import gemini_client
-from app.utils.gemini_client import ask_gemini, scrub_pii
+from app import utils as gemini_client
+from app.utils import ApiError, ask_gemini, scrub_pii
 
 
 def test_scrub_replaces_each_kind_of_personal_data():

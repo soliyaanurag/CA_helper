@@ -31,7 +31,7 @@ def main() -> None:
         rows = list(csv.DictReader(file))
 
     with app_context() as context:
-        from app.services import onboarding_service
+        from app import onboarding as onboarding_service
 
         if keywords_only:
             context.app.config["GEMINI_API_KEY"] = ""

@@ -13,13 +13,18 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import Business, ComplianceItem, PenaltyRule, User
-from app.models.base import today_in_india
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType
+from app import alerts as alerts_service
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    PenaltyRule,
+    today_in_india,
+    User,
+    UserRole,
+)
 from app.seed import PENALTY_COLUMNS, PENALTY_RULES, seed_penalty_rules
-from app.services import alerts_service
 
 BASE = "/api/v1/alerts"
 

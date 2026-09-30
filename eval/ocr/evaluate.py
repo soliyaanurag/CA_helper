@@ -15,8 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common import percent, print_table  # noqa: E402
 
-from app.utils import ocr  # noqa: E402
-from app.utils.document_text import read_proof_fields, read_registration  # noqa: E402
+from app import ocr
+from app.ocr import read_proof_fields, read_registration
 
 HERE = Path(__file__).parent
 # The samples' dates are in 2026; a later "today" keeps every one of them valid.

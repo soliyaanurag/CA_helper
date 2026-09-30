@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.enums import UserRole
+from app.models import UserRole
 from tests.conftest import TEST_PASSWORD
 
 URL = "/api/v1/auth/change-password"

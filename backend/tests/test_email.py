@@ -5,7 +5,7 @@ import smtplib
 
 import pytest
 
-from app.utils.email import send_email
+from app.utils import send_email
 
 
 def test_send_email_renders_the_template(app, mailbox):

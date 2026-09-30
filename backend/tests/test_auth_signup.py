@@ -5,10 +5,8 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select
 
-from app.models import EmailOtp, User
-from app.models.base import utcnow
-from app.models.email_otp import OtpPurpose
-from app.utils.passwords import verify_password
+from app.models import EmailOtp, OtpPurpose, User, utcnow
+from app.utils import verify_password
 from tests.conftest import emailed_code
 
 SIGNUP_URL = "/api/v1/auth/signup"

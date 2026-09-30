@@ -5,13 +5,24 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem, ObligationTemplate, RegulatoryProfile, User
-from app.models.base import utcnow
-from app.models.compliance import ComplianceStatus
-from app.models.enums import FormCode, UserRole
-from app.models.onboarding import EntityType
+from app import (
+    alerts as alerts_service,
+    compliance as compliance_service,
+    onboarding as onboarding_service,
+)
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    FormCode,
+    ObligationTemplate,
+    RegulatoryProfile,
+    User,
+    UserRole,
+    utcnow,
+)
 from app.seed import run_all_seeds
-from app.services import alerts_service, compliance_service, onboarding_service
 
 TODAY = date(2026, 9, 28)
 

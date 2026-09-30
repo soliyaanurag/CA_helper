@@ -9,9 +9,8 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import Business, RuleThreshold
-from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
-from app.services.onboarding_service import compute_profile
+from app.models import Business, EntityType, GstScheme, ItrForm, MsmeTier, RuleThreshold
+from app.onboarding import compute_profile
 
 TODAY = date(2026, 9, 27)
 LAKH = Decimal("100000")

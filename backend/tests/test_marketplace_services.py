@@ -11,9 +11,14 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import CaProfile, CaService, CatalogService
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus, ServiceUnit
+from app.models import (
+    CaProfile,
+    CaService,
+    CatalogService,
+    CaVerificationStatus,
+    ServiceUnit,
+    UserRole,
+)
 
 SERVICES_URL = "/api/v1/marketplace/services"
 MENU_URL = "/api/v1/marketplace/ca-services"

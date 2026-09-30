@@ -1,7 +1,7 @@
 """The app factory wires up the blueprints, OpenAPI docs and the JSON error format."""
 
 from app import create_app
-from app.errors import ApiError
+from app.utils import ApiError
 from tests.conftest import TEST_CONFIG
 
 EXPECTED_BLUEPRINTS = {"health", "auth", "compliance", "ca_workspace", "admin"}

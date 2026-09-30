@@ -5,9 +5,8 @@ from datetime import date
 import pytest
 from sqlalchemy import text
 
-from app.models import ComplianceItem
-from app.models.enums import UserRole
-from app.services import onboarding_service
+from app import onboarding as onboarding_service
+from app.models import ComplianceItem, UserRole
 
 URL = "/api/v1/onboarding/business"
 

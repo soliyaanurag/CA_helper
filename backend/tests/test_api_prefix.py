@@ -1,6 +1,6 @@
 """Feature routes live under /api/v1; health and docs stay unversioned."""
 
-from app.routes import API_PREFIX, BLUEPRINTS
+from app import API_PREFIX, BLUEPRINTS
 
 
 def test_every_feature_blueprint_is_served_under_api_v1(app):

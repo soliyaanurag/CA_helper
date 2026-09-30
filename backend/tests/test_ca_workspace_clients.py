@@ -12,25 +12,27 @@ from types import SimpleNamespace
 
 import pytest
 
+from app import ca_workspace as ca_workspace_service, compliance as compliance_service
 from app.models import (
     Business,
     CaProfile,
     CatalogService,
+    CaVerificationStatus,
     ComplianceItem,
     ComplianceItemDocument,
+    ComplianceStatus,
     Document,
     DocumentRequest,
     Engagement,
     EngagementItem,
+    EngagementStatus,
+    FilingPath,
     Notification,
     ObligationTemplate,
     User,
+    UserRole,
 )
-from app.models.compliance import ComplianceStatus, FilingPath
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus, EngagementStatus
 from app.seed import seed_service_catalog
-from app.services import ca_workspace_service, compliance_service
 
 BASE = "/api/v1/ca-workspace"
 TODAY = date(2026, 9, 28)

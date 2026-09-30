@@ -9,14 +9,15 @@ from sqlalchemy.exc import IntegrityError
 from app.models import (
     Business,
     CaProfile,
+    CaVerificationStatus,
     ComplianceItem,
     Engagement,
+    EntityType,
+    FormCode,
     ObligationTemplate,
     Rating,
+    UserRole,
 )
-from app.models.enums import FormCode, UserRole
-from app.models.marketplace import CaVerificationStatus
-from app.models.onboarding import EntityType
 
 
 def new_business(user, **changes) -> Business:

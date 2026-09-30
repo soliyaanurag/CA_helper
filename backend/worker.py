@@ -13,13 +13,7 @@ import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
 from flask import Flask
 
-from app import create_app
-from app.services import (
-    alerts_service,
-    compliance_service,
-    marketplace_service,
-    regulatory_service,
-)
+from app import alerts, compliance, create_app, marketplace, regulatory
 
 log = logging.getLogger("worker")
 
@@ -53,7 +47,7 @@ def build_scheduler(app: Flask) -> AppScheduler:
     # CO11: every hour, late filings the business has not started become "overdue".
     # Hourly (not once at midnight), so a worker started late in the day catches up soon.
     scheduler.add_job(
-        compliance_service.mark_overdue_filings,
+        compliance.mark_overdue_filings,
         "interval",
         hours=1,
         id="compliance.mark_overdue",
@@ -61,7 +55,7 @@ def build_scheduler(app: Flask) -> AppScheduler:
 
     # MA12: every 15 minutes, requests unanswered for 48 hours expire.
     scheduler.add_job(
-        marketplace_service.expire_old_requests,
+        marketplace.expire_old_requests,
         "interval",
         minutes=15,
         id="marketplace.expire_requests",
@@ -70,12 +64,12 @@ def build_scheduler(app: Flask) -> AppScheduler:
     # AL2: every morning, deadline (T-7/T-3/T-1) and overdue reminders, by tray and email.
     # 08:15, after the hourly overdue job has had a chance to run.
     scheduler.add_job(
-        alerts_service.send_reminders, "cron", hour=8, minute=15, id="alerts.reminders"
+        alerts.send_reminders, "cron", hour=8, minute=15, id="alerts.reminders"
     )
 
     # RE2 (X2): every morning, read the news sources and save changes for an admin to review.
     scheduler.add_job(
-        regulatory_service.scan_news, "cron", hour=7, minute=0, id="regulatory.scan_news"
+        regulatory.scan_news, "cron", hour=7, minute=0, id="regulatory.scan_news"
     )
     return scheduler
 

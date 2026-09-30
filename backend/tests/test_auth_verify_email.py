@@ -5,8 +5,8 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select, update
 
+from app.auth import OTP_MAX_ATTEMPTS
 from app.models import EmailOtp, User
-from app.services.auth_service import OTP_MAX_ATTEMPTS
 from tests.conftest import emailed_code
 
 VERIFY_URL = "/api/v1/auth/verify-email"

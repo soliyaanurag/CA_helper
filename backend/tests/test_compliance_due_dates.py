@@ -5,14 +5,8 @@ The rules here are made up for the tests, except the last test, which checks see
 
 from datetime import date
 
-from app.models import ObligationTemplate
-from app.models.compliance import Frequency
-from app.services.compliance_service import (
-    due_date,
-    financial_year_start,
-    fy_label,
-    periods_of_year,
-)
+from app.compliance import due_date, financial_year_start, fy_label, periods_of_year
+from app.models import Frequency, ObligationTemplate
 
 MONTHLY = ObligationTemplate(frequency=Frequency.MONTHLY, due_date_rule={"day": 11})
 QUARTERLY = ObligationTemplate(

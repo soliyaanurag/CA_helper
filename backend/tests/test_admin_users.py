@@ -4,10 +4,8 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from app.models import ComplianceItem
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.services import compliance_service
+from app import compliance as compliance_service
+from app.models import ComplianceItem, ComplianceStatus, UserRole
 from tests.test_ca_workspace_clients import filing
 
 BASE = "/api/v1/admin"

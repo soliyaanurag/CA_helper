@@ -4,11 +4,17 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem, RegulatoryProfile, User
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType, GstScheme
-from app.services.compliance_service import create_filings, sync_filings
+from app.compliance import create_filings, sync_filings
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    GstScheme,
+    RegulatoryProfile,
+    User,
+    UserRole,
+)
 
 TODAY = date(2026, 9, 27)
 URL = "/api/v1/compliance/items"

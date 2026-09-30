@@ -8,11 +8,9 @@ import json
 import pytest
 from sqlalchemy import func, select
 
-from app.models import NicCode, User
-from app.models.enums import UserRole
+from app import onboarding as onboarding_service, utils as gemini_client
+from app.models import NicCode, User, UserRole
 from app.seed import seed_nic_codes
-from app.services import onboarding_service
-from app.utils import gemini_client
 
 SUGGEST_URL = "/api/v1/onboarding/nic-suggestions"
 SEARCH_URL = "/api/v1/onboarding/nic-codes"

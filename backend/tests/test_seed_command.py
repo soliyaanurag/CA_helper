@@ -3,11 +3,17 @@
 import pytest
 from sqlalchemy import func, select
 
-from app.models import CaProfile, CaService, CatalogService, User
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus
-from app.seed import SAMPLE_CAS, SAMPLE_PRICES, SERVICE_CATALOG, SERVICE_SPECIALIZATIONS
-from app.utils.passwords import verify_password
+from app.models import (
+    SERVICE_SPECIALIZATIONS,
+    CaProfile,
+    CaService,
+    CatalogService,
+    CaVerificationStatus,
+    User,
+    UserRole,
+)
+from app.seed import SAMPLE_CAS, SAMPLE_PRICES, SERVICE_CATALOG
+from app.utils import verify_password
 
 DEMO_ENV = {
     "DEMO_BUSINESS_EMAIL": " Business@Demo.local ",

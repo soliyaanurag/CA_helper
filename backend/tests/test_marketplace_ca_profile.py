@@ -3,9 +3,7 @@
 import pytest
 from sqlalchemy import text
 
-from app.models import CaProfile
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus
+from app.models import CaProfile, CaVerificationStatus, UserRole
 
 URL = "/api/v1/marketplace/ca-profile"
 

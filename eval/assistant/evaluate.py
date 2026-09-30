@@ -44,7 +44,7 @@ def main() -> None:
     }
     rows = []
     with app_context() as context:
-        from app.services import assistant_service
+        from app import assistant as assistant_service
 
         if keywords_only:
             context.app.config["GEMINI_API_KEY"] = ""

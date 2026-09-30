@@ -4,10 +4,9 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem
-from app.models.enums import UserRole
-from app.services import marketplace_service, onboarding_service
-from app.utils.gstin import gstin_check_character
+from app import marketplace as marketplace_service, onboarding as onboarding_service
+from app.models import Business, ComplianceItem, UserRole
+from app.utils import gstin_check_character
 from tests.test_onboarding_register import FORM, URL, register
 
 STATES_URL = "/api/v1/onboarding/states"

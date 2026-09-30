@@ -15,32 +15,37 @@ from decimal import Decimal
 import pytest
 from flask_jwt_extended import verify_jwt_in_request
 
-from app.errors import ApiError
+from app import marketplace as marketplace_service
 from app.models import (
     Business,
     CaProfile,
     CaService,
     CatalogService,
+    CaVerificationStatus,
     ComplianceItem,
     ComplianceItemDocument,
+    ComplianceStatus,
     Document,
+    DocumentType,
+    encrypt_bytes,
     Engagement,
     EngagementItem,
+    EngagementStatus,
+    EntityType,
+    FilingPath,
+    FormCode,
+    GstScheme,
+    ItrForm,
+    MsmeTier,
     Notification,
     ObligationTemplate,
     Rating,
     RegulatoryProfile,
+    UserRole,
+    utcnow,
 )
-from app.models.base import utcnow
-from app.models.compliance import ComplianceStatus, FilingPath
-from app.models.documents import DocumentType
-from app.models.enums import FormCode, UserRole
-from app.models.marketplace import CaVerificationStatus, EngagementStatus
-from app.models.onboarding import EntityType, GstScheme, ItrForm, MsmeTier
 from app.seed import seed_service_catalog
-from app.services import marketplace_service
-from app.utils.decorators import require_ca_access
-from app.utils.encryption import encrypt_bytes
+from app.utils import ApiError, require_ca_access
 from worker import build_scheduler
 
 BASE = "/api/v1/marketplace"

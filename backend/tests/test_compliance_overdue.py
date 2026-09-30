@@ -9,11 +9,16 @@ from datetime import date
 
 import pytest
 
-from app.models import Business, ComplianceItem, RegulatoryProfile
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType, GstScheme
-from app.services.compliance_service import create_filings, mark_overdue_filings
+from app.compliance import create_filings, mark_overdue_filings
+from app.models import (
+    Business,
+    ComplianceItem,
+    ComplianceStatus,
+    EntityType,
+    GstScheme,
+    RegulatoryProfile,
+    UserRole,
+)
 from worker import build_scheduler
 
 

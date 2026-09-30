@@ -75,7 +75,7 @@ def evaluate(questions: list[dict], delay: float) -> list[dict]:
     """Ask every question; returns one result row per question."""
     rows = []
     with app_context():
-        from app.services import assistant_service
+        from app import assistant as assistant_service
 
         for index, item in enumerate(questions):
             if index > 0 and delay > 0:

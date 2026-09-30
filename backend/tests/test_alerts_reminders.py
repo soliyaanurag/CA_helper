@@ -10,22 +10,23 @@ from decimal import Decimal
 
 import pytest
 
+from app.alerts import reminder_kind, send_reminders
 from app.models import (
     CaProfile,
     CatalogService,
+    CaVerificationStatus,
     ComplianceItem,
+    ComplianceStatus,
     Engagement,
     EngagementItem,
+    EngagementStatus,
     Notification,
+    NotificationType,
     ReminderLog,
     User,
+    UserRole,
 )
-from app.models.alerts import NotificationType
-from app.models.compliance import ComplianceStatus
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus, EngagementStatus
 from app.seed import seed_service_catalog
-from app.services.alerts_service import reminder_kind, send_reminders
 from worker import build_scheduler
 
 

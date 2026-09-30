@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from sqlalchemy import func, select, text
 
-from app.extensions import db
+from app.models import db
 from tests._models import Gadget, GadgetColour
 
 

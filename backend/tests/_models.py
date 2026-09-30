@@ -9,7 +9,7 @@ from enum import StrEnum
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseModel
+from app.models import BaseModel
 
 
 class GadgetColour(StrEnum):

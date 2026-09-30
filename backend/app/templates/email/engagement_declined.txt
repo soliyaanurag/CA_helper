@@ -1,6 +1,0 @@
-Hello {{ owner_name }},
-
-{{ ca_name }} has declined your request. The filings in it are free again, so you
-can request another CA from "Find a CA" in CA Helper.
-
-CA Helper

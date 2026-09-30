@@ -8,12 +8,8 @@ from datetime import timedelta
 
 import pytest
 
-from app.extensions import db
-from app.models import Notification
-from app.models.alerts import NotificationType
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.services import alerts_service
+from app import alerts as alerts_service
+from app.models import db, Notification, NotificationType, UserRole, utcnow
 
 BASE = "/api/v1/alerts"
 SETTINGS = "/api/v1/auth/settings"

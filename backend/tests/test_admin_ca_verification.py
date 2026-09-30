@@ -4,9 +4,7 @@ import io
 
 import pytest
 
-from app.models import CaProfile, Document
-from app.models.enums import UserRole
-from app.models.marketplace import CaVerificationStatus
+from app.models import CaProfile, CaVerificationStatus, Document, UserRole
 
 PROFILE_URL = "/api/v1/marketplace/ca-profile"
 CERT_URL = PROFILE_URL + "/certificate"

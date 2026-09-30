@@ -12,22 +12,28 @@ import pytest
 from click.testing import CliRunner
 from sqlalchemy import select
 
+from app import (
+    ca_workspace as ca_workspace_service,
+    compliance as compliance_service,
+    regulatory as regulatory_service,
+    utils as gemini_client,
+)
 from app.models import (
+    GstScheme,
+    ItrForm,
+    MsmeTier,
     NewsArticle,
     NewsSource,
+    NewsSourceKind,
     Notification,
     RegulatoryChange,
     RegulatoryChangeMatch,
     RegulatoryProfile,
     User,
+    UserRole,
+    utcnow,
 )
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.onboarding import GstScheme, ItrForm, MsmeTier
-from app.models.regulatory import NewsSourceKind
 from app.seed import NEWS_SOURCES, seed_news_sources
-from app.services import ca_workspace_service, compliance_service, regulatory_service
-from app.utils import gemini_client
 from tests.test_ca_workspace_clients import engage, filing, make_ca
 
 BASE = "/api/v1/admin/regulatory"

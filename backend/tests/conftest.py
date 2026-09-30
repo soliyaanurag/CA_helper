@@ -29,16 +29,20 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 
 from app import create_app
-from app.extensions import db as _db
-from app.models import Business, RegulatoryProfile, User
-from app.models.base import utcnow
-from app.models.enums import UserRole
-from app.models.onboarding import EntityType, GstScheme
+from app.auth import issue_access_token
+from app.compliance import create_filings
+from app.models import (
+    Business,
+    db as _db,
+    EntityType,
+    GstScheme,
+    RegulatoryProfile,
+    User,
+    UserRole,
+    utcnow,
+)
 from app.seed import seed_obligation_templates, seed_rule_thresholds
-from app.services.auth_service import issue_access_token
-from app.services.compliance_service import create_filings
-from app.utils.email import outbox
-from app.utils.passwords import hash_password
+from app.utils import hash_password, outbox
 
 TEST_PASSWORD = "Correct-Horse-9"
 
