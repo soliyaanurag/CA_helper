@@ -211,7 +211,7 @@ BLUEPRINTS = [
     onboarding.bp,
     compliance.bp,
     ca_workspace.blp,
-    marketplace.blp,
+    marketplace.bp,
     admin.blp,
     alerts.bp,
     documents.bp,

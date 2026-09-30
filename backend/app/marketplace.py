@@ -1,131 +1,36 @@
-"""Request and response shapes for /api/v1/marketplace/...
+"""The CA marketplace: CA profiles and prices, Find a CA, requests between a business and a
+CA (quote, accept, decline, expiry), ratings, the pro-bono queue, and the access checks
+that decide what a CA may see of a business.
 
-Business logic for the CA marketplace: CA profiles, prices and the list businesses browse.
-
-get_own_profile(user) -> CaProfile                  the CA's profile (404 before the first save)
-save_own_profile(user, **fields) -> CaProfile        create or update it
-list_verified_cas(page, page_size, ...) -> dict      verified CAs, filtered and paginated
-get_verified_ca(profile_id) -> dict                  one verified CA with the services they offer
-save_certificate(user, upload) -> CaProfile          upload the Certificate of Practice (-> pending)
-list_catalog() -> list[dict]                         catalog services with their typical price range
-get_own_menu(user) -> dict                           the services the CA offers, with prices
-save_own_menu(user, items) -> dict                   replace the CA's price menu
-
-Engagements (a business working with a CA on some filings):
-list_requestable_filings(business, ca_id) -> list    the business's filings, with this CA's prices
-open_filing_ids(filing_ids) -> set                   those in an open engagement (for onboarding)
-create_request(business, ca_id, items) -> dict       send a request (status `requested`)
-list_business_engagements(business) -> list          the business's engagements, newest first
-list_ca_engagements(user) -> list                    the CA's engagements, newest first
-accept_request / send_quote / decline_request / complete_engagement(user, id)    CA actions
-expire_old_requests() -> int                         worker job: unanswered requests expire (MA12)
-
-Access checks (MA14): the ONLY way to decide what a CA may see of a business (CLAUDE.md rule 5):
-ca_has_active_access(ca_profile_id, business_id) -> bool     an ACTIVE engagement between them?
-active_engagement_item_ids(ca_profile_id, business_id)      filings the CA works on (active)
-open_engagement_item_ids(ca_profile_id, business_id)        filings in a request or active work
-ca_can_access_document(ca_profile_id, document_id) -> bool  a document of one of those filings?
-own_profile_id(user) -> uuid | None                          the logged-in CA's profile id
-active_ca_users_by_filing(filing_ids) -> dict               {filing id: CA user} (alerts' reminders)
-
-For ca_workspace: active_work(ca_profile_id), active_cas_of_business(business_id),
-complete_if_all_filed(engagement_id) (the last filing filed completes the engagement).
-
-Capacity (MA7): `capacity` is the most businesses a CA has ACTIVE engagements with.
-A full CA is hidden from the list, and a request, an acceptance, an accepted quote or
-a pro-bono match that would add a client answers 409 CA_AT_CAPACITY.
-
-"Find a CA" lists the best rated CAs first, then the most experienced, then by name.
-
-Ratings (MA17): rate_engagement(business, id, stars, review) after completion, once;
-rating_summary(ca_profile_id) -> {rating_average, rating_count}; latest_reviews(ca_profile_id).
-
-Pro-bono queue (MA16): a MICRO business asks for free help with some filings
-(join_pro_bono_queue); verified CAs with free slots this month see the queue
-(get_pro_bono_queue) and take a request (accept_pro_bono_request), which becomes an
-`active` engagement at ₹0 with is_pro_bono. The business can cancel while queued.
-accept_quote / reject_quote / withdraw_request(business, id)                    business actions
-
-Engagement lifecycle: requested -> active (the CA accepts at the listed prices), or
-requested -> quoted -> active (the business accepts the CA's quote); a request can also
-end as declined (by the CA) or cancelled (the business withdraws it or rejects the
-quote); active -> completed (the CA marks it done). A filing is in at most one OPEN
-engagement (requested, quoted or active). When an engagement becomes active, its
-filings are set to "With CA" (compliance.mark_filings_with_ca).
-
-Typical price range: the min, median and max price of a service across verified CAs
-with live accounts, worked out each time from `ca_services` (never typed in). It is
-shown only once MIN_CAS_FOR_RANGE CAs offer the service; with fewer, one or two
-prices would say little and could reveal a single CA's fee.
-
-Tray notifications (AL1): every event that emails someone (request, accept, quote, decline,
-expiry, pro-bono match) also adds a tray entry with alerts.notify(), before the
-commit; completion adds a tray entry only. The emails are sent only when the user's
-`email_notifications` switch is on.
-
-For the admin module: list_cas_for_admin, get_ca_for_admin, certificate_document_id,
-set_verification, count_cas_by_status, count_open_engagements.
+Engagement lifecycle: requested -> active (the CA accepts the listed prices), or
+requested -> quoted -> active (the business accepts the quote); a request can also end
+declined, expired (48 hours without an answer) or cancelled (by the business); active ->
+completed. A filing is in at most one open engagement (requested, quoted or active).
 
 Verification: a new profile is `pending` until an admin checks it (the Certificate of
-Practice must be uploaded first). A new certificate sends it back to `pending`. If a verified or
-rejected CA changes the membership or CoP number, it goes back to `pending` (the
-admin must check the new number). A rejected CA's profile goes back to `pending`
-on any save, so fixing it and saving asks for a new check.
-
-Routes for the CA marketplace (all under /api/v1).
-
-    GET  /api/v1/marketplace/ca-profile   CA only        the CA's own profile
-    PUT  /api/v1/marketplace/ca-profile   CA only        create or update it
-    GET  /api/v1/marketplace/cas          business only  list of verified CAs
-    GET  /api/v1/marketplace/cas/<id>     business only  one verified CA with services and prices
-    GET  /api/v1/marketplace/services     logged in      catalog services + typical prices
-    GET  /api/v1/marketplace/ca-services  CA only        the services the CA offers, with prices
-    PUT  /api/v1/marketplace/ca-services  CA only        replace the CA's price menu
-
-Engagements (a business working with a CA):
-    GET  /api/v1/marketplace/cas/<id>/requestable-filings  business  its filings + CA prices
-    POST /api/v1/marketplace/engagements                   business  send a request
-    GET  /api/v1/marketplace/my-engagements                business  its engagements
-    GET  /api/v1/marketplace/ca-engagements                CA        their engagements
-    POST /api/v1/marketplace/engagements/<id>/accept       CA        accept at the listed prices
-    POST /api/v1/marketplace/engagements/<id>/quote        CA        send new prices with a reason
-    POST /api/v1/marketplace/engagements/<id>/decline      CA        decline the request
-    POST /api/v1/marketplace/engagements/<id>/complete     CA        mark the work as done
-    POST /api/v1/marketplace/engagements/<id>/accept-quote business  accept the CA's quote
-    POST /api/v1/marketplace/engagements/<id>/reject-quote business  reject the CA's quote
-    POST /api/v1/marketplace/engagements/<id>/withdraw     business  withdraw an unanswered request
-    POST /api/v1/marketplace/engagements/<id>/rating       business  rate completed work (MA17)
-
-Pro-bono queue (MA16):
-    GET  /api/v1/marketplace/pro-bono                      business  eligibility, request, filings
-    POST /api/v1/marketplace/pro-bono                      business  join the queue
-    POST /api/v1/marketplace/pro-bono/<id>/cancel          business  leave the queue
-    GET  /api/v1/marketplace/pro-bono-queue                CA        pledge, slots used, the queue
-    POST /api/v1/marketplace/pro-bono/<id>/accept          CA        take a request (free work)
-
-Each route only checks who is calling, reads the input, calls one function in
-app/marketplace.py and returns its result as JSON.
+Practice must be uploaded first). A new certificate, a changed membership or CoP number,
+or any save of a rejected profile sends it back to `pending`. Only verified CAs are listed.
 """
 
 import logging
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from statistics import median
 from zoneinfo import ZoneInfo
 
-from flask_smorest import Blueprint
-from marshmallow import fields, post_load, Schema, validate, ValidationError
+from flask import Blueprint, jsonify, request
 from sqlalchemy import func, select
 
 from app import alerts, compliance, documents, onboarding
 from app.models import (
     CA_LANGUAGES,
     CA_SPECIALIZATIONS,
+    SERVICE_SPECIALIZATIONS,
     CaProfile,
     CaService,
     CatalogService,
     CaVerificationStatus,
     ComplianceStatus,
-    db,
     DocumentType,
     Engagement,
     EngagementItem,
@@ -135,464 +40,316 @@ from app.models import (
     ProBonoRequest,
     ProBonoRequestStatus,
     Rating,
-    SERVICE_SPECIALIZATIONS,
-    ServiceUnit,
-    today_in_india,
     User,
     UserRole,
+    db,
+    today_in_india,
     utcnow,
 )
 from app.utils import (
+    MISSING,
     ApiError,
     current_business,
     current_user,
-    ErrorSchema,
+    iso,
+    json_body,
     login_required,
-    PageArgsSchema,
-    PageSchema,
+    money,
+    read_page_args,
+    read_uuid,
     roles_required,
     send_email,
+    validation_error,
 )
-
-
-# --- Request and response shapes ---------------------------------------------------------
-
-
-def _not_blank(value: str) -> None:
-    if not value.strip():
-        raise ValidationError("Must not be blank.")
-
-
-def _code_list(codes: tuple[str, ...], what: str) -> fields.List:
-    """A non-empty list of known codes, e.g. ["itr", "gstr_1"]."""
-    return fields.List(
-        fields.String(validate=validate.OneOf(codes)),
-        required=True,
-        validate=validate.Length(min=1, error=f"Choose at least one {what}."),
-    )
-
-
-def _in_list_order(all_codes: tuple, chosen: list) -> list:
-    """The chosen codes once each, in the order of `all_codes` (e.g. CA_LANGUAGES)."""
-    result = []
-    for code in all_codes:
-        if code in chosen:
-            result.append(code)
-    return result
-
-
-class CaProfileInputSchema(Schema):
-    """PUT /marketplace/ca-profile: everything the CA fills in."""
-
-    membership_no = fields.String(
-        required=True,
-        validate=validate.Regexp(r"^[0-9]{6}$", error="Enter your 6-digit ICAI membership number."),
-    )
-    cop_number = fields.String(required=True, validate=[validate.Length(1, 20), _not_blank])
-    city = fields.String(required=True, validate=[validate.Length(1, 100), _not_blank])
-    languages = _code_list(CA_LANGUAGES, "language")
-    specializations = _code_list(CA_SPECIALIZATIONS, "specialization")
-    capacity = fields.Integer(required=True, validate=validate.Range(1, 1000))
-    years_experience = fields.Integer(required=True, validate=validate.Range(0, 70))
-    about = fields.String(load_default="", validate=validate.Length(max=500))
-    # Free (pro-bono) engagements the CA takes each month. Not sent -> the saved number stays.
-    pro_bono_slots_per_month = fields.Integer(load_default=None, validate=validate.Range(0, 1000))
-
-    @post_load
-    def _clean(self, data: dict, **kwargs) -> dict:
-        """Trim text; store each code once, in a fixed order."""
-        for key in ("cop_number", "city", "about"):
-            data[key] = data[key].strip()
-        data["languages"] = _in_list_order(CA_LANGUAGES, data["languages"])
-        data["specializations"] = _in_list_order(CA_SPECIALIZATIONS, data["specializations"])
-        return data
-
-
-class CaProfileSchema(Schema):
-    """The CA's own profile, including the numbers and the verification status."""
-
-    id = fields.UUID(required=True)
-    membership_no = fields.String(required=True)
-    cop_number = fields.String(required=True)
-    city = fields.String(required=True)
-    languages = fields.List(fields.String(), required=True)
-    specializations = fields.List(fields.String(), required=True)
-    capacity = fields.Integer(required=True)
-    years_experience = fields.Integer(required=True)
-    about = fields.String(required=True)
-    verification_status = fields.String(validate=validate.OneOf(list(CaVerificationStatus)), required=True)
-    updated_at = fields.DateTime(required=True)
-    pro_bono_slots_per_month = fields.Integer(required=True)
-    rejection_reason = fields.String(allow_none=True)  # set by an admin when rejecting
-    has_certificate = fields.Method("_has_certificate")
-
-    def _has_certificate(self, profile) -> bool:
-        return profile.cop_document_id is not None
-
-
-class CertificateUploadSchema(Schema):
-    """POST /marketplace/ca-profile/certificate (multipart/form-data)."""
-
-    file = fields.Raw(required=True, metadata={"type": "string", "format": "binary"})
-
-
-class CaListArgsSchema(PageArgsSchema):
-    """GET /marketplace/cas filters; all optional."""
-
-    specialization = fields.String(validate=validate.OneOf(CA_SPECIALIZATIONS))
-    language = fields.String(validate=validate.OneOf(CA_LANGUAGES))
-    city = fields.String(validate=validate.Length(max=100))
-    # A catalog service code, e.g. "gstr_3b": only CAs who offer it, with their price.
-    service = fields.String(validate=validate.Length(max=50))
-
-
-class RatingSchema(Schema):
-    """One rating: 1 to 5 stars and an optional review. Never shows who wrote it."""
-
-    stars = fields.Integer(required=True)
-    review = fields.String(allow_none=True)
-    created_at = fields.DateTime(required=True)
-
-
-class CaListItemSchema(Schema):
-    """A verified CA as businesses see them (no CoP number, no capacity)."""
-
-    id = fields.UUID(required=True)
-    full_name = fields.String(required=True)
-    membership_no = fields.String(required=True)
-    city = fields.String(required=True)
-    languages = fields.List(fields.String(), required=True)
-    specializations = fields.List(fields.String(), required=True)
-    years_experience = fields.Integer(required=True)
-    about = fields.String(required=True)
-    # The CA's price for the `service` filter; null when no service is chosen.
-    price = fields.Decimal(as_string=True, places=2, allow_none=True)
-    # The average of the CA's ratings (one decimal), null before the first rating.
-    rating_average = fields.Float(allow_none=True)
-    rating_count = fields.Integer(required=True)
-
-
-class CaListPageSchema(PageSchema):
-    items = fields.List(fields.Nested(CaListItemSchema), required=True)
-
-
-# --- Service catalog and CA prices ------------------------------------------------
-
-MAX_PRICE = 1000000  # rupees; a higher price is almost certainly a typing mistake
-
-
-class CatalogServiceSchema(Schema):
-    """A catalog service and its typical price range across verified CAs.
-
-    The min / median / max prices are null until at least
-    MIN_CAS_FOR_RANGE CAs offer the service.
-    """
-
-    id = fields.UUID(required=True)
-    code = fields.String(required=True)
-    name = fields.String(required=True)
-    description = fields.String(required=True)
-    unit = fields.String(validate=validate.OneOf(list(ServiceUnit)), required=True)
-    # The CA specialization this service belongs to (null: none).
-    specialization = fields.String(allow_none=True)
-    ca_count = fields.Integer(required=True, metadata={"description": "Verified CAs offering it"})
-    min_price = fields.Decimal(as_string=True, places=2, allow_none=True)
-    median_price = fields.Decimal(as_string=True, places=2, allow_none=True)
-    max_price = fields.Decimal(as_string=True, places=2, allow_none=True)
-
-
-class CaServicePriceSchema(Schema):
-    """One service the CA offers and their price for it."""
-
-    service_id = fields.UUID(required=True)
-    price = fields.Decimal(
-        as_string=True,
-        places=2,
-        required=True,
-        validate=validate.Range(min=1, max=MAX_PRICE, error="Enter a price from 1 to 10,00,000."),
-    )
-
-
-class CaServiceMenuSchema(Schema):
-    """The CA's whole price menu. Saving it replaces the old one."""
-
-    items = fields.List(fields.Nested(CaServicePriceSchema), required=True)
-
-
-class CaOfferedServiceSchema(CatalogServiceSchema):
-    """A catalog service a CA offers: the typical range plus this CA's price."""
-
-    price = fields.Decimal(as_string=True, places=2, required=True)
-
-
-class CaDetailSchema(Schema):
-    """One verified CA's public page (no CoP number, no capacity)."""
-
-    id = fields.UUID(required=True)
-    full_name = fields.String(required=True)
-    membership_no = fields.String(required=True)
-    city = fields.String(required=True)
-    languages = fields.List(fields.String(), required=True)
-    specializations = fields.List(fields.String(), required=True)
-    years_experience = fields.Integer(required=True)
-    about = fields.String(required=True)
-    services = fields.List(fields.Nested(CaOfferedServiceSchema), required=True)
-    rating_average = fields.Float(allow_none=True)
-    rating_count = fields.Integer(required=True)
-    # The latest ratings, newest first (anonymous).
-    reviews = fields.List(fields.Nested(RatingSchema), required=True)
-
-
-# --- Engagements ---------------------------------------------------------------------
-
-
-def _money(**kwargs) -> fields.Decimal:
-    """Rupees, sent as a string with two decimals ("750.00")."""
-    return fields.Decimal(as_string=True, places=2, **kwargs)
-
-
-class FilingServiceOptionSchema(Schema):
-    """One of the CA's services that can do a filing, with the CA's price."""
-
-    service_id = fields.UUID(required=True)
-    name = fields.String(required=True)
-    price = _money(required=True)
-
-
-class RequestableFilingSchema(Schema):
-    """One of the business's filings on the "Request this CA" page."""
-
-    id = fields.UUID(required=True)
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    period_label = fields.String(required=True)
-    due_date = fields.Date(required=True)
-    status = fields.String(validate=validate.OneOf(list(ComplianceStatus)), required=True)
-    options = fields.List(fields.Nested(FilingServiceOptionSchema), required=True)
-    # Why it cannot be picked ("Already filed." ...); null when it can.
-    blocked_reason = fields.String(allow_none=True)
-
-
-class RequestItemInputSchema(Schema):
-    compliance_item_id = fields.UUID(required=True)
-    service_id = fields.UUID(required=True)
-
-
-class EngagementRequestInputSchema(Schema):
-    """POST /marketplace/engagements: the CA and the filings the business picked."""
-
-    ca_profile_id = fields.UUID(required=True)
-    items = fields.List(
-        fields.Nested(RequestItemInputSchema),
-        required=True,
-        validate=validate.Length(min=1, error="Choose at least one filing."),
-    )
-
-
-class EngagementItemSchema(Schema):
-    """One filing in an engagement, with its prices."""
-
-    id = fields.UUID(required=True)
-    compliance_item_id = fields.UUID(required=True)
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), allow_none=True)
-    period_label = fields.String(allow_none=True)
-    due_date = fields.Date(allow_none=True)
-    service_name = fields.String(required=True)
-    listed_price = _money(required=True)
-    quoted_price = _money(allow_none=True)
-    agreed_price = _money(allow_none=True)
-
-
-class EngagementSchema(Schema):
-    """One engagement between a business and a CA."""
-
-    id = fields.UUID(required=True)
-    status = fields.String(validate=validate.OneOf(list(EngagementStatus)), required=True)
-    ca_profile_id = fields.UUID(required=True)
-    ca_name = fields.String(required=True)
-    business_name = fields.String(required=True)
-    quote_reason = fields.String(allow_none=True)
-    requested_at = fields.DateTime(required=True)
-    expires_at = fields.DateTime(allow_none=True)
-    responded_at = fields.DateTime(allow_none=True)
-    activated_at = fields.DateTime(allow_none=True)
-    completed_at = fields.DateTime(allow_none=True)
-    items = fields.List(fields.Nested(EngagementItemSchema), required=True)
-    # The business's rating once it rated the completed engagement (null before).
-    rating = fields.Nested(RatingSchema, allow_none=True)
-    # A free engagement from the pro-bono queue (prices are 0).
-    is_pro_bono = fields.Boolean(required=True)
-
-
-class QuotePriceInputSchema(Schema):
-    engagement_item_id = fields.UUID(required=True)
-    price = _money(
-        required=True,
-        validate=validate.Range(min=0, max=MAX_PRICE, error="Enter a price from 0 to 10,00,000."),
-    )
-
-
-class QuoteInputSchema(Schema):
-    """POST /marketplace/engagements/<id>/quote: a new price per filing and why."""
-
-    reason = fields.String(required=True, validate=[validate.Length(1, 1000), _not_blank])
-    prices = fields.List(
-        fields.Nested(QuotePriceInputSchema),
-        required=True,
-        validate=validate.Length(min=1, error="Enter the new prices."),
-    )
-
-
-class RatingInputSchema(Schema):
-    """POST /marketplace/engagements/<id>/rating: 1 to 5 stars and an optional review."""
-
-    stars = fields.Integer(
-        required=True, validate=validate.Range(1, 5, error="Choose 1 to 5 stars.")
-    )
-    review = fields.String(load_default="", validate=validate.Length(max=2000))
-
-
-# --- Pro-bono queue (MA16) --------------------------------------------------------------
-
-
-class ProBonoFilingSchema(Schema):
-    id = fields.UUID(required=True)
-    form_code = fields.String(validate=validate.OneOf(list(FormCode)), required=True)
-    period_label = fields.String(required=True)
-    due_date = fields.Date(required=True)
-    # Why it cannot be chosen ("Already filed." ...); null when it can.
-    blocked_reason = fields.String(allow_none=True)
-
-
-class ProBonoRequestSchema(Schema):
-    id = fields.UUID(required=True)
-    status = fields.String(validate=validate.OneOf(list(ProBonoRequestStatus)), required=True)
-    note = fields.String(required=True)
-    created_at = fields.DateTime(required=True)
-    business_name = fields.String(required=True)
-    filings = fields.List(fields.Nested(ProBonoFilingSchema), required=True)
-
-
-class ProBonoPageSchema(Schema):
-    """GET /marketplace/pro-bono: what the business's pro-bono page shows."""
-
-    eligible = fields.Boolean(required=True)
-    reason = fields.String(required=True)
-    request = fields.Nested(ProBonoRequestSchema, allow_none=True)  # its queued request
-    filings = fields.List(fields.Nested(ProBonoFilingSchema), required=True)
-
-
-class ProBonoJoinInputSchema(Schema):
-    """POST /marketplace/pro-bono: the filings to get free help with, and a short note."""
-
-    compliance_item_ids = fields.List(
-        fields.UUID(),
-        required=True,
-        validate=validate.Length(min=1, error="Choose at least one filing."),
-    )
-    note = fields.String(load_default="", validate=validate.Length(max=1000))
-
-
-class ProBonoQueueSchema(Schema):
-    """GET /marketplace/pro-bono-queue: the CA's pledge, slots used this month, the queue."""
-
-    pledged = fields.Integer(required=True)
-    used_this_month = fields.Integer(required=True)
-    verified = fields.Boolean(required=True)
-    requests = fields.List(fields.Nested(ProBonoRequestSchema), required=True)
-
-
-# --- Logic -------------------------------------------------------------------------------
-
 
 log = logging.getLogger(__name__)
 
+bp = Blueprint("marketplace", __name__)
+
 # Changing one of these needs a new admin check.
 IDENTITY_FIELDS = ("membership_no", "cop_number")
-
 # The typical price range of a service is shown once this many CAs offer it.
 MIN_CAS_FOR_RANGE = 3
+MAX_PRICE = Decimal(1000000)  # rupees; a higher price is almost certainly a typing mistake
+# An engagement in one of these still holds its filings: nobody may request them again.
+OPEN_STATUSES = [EngagementStatus.REQUESTED, EngagementStatus.QUOTED, EngagementStatus.ACTIVE]
+# Filings in these states are done: there is nothing left for a CA to do.
+FILED_STATUSES = [ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED]
+# A CA has this long to answer a request; then the worker marks it `expired`.
+ANSWER_WITHIN = timedelta(hours=48)
+# How many of a CA's latest reviews the CA page shows.
+REVIEWS_SHOWN = 5
+# Only businesses whose MSME tier is one of these may ask for free help (a platform policy).
+PRO_BONO_TIERS = ["micro"]
+# The one catalog service that fits each ITR form, so an ITR filing is only ever priced
+# with the service for the business's own form.
+ITR_SERVICE_CODES = {
+    "itr_3": "itr_business",
+    "itr_4": "itr_presumptive",
+    "itr_5": "itr_firm_company",
+    "itr_6": "itr_firm_company",
+}
 
 
-def _only_listed_cas(stmt):
-    """Keep verified CA profiles: the CAs businesses may see.
-
-    `stmt` must already join CaProfile and User.
-    """
-    return stmt.where(
-        CaProfile.verification_status == CaVerificationStatus.VERIFIED,
-    )
+# --- Reading the request fields ----------------------------------------------------------
 
 
-def _find_profile(user: User) -> CaProfile | None:
-    return db.session.scalar(
-        select(CaProfile).where(CaProfile.user_id == user.id)
-    )
+def read_int(data: dict, field: str, lowest: int, highest: int, errors: dict, required=True):
+    """A whole number between `lowest` and `highest` from a JSON body."""
+    value = data.get(field)
+    if value is None:
+        if required:
+            errors[field] = [MISSING]
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        errors[field] = ["Not a valid integer."]
+        return None
+    if not lowest <= value <= highest:
+        errors[field] = [
+            f"Must be greater than or equal to {lowest} and less than or equal to {highest}."
+        ]
+    return value
+
+
+def read_price(value, lowest: int) -> Decimal | None:
+    """A price in rupees (2 decimals) from `lowest` to MAX_PRICE, or None when it is not one."""
+    try:
+        if isinstance(value, bool) or value is None:
+            return None
+        price = Decimal(str(value)).quantize(Decimal("0.01"))
+    except InvalidOperation:
+        return None
+    if not lowest <= price <= MAX_PRICE:
+        return None
+    return price
+
+
+def read_code_list(data: dict, field: str, codes: tuple, what: str, errors: dict) -> list:
+    """A non-empty list of known codes, stored once each in the order of `codes`."""
+    chosen = data.get(field)
+    if chosen is None:
+        errors[field] = [MISSING]
+        return []
+    if not isinstance(chosen, list):
+        errors[field] = ["Not a valid list."]
+        return []
+    if len(chosen) == 0:
+        errors[field] = [f"Choose at least one {what}."]
+    elif any(code not in codes for code in chosen):
+        errors[field] = [f"Must be one of: {', '.join(codes)}."]
+    return [code for code in codes if code in chosen]
+
+
+def read_text(data: dict, field: str, max_length: int, errors: dict) -> str | None:
+    """A required text that is not blank."""
+    text = data.get(field)
+    if text is None:
+        errors[field] = [MISSING]
+    elif not isinstance(text, str) or not 1 <= len(text) <= max_length:
+        errors[field] = [f"Length must be between 1 and {max_length}."]
+    elif not text.strip():
+        errors[field] = ["Must not be blank."]
+    else:
+        return text.strip()
+    return None
+
+
+# --- JSON shapes -------------------------------------------------------------------------
+
+
+def profile_to_dict(profile: CaProfile) -> dict:
+    """The CA's own profile, with the numbers and the verification status."""
+    return {
+        "id": str(profile.id),
+        "membership_no": profile.membership_no,
+        "cop_number": profile.cop_number,
+        "city": profile.city,
+        "languages": profile.languages,
+        "specializations": profile.specializations,
+        "capacity": profile.capacity,
+        "years_experience": profile.years_experience,
+        "about": profile.about,
+        "verification_status": profile.verification_status,
+        "updated_at": iso(profile.updated_at),
+        "pro_bono_slots_per_month": profile.pro_bono_slots_per_month,
+        "rejection_reason": profile.rejection_reason,
+        "has_certificate": profile.cop_document_id is not None,
+    }
+
+
+def rating_to_dict(rating: Rating) -> dict:
+    """One rating: stars and an optional review. Never shows who wrote it."""
+    return {"stars": rating.stars, "review": rating.review, "created_at": iso(rating.created_at)}
+
+
+def engagement_to_dict(engagement: Engagement) -> dict:
+    """One engagement as both sides see it: the CA, the business, the filings and prices."""
+    ca = db.session.get(CaProfile, engagement.ca_profile_id)
+    business = onboarding.get_business(engagement.business_id)
+    rows = items_of(engagement)
+    filings = compliance.get_filings_by_ids([row.compliance_item_id for row in rows])
+
+    items = []
+    for row in rows:
+        service = db.session.get(CatalogService, row.service_id)
+        filing = filings.get(row.compliance_item_id)  # None if the filing was removed
+        items.append(
+            {
+                "id": str(row.id),
+                "compliance_item_id": str(row.compliance_item_id),
+                "form_code": filing.form_code if filing else None,
+                "period_label": filing.period_label if filing else None,
+                "due_date": iso(filing.due_date) if filing else None,
+                "service_name": service.name,
+                "listed_price": money(row.listed_price),
+                "quoted_price": money(row.quoted_price),
+                "agreed_price": money(row.agreed_price),
+            }
+        )
+
+    rating = db.session.scalar(select(Rating).where(Rating.engagement_id == engagement.id))
+    return {
+        "id": str(engagement.id),
+        "status": engagement.status,
+        "ca_profile_id": str(ca.id),
+        "ca_name": ca.user.full_name,
+        "business_name": business.legal_name,
+        "quote_reason": engagement.quote_reason,
+        "requested_at": iso(engagement.requested_at),
+        "expires_at": iso(engagement.expires_at),
+        "responded_at": iso(engagement.responded_at),
+        "activated_at": iso(engagement.activated_at),
+        "completed_at": iso(engagement.completed_at),
+        "items": items,
+        "rating": rating_to_dict(rating) if rating else None,
+        "is_pro_bono": engagement.is_pro_bono,
+    }
+
+
+def pro_bono_filing_to_dict(filing, blocked_reason) -> dict:
+    return {
+        "id": str(filing.id),
+        "form_code": filing.form_code,
+        "period_label": filing.period_label,
+        "due_date": iso(filing.due_date),
+        "blocked_reason": blocked_reason,
+    }
+
+
+def pro_bono_request_to_dict(pro_bono: ProBonoRequest) -> dict:
+    """A pro-bono request as both sides see it."""
+    business = onboarding.get_business(pro_bono.business_id)
+    filings = compliance.get_filings_by_ids(pro_bono.compliance_item_ids)
+    return {
+        "id": str(pro_bono.id),
+        "status": pro_bono.status,
+        "note": pro_bono.note,
+        "created_at": iso(pro_bono.created_at),
+        "business_name": business.legal_name,
+        "filings": [pro_bono_filing_to_dict(filing, None) for filing in filings.values()],
+    }
+
+
+# --- CA profiles ---------------------------------------------------------------------------
+
+
+def find_profile(user: User) -> CaProfile | None:
+    return db.session.scalar(select(CaProfile).where(CaProfile.user_id == user.id))
 
 
 def get_own_profile(user: User) -> CaProfile:
-    """The logged-in CA's profile. Raises 404 CA_PROFILE_NOT_FOUND if they have not saved one."""
-    profile = _find_profile(user)
+    """The logged-in CA's profile. 404 CA_PROFILE_NOT_FOUND if they have not saved one."""
+    profile = find_profile(user)
     if profile is None:
         raise ApiError(404, "CA_PROFILE_NOT_FOUND", "You have not completed your profile yet.")
     return profile
 
 
-def save_own_profile(user: User, **fields) -> CaProfile:
-    """Create or update the logged-in CA's profile with the validated `fields`.
+def own_profile_id(user: User):
+    """The logged-in CA's profile id, or None if they have not saved a profile."""
+    profile = find_profile(user)
+    return profile.id if profile else None
 
-    Raises 409 DUPLICATE_MEMBERSHIP_NO if another CA already uses that number.
-    """
-    profile = _find_profile(user)
+
+@bp.get("/marketplace/ca-profile")
+@roles_required(UserRole.CA)
+def get_my_profile():
+    return jsonify(profile_to_dict(get_own_profile(current_user())))
+
+
+@bp.put("/marketplace/ca-profile")
+@roles_required(UserRole.CA)
+def save_my_profile():
+    """Create or update the CA's profile. 409 DUPLICATE_MEMBERSHIP_NO if another CA uses it."""
+    data = json_body()
+    errors = {}
+    values = {}
+    membership_no = data.get("membership_no")
+    if membership_no is None:
+        errors["membership_no"] = [MISSING]
+    elif (
+        not isinstance(membership_no, str) or len(membership_no) != 6 or not membership_no.isdigit()
+    ):
+        errors["membership_no"] = ["Enter your 6-digit ICAI membership number."]
+    values["membership_no"] = membership_no
+    values["cop_number"] = read_text(data, "cop_number", 20, errors)
+    values["city"] = read_text(data, "city", 100, errors)
+    values["languages"] = read_code_list(data, "languages", CA_LANGUAGES, "language", errors)
+    values["specializations"] = read_code_list(
+        data, "specializations", CA_SPECIALIZATIONS, "specialization", errors
+    )
+    values["capacity"] = read_int(data, "capacity", 1, 1000, errors)
+    values["years_experience"] = read_int(data, "years_experience", 0, 70, errors)
+    about = data.get("about", "")
+    if not isinstance(about, str) or len(about) > 500:
+        errors["about"] = ["Longer than maximum length 500."]
+    else:
+        values["about"] = about.strip()
+    # Not sent -> the saved number stays.
+    values["pro_bono_slots_per_month"] = read_int(
+        data, "pro_bono_slots_per_month", 0, 1000, errors, required=False
+    )
+    if errors:
+        raise validation_error(errors)
+
+    user = current_user()
     taken = db.session.scalar(
         select(CaProfile.id).where(
-            CaProfile.membership_no == fields["membership_no"],
-            CaProfile.user_id != user.id,
+            CaProfile.membership_no == values["membership_no"], CaProfile.user_id != user.id
         )
     )
     if taken:
         raise ApiError(
-            409,
-            "DUPLICATE_MEMBERSHIP_NO",
-            "Another CA has already registered this membership number.",
+            409, "DUPLICATE_MEMBERSHIP_NO", "Another CA has already registered this membership number."
         )
 
+    profile = find_profile(user)
     if profile is None:
         profile = CaProfile(user_id=user.id, verification_status=CaVerificationStatus.PENDING)
         db.session.add(profile)
         log.info("CA profile created for user %s", user.id)
-    elif profile.verification_status == CaVerificationStatus.REJECTED or _identity_changed(
-        profile, fields
+    elif profile.verification_status == CaVerificationStatus.REJECTED or any(
+        getattr(profile, name) != values[name] for name in IDENTITY_FIELDS
     ):
         profile.verification_status = CaVerificationStatus.PENDING
-
-    for name, value in fields.items():
-        if value is not None:  # an older form sends no pro-bono slots: keep the saved number
+    for name, value in values.items():
+        if value is not None:
             setattr(profile, name, value)
     db.session.commit()
-    return profile
+    return jsonify(profile_to_dict(profile))
 
 
-def _identity_changed(profile: CaProfile, fields: dict) -> bool:
-    """True if the membership or CoP number in `fields` differs from the saved one."""
-    changed = False
-    for name in IDENTITY_FIELDS:
-        if getattr(profile, name) != fields[name]:
-            changed = True
-    return changed
-
-
-def save_certificate(user: User, upload) -> CaProfile:
-    """Store the CA's Certificate of Practice (encrypted) and link it to their profile.
-
-    A new certificate needs a new admin check: the profile goes back to `pending`
-    (a verified CA leaves the marketplace until then). The old certificate is deleted.
-    404 CA_PROFILE_NOT_FOUND before the first profile save; storage errors pass through.
-    """
+@bp.post("/marketplace/ca-profile/certificate")
+@roles_required(UserRole.CA)
+def upload_certificate():
+    """Store the Certificate of Practice (encrypted). A new certificate needs a new admin
+    check: the profile goes back to `pending`. The old certificate is deleted."""
+    upload = request.files.get("file")
+    if upload is None:
+        raise validation_error({"file": [MISSING]}, "files")
+    user = current_user()
     profile = get_own_profile(user)
-    document = documents.add_document(
-        user.id, user.id, upload, DocumentType.CERTIFICATE_OF_PRACTICE
-    )
-    db.session.flush()  # gives document.id
+    document = documents.add_document(user.id, user.id, upload, DocumentType.CERTIFICATE_OF_PRACTICE)
     old_document_id = profile.cop_document_id
     profile.cop_document_id = document.id
     if old_document_id:
@@ -601,118 +358,110 @@ def save_certificate(user: User, upload) -> CaProfile:
     profile.verification_status = CaVerificationStatus.PENDING
     db.session.commit()
     log.info("CA profile %s uploaded a certificate", profile.id)
-    return profile
+    return jsonify(profile_to_dict(profile))
 
 
-# --- For the admin module: verification and counts (none of these commits) --------------
+# --- Find a CA, the catalog and CA prices --------------------------------------------------
 
 
-def _admin_row(profile: CaProfile) -> dict:
-    """Everything an admin sees about a CA (their numbers too, for checking)."""
-    return {
-        "id": profile.id,
-        "user_id": profile.user_id,
-        "full_name": profile.user.full_name,
-        "email": profile.user.email,
-        "membership_no": profile.membership_no,
-        "cop_number": profile.cop_number,
-        "city": profile.city,
-        "languages": profile.languages,
-        "specializations": profile.specializations,
-        "capacity": profile.capacity,
-        "years_experience": profile.years_experience,
-        "pro_bono_slots_per_month": profile.pro_bono_slots_per_month,
-        "about": profile.about,
-        "verification_status": profile.verification_status,
-        "rejection_reason": profile.rejection_reason,
-        "verified_at": profile.verified_at,
-        "has_certificate": profile.cop_document_id is not None,
-        "updated_at": profile.updated_at,
-    }
+def listed_cas():
+    """Verified CA profiles (the CAs businesses may see), joined with their users."""
+    return (
+        select(CaProfile)
+        .join(CaProfile.user)
+        .where(CaProfile.verification_status == CaVerificationStatus.VERIFIED)
+    )
 
 
-def list_cas_for_admin(status: CaVerificationStatus | None) -> list[dict]:
-    """CA profiles (optionally of one status), the longest-waiting first."""
-    stmt = select(CaProfile).order_by(CaProfile.updated_at)
-    if status is not None:
-        stmt = stmt.where(CaProfile.verification_status == status)
-    rows = []
-    for profile in db.session.scalars(stmt):
-        rows.append(_admin_row(profile))
-    return rows
-
-
-def _ca_for_admin(profile_id) -> CaProfile:
-    profile = db.session.get(CaProfile, profile_id)
+def find_listed_ca(profile_id) -> CaProfile:
+    """A CA businesses may see. 404 CA_NOT_FOUND otherwise."""
+    profile = db.session.scalar(listed_cas().where(CaProfile.id == profile_id))
     if profile is None:
-        raise ApiError(404, "CA_NOT_FOUND", "This CA was not found.")
+        raise ApiError(404, "CA_NOT_FOUND", "This CA is not listed on the marketplace.")
     return profile
 
 
-def get_ca_for_admin(profile_id) -> dict:
-    return _admin_row(_ca_for_admin(profile_id))
+def active_client_count_sql():
+    """SQL: how many businesses the CaProfile of the outer query has ACTIVE engagements with."""
+    return (
+        select(func.count(func.distinct(Engagement.business_id)))
+        .where(Engagement.ca_profile_id == CaProfile.id, Engagement.status == EngagementStatus.ACTIVE)
+        .correlate(CaProfile)
+        .scalar_subquery()
+    )
 
 
-def certificate_document_id(profile_id):
-    """The document id of the CA's Certificate of Practice. 404 CERTIFICATE_MISSING."""
-    profile = _ca_for_admin(profile_id)
-    if profile.cop_document_id is None:
-        raise ApiError(404, "CERTIFICATE_MISSING", "This CA has not uploaded a certificate.")
-    return profile.cop_document_id
+def rating_summary(ca_profile_id) -> dict:
+    """{"rating_average": 4.3 (one decimal) or None before any rating, "rating_count": n}."""
+    stars = db.session.scalars(
+        select(Rating.stars)
+        .join(Engagement, Rating.engagement_id == Engagement.id)
+        .where(Engagement.ca_profile_id == ca_profile_id)
+    ).all()
+    if len(stars) == 0:
+        return {"rating_average": None, "rating_count": 0}
+    return {"rating_average": round(sum(stars) / len(stars), 1), "rating_count": len(stars)}
 
 
-def set_verification(profile_id, admin: User, verified: bool, reason: str | None) -> CaProfile:
-    """An admin verifies or rejects a CA. Verifying needs an uploaded certificate
-    (409 CERTIFICATE_MISSING). Does not commit."""
-    profile = _ca_for_admin(profile_id)
-    if verified:
-        if profile.cop_document_id is None:
-            raise ApiError(
-                409, "CERTIFICATE_MISSING", "Ask the CA to upload their certificate first."
-            )
-        profile.verification_status = CaVerificationStatus.VERIFIED
-        profile.verified_at = utcnow()
-        profile.verified_by_id = admin.id
-        profile.rejection_reason = None
-    else:
-        profile.verification_status = CaVerificationStatus.REJECTED
-        profile.rejection_reason = reason
-        profile.verified_at = None
-        profile.verified_by_id = None
-    return profile
+def list_catalog() -> list[dict]:
+    """Every catalog service, in catalog order, with its typical price range: the min,
+    median and max price of the verified CAs, once MIN_CAS_FOR_RANGE of them offer it."""
+    prices = {}  # service id -> [prices of verified CAs]
+    stmt = select(CaService.service_id, CaService.price).join(
+        CaProfile, CaService.ca_profile_id == CaProfile.id
+    )
+    stmt = stmt.where(CaProfile.verification_status == CaVerificationStatus.VERIFIED)
+    for service_id, price in db.session.execute(stmt):
+        prices.setdefault(service_id, []).append(price)
+
+    result = []
+    for service in db.session.scalars(select(CatalogService).order_by(CatalogService.sort_order)):
+        service_prices = prices.get(service.id, [])
+        row = {
+            "id": str(service.id),
+            "code": service.code,
+            "name": service.name,
+            "description": service.description,
+            "unit": service.unit,
+            "specialization": SERVICE_SPECIALIZATIONS.get(service.code),
+            "ca_count": len(service_prices),
+            "min_price": None,
+            "median_price": None,
+            "max_price": None,
+        }
+        if len(service_prices) >= MIN_CAS_FOR_RANGE:
+            row["min_price"] = money(min(service_prices))
+            row["median_price"] = money(median(service_prices))
+            row["max_price"] = money(max(service_prices))
+        result.append(row)
+    return result
 
 
-def count_cas_by_status() -> dict:
-    """{"pending": n, "verified": n, "rejected": n} over all CA profiles."""
-    counts = {"pending": 0, "verified": 0, "rejected": 0}
-    for status in db.session.scalars(select(CaProfile.verification_status)):
-        counts[status] += 1
-    return counts
-
-
-def count_open_engagements() -> int:
-    stmt = select(func.count()).select_from(Engagement).where(Engagement.status.in_(OPEN_STATUSES))
-    return db.session.scalar(stmt)
-
-
-def list_verified_cas(
-    page: int,
-    page_size: int,
-    specialization: str | None = None,
-    language: str | None = None,
-    city: str | None = None,
-    service: str | None = None,
-) -> dict:
+@bp.get("/marketplace/cas")
+@roles_required(UserRole.BUSINESS)
+def list_cas():
     """Verified CAs with room for clients: the best rated first, then the most experienced,
-    then by name.
+    then by name. Filters: specialization, language, city (any part of it) and a catalog
+    service (then each CA has their `price` for it)."""
+    args = request.args
+    errors = {}
+    page, page_size = read_page_args(errors)
+    specialization = args.get("specialization")
+    if specialization is not None and specialization not in CA_SPECIALIZATIONS:
+        errors["specialization"] = [f"Must be one of: {', '.join(CA_SPECIALIZATIONS)}."]
+    language = args.get("language")
+    if language is not None and language not in CA_LANGUAGES:
+        errors["language"] = [f"Must be one of: {', '.join(CA_LANGUAGES)}."]
+    city = args.get("city")
+    if city is not None and len(city) > 100:
+        errors["city"] = ["Longer than maximum length 100."]
+    service = args.get("service")
+    if service is not None and len(service) > 50:
+        errors["service"] = ["Longer than maximum length 50."]
+    if errors:
+        raise validation_error(errors, "query")
 
-    `specialization` / `language` keep CAs whose list contains that code; `city`
-    keeps CAs whose city contains the text (any case); `service` (a catalog code)
-    keeps CAs who offer that service, and each item then has their `price`.
-    """
-    stmt = select(CaProfile).join(CaProfile.user)
-    stmt = _only_listed_cas(stmt)
-    stmt = stmt.where(_active_client_count_sql() < CaProfile.capacity)  # MA7: full CAs are hidden
+    stmt = listed_cas().where(active_client_count_sql() < CaProfile.capacity)  # full CAs hidden
     if specialization:
         stmt = stmt.where(CaProfile.specializations.contains([specialization]))
     if language:
@@ -735,18 +484,20 @@ def list_verified_cas(
             row[0].user.full_name,
         )
     )
-    total = len(rows)
-    # Keep only this page, e.g. page 2 with page_size 20 is rows 20 to 39.
-    start = (page - 1) * page_size
+    start = (page - 1) * page_size  # e.g. page 2 with page_size 20 is rows 20 to 39
 
     items = []
     for profile, ratings in rows[start : start + page_size]:
         price = None
         if service:
-            price = _price_of(profile, service)
+            price = db.session.scalar(
+                select(CaService.price)
+                .join(CatalogService, CaService.service_id == CatalogService.id)
+                .where(CaService.ca_profile_id == profile.id, CatalogService.code == service)
+            )
         items.append(
             {
-                "id": profile.id,
+                "id": str(profile.id),
                 "full_name": profile.user.full_name,
                 "membership_no": profile.membership_no,
                 "city": profile.city,
@@ -754,219 +505,132 @@ def list_verified_cas(
                 "specializations": profile.specializations,
                 "years_experience": profile.years_experience,
                 "about": profile.about,
-                "price": price,
+                "price": money(price),
                 "rating_average": ratings["rating_average"],
                 "rating_count": ratings["rating_count"],
             }
         )
-    return {"items": items, "page": page, "page_size": page_size, "total": total}
+    return jsonify({"items": items, "page": page, "page_size": page_size, "total": len(rows)})
 
 
-def _price_of(profile: CaProfile, service_code: str):
-    """The CA's current price for a catalog service, or None if they do not offer it."""
-    stmt = (
-        select(CaService.price)
-        .join(CatalogService, CaService.service_id == CatalogService.id)
-        .where(
-            CaService.ca_profile_id == profile.id,
-            CatalogService.code == service_code,
-        )
-    )
-    return db.session.scalar(stmt)
-
-
-# --- Service catalog and CA prices ------------------------------------------------
-
-
-def _prices_by_service() -> dict:
-    """{service_id: [prices]} of every verified CA with a live account."""
-    stmt = (
-        select(CaService.service_id, CaService.price)
-        .join(CaProfile, CaService.ca_profile_id == CaProfile.id)
-        .join(User, CaProfile.user_id == User.id)
-    )
-    stmt = _only_listed_cas(stmt)
-
-    prices = {}
-    for service_id, price in db.session.execute(stmt):
-        if service_id not in prices:
-            prices[service_id] = []
-        prices[service_id].append(price)
-    return prices
-
-
-def list_catalog() -> list[dict]:
-    """Every active catalog service, in catalog order, with its typical price range."""
-    services = db.session.scalars(
-        select(CatalogService).order_by(CatalogService.sort_order)
-    ).all()
-    prices = _prices_by_service()
-
-    result = []
-    for service in services:
-        service_prices = prices.get(service.id, [])
-        row = {
-            "id": service.id,
-            "code": service.code,
-            "name": service.name,
-            "description": service.description,
-            "unit": service.unit,
-            "specialization": SERVICE_SPECIALIZATIONS.get(service.code),
-            "ca_count": len(service_prices),
-            "min_price": None,
-            "median_price": None,
-            "max_price": None,
-        }
-        if len(service_prices) >= MIN_CAS_FOR_RANGE:
-            row["min_price"] = min(service_prices)
-            row["median_price"] = median(service_prices)
-            row["max_price"] = max(service_prices)
-        result.append(row)
-    return result
-
-
-def _menu_of(profile: CaProfile) -> dict:
-    """The services a CA offers now, as {"items": [{service_id, price}]}. Does not commit."""
-    rows = db.session.scalars(
-        select(CaService).where(CaService.ca_profile_id == profile.id)
-    ).all()
-    items = []
-    for row in rows:
-        items.append({"service_id": row.service_id, "price": row.price})
-    return {"items": items}
-
-
-def get_own_menu(user: User) -> dict:
-    """The logged-in CA's price menu. Empty until they have a profile and set prices."""
-    profile = _find_profile(user)
-    if profile is None:
-        return {"items": []}
-    return _menu_of(profile)
-
-
-def save_own_menu(user: User, items: list[dict]) -> dict:
-    """Replace the CA's price menu with `items` ([{service_id, price}]).
-
-    Services left out are no longer offered (their rows are deleted). Raises 404 CA_PROFILE_NOT_FOUND without a profile, and
-    400 UNKNOWN_SERVICE for a service that is not in the active catalog.
-    """
-    profile = get_own_profile(user)
-
-    new_prices = {}
-    for item in items:
-        new_prices[item["service_id"]] = item["price"]
-
-    for service_id in new_prices:
-        service = db.session.get(CatalogService, service_id)
-        if service is None:
-            raise ApiError(400, "UNKNOWN_SERVICE", "One of the services is not in the catalog.")
-
-    # Update the rows the CA already has; delete the ones left out.
-    old_rows = db.session.scalars(
-        select(CaService).where(CaService.ca_profile_id == profile.id)
-    ).all()
-    for row in old_rows:
-        if row.service_id in new_prices:
-            row.price = new_prices[row.service_id]
-            del new_prices[row.service_id]
-        else:
-            db.session.delete(row)
-
-    # Whatever is left is offered for the first time.
-    for service_id, price in new_prices.items():
-        db.session.add(CaService(ca_profile_id=profile.id, service_id=service_id, price=price))
-
-    db.session.commit()
-    log.info("CA %s saved a price menu with %d services", profile.id, len(items))
-    return _menu_of(profile)
-
-
-def _find_listed_ca(profile_id) -> CaProfile:
-    """A CA businesses may see (verified, live account). Raises 404 CA_NOT_FOUND otherwise."""
-    stmt = select(CaProfile).join(CaProfile.user).where(CaProfile.id == profile_id)
-    stmt = _only_listed_cas(stmt)
-    profile = db.session.scalar(stmt)
-    if profile is None:
-        raise ApiError(404, "CA_NOT_FOUND", "This CA is not listed on the marketplace.")
-    return profile
-
-
-def get_verified_ca(profile_id) -> dict:
-    """One listed CA's public details and the services they offer, in catalog order.
-
-    Each service has the CA's price and the typical range, so the page can compare
-    them. Raises 404 CA_NOT_FOUND for a CA businesses may not see (not verified, or
-    the account is deactivated), exactly like the list.
-    """
-    profile = _find_listed_ca(profile_id)
-
-    # The CA's current prices, by catalog service id.
+@bp.get("/marketplace/cas/<uuid:ca_id>")
+@roles_required(UserRole.BUSINESS)
+def get_ca(ca_id):
+    """One CA's public page: details, the services they offer with their price and the
+    typical range, and their latest reviews (anonymous)."""
+    profile = find_listed_ca(ca_id)
     my_prices = {}
-    for row in db.session.scalars(
-        select(CaService).where(CaService.ca_profile_id == profile.id)
-    ):
-        my_prices[row.service_id] = row.price
+    for row in db.session.scalars(select(CaService).where(CaService.ca_profile_id == profile.id)):
+        my_prices[str(row.service_id)] = row.price
 
     services = []
     for service in list_catalog():
         if service["id"] in my_prices:
-            offered = dict(service)  # a copy with the typical range, plus this CA's price
-            offered["price"] = my_prices[service["id"]]
-            services.append(offered)
+            service["price"] = money(my_prices[service["id"]])
+            services.append(service)
 
+    latest = db.session.scalars(
+        select(Rating)
+        .join(Engagement, Rating.engagement_id == Engagement.id)
+        .where(Engagement.ca_profile_id == profile.id)
+        .order_by(Rating.created_at.desc())
+        .limit(REVIEWS_SHOWN)
+    )
     ratings = rating_summary(profile.id)
-    return {
-        "id": profile.id,
-        "full_name": profile.user.full_name,
-        "membership_no": profile.membership_no,
-        "city": profile.city,
-        "languages": profile.languages,
-        "specializations": profile.specializations,
-        "years_experience": profile.years_experience,
-        "about": profile.about,
-        "services": services,
-        "rating_average": ratings["rating_average"],
-        "rating_count": ratings["rating_count"],
-        "reviews": latest_reviews(profile.id),
-    }
+    return jsonify(
+        {
+            "id": str(profile.id),
+            "full_name": profile.user.full_name,
+            "membership_no": profile.membership_no,
+            "city": profile.city,
+            "languages": profile.languages,
+            "specializations": profile.specializations,
+            "years_experience": profile.years_experience,
+            "about": profile.about,
+            "services": services,
+            "rating_average": ratings["rating_average"],
+            "rating_count": ratings["rating_count"],
+            "reviews": [rating_to_dict(rating) for rating in latest],
+        }
+    )
 
 
-# --- Engagements: requests, answers and the lifecycle (MA9, MA10, MA11, MA13) --------
-
-# An engagement in one of these still holds its filings: nobody may request them again.
-OPEN_STATUSES = [EngagementStatus.REQUESTED, EngagementStatus.QUOTED, EngagementStatus.ACTIVE]
-
-# Filings in these states are done: there is nothing left for a CA to do.
-FILED_STATUSES = [ComplianceStatus.FILED, ComplianceStatus.FILED_VERIFIED]
-
-# A CA has this long to answer a request. After that, expire_old_requests() (a worker
-# job, MA12) marks it `expired` and the CA can no longer accept, quote or decline it.
-ANSWER_WITHIN = timedelta(hours=48)
-
-# The one catalog service (seed.SERVICE_CATALOG code) that fits each ITR form, so an ITR
-# filing is only ever priced with the service for the business's own form.
-ITR_SERVICE_CODES = {
-    "itr_3": "itr_business",
-    "itr_4": "itr_presumptive",
-    "itr_5": "itr_firm_company",
-    "itr_6": "itr_firm_company",
-}
+@bp.get("/marketplace/services")
+@login_required
+def list_services():
+    return jsonify(list_catalog())
 
 
-def _itr_service_code(business) -> str | None:
+def menu_of(profile: CaProfile | None) -> dict:
+    """The services a CA offers now: {"items": [{service_id, price}]}."""
+    items = []
+    if profile is not None:
+        for row in db.session.scalars(select(CaService).where(CaService.ca_profile_id == profile.id)):
+            items.append({"service_id": str(row.service_id), "price": money(row.price)})
+    return {"items": items}
+
+
+@bp.get("/marketplace/ca-services")
+@roles_required(UserRole.CA)
+def get_my_services():
+    """The CA's price menu (empty until they have a profile and set prices)."""
+    return jsonify(menu_of(find_profile(current_user())))
+
+
+@bp.put("/marketplace/ca-services")
+@roles_required(UserRole.CA)
+def save_my_services():
+    """Replace the CA's whole price menu; services left out are no longer offered.
+    400 UNKNOWN_SERVICE for a service that is not in the catalog."""
+    items = json_body().get("items")
+    if items is None:
+        raise validation_error({"items": [MISSING]})
+    if not isinstance(items, list):
+        raise validation_error({"items": ["Not a valid list."]})
+    new_prices = {}
+    for item in items:
+        service_id = read_uuid(item.get("service_id")) if isinstance(item, dict) else None
+        price = read_price(item.get("price"), 1) if isinstance(item, dict) else None
+        if service_id is None or price is None:
+            raise validation_error({"items": ["Choose a service and enter a price from 1 to 10,00,000."]})
+        new_prices[service_id] = price
+
+    profile = get_own_profile(current_user())
+    for service_id in new_prices:
+        if db.session.get(CatalogService, service_id) is None:
+            raise ApiError(400, "UNKNOWN_SERVICE", "One of the services is not in the catalog.")
+    # Update the rows the CA already has; delete the ones left out.
+    for row in db.session.scalars(select(CaService).where(CaService.ca_profile_id == profile.id)):
+        if row.service_id in new_prices:
+            row.price = new_prices.pop(row.service_id)
+        else:
+            db.session.delete(row)
+    # Whatever is left is offered for the first time.
+    for service_id, price in new_prices.items():
+        db.session.add(CaService(ca_profile_id=profile.id, service_id=service_id, price=price))
+    db.session.commit()
+    log.info("CA %s saved a price menu with %d services", profile.id, len(items))
+    return jsonify(menu_of(profile))
+
+
+# --- Requests and engagements -------------------------------------------------------------
+
+
+def itr_service_code(business) -> str | None:
     """The catalog code of the ITR service that fits the business's profile."""
     return ITR_SERVICE_CODES.get(onboarding.get_itr_form(business))
 
 
-def _fits(service: CatalogService, filing, itr_service_code: str | None) -> bool:
+def service_fits(service: CatalogService, filing, itr_code: str | None) -> bool:
     """True if `service` is for this filing; for ITR, only the service of the business's form."""
     if service.form_code != filing.form_code:
         return False
-    return filing.form_code != FormCode.ITR or service.code == itr_service_code
+    return filing.form_code != FormCode.ITR or service.code == itr_code
 
 
-def _busy_filing_ids(filing_ids) -> set:
-    """The filings among `filing_ids` that are already in an open engagement."""
+def open_filing_ids(filing_ids) -> set:
+    """The filings among `filing_ids` that are already in an open engagement (a profile
+    edit never removes them; nobody may request them again)."""
     stmt = (
         select(EngagementItem.compliance_item_id)
         .join(Engagement, EngagementItem.engagement_id == Engagement.id)
@@ -978,85 +642,15 @@ def _busy_filing_ids(filing_ids) -> set:
     return set(db.session.scalars(stmt))
 
 
-def open_filing_ids(filing_ids) -> set:
-    """The filings among `filing_ids` in an open engagement (used by onboarding: a profile
-    edit never removes them)."""
-    return _busy_filing_ids(filing_ids)
-
-
-def _filing_services(ca: CaProfile) -> list:
-    """The CA's current services that are for a filing, as (CatalogService, price) pairs."""
+def filing_services(ca: CaProfile) -> list:
+    """The CA's services that are for a filing, as (CatalogService, price) pairs."""
     stmt = (
         select(CatalogService, CaService.price)
         .join(CaService, CaService.service_id == CatalogService.id)
-        .where(
-            CaService.ca_profile_id == ca.id,
-            CatalogService.form_code.is_not(None),
-        )
+        .where(CaService.ca_profile_id == ca.id, CatalogService.form_code.is_not(None))
         .order_by(CatalogService.sort_order)
     )
     return db.session.execute(stmt).all()
-
-
-def list_requestable_filings(business, ca_profile_id) -> list[dict]:
-    """The business's filings, each with this CA's price options, soonest due first.
-
-    `blocked_reason` says why a filing cannot be picked (None when it can).
-    """
-    ca = _find_listed_ca(ca_profile_id)
-    services = _filing_services(ca)
-    itr_service_code = _itr_service_code(business)
-    filings = compliance.list_filings(business)
-    filing_ids = []
-    for filing in filings:
-        filing_ids.append(filing.id)
-    busy = _busy_filing_ids(filing_ids)
-
-    result = []
-    for filing in filings:
-        options = []
-        for service, price in services:
-            if _fits(service, filing, itr_service_code):
-                options.append({"service_id": service.id, "name": service.name, "price": price})
-
-        blocked_reason = None
-        if filing.status in FILED_STATUSES:
-            blocked_reason = "Already filed."
-        elif filing.id in busy:
-            blocked_reason = "Already requested from a CA or with a CA."
-        elif len(options) == 0 and filing.form_code == FormCode.ITR:
-            blocked_reason = "This CA has not listed a price for the ITR of your business type."
-        elif len(options) == 0:
-            blocked_reason = "This CA has not listed a price for this filing."
-
-        result.append(
-            {
-                "id": filing.id,
-                "form_code": filing.form_code,
-                "period_label": filing.period_label,
-                "due_date": filing.due_date,
-                "status": filing.status,
-                "options": options,
-                "blocked_reason": blocked_reason,
-            }
-        )
-    return result
-
-
-# --- Capacity (MA7): `ca_profiles.capacity` is the most ACTIVE clients a CA takes ---------
-
-
-def _active_client_count_sql():
-    """SQL: how many businesses the CaProfile of the outer query has ACTIVE engagements with."""
-    return (
-        select(func.count(func.distinct(Engagement.business_id)))
-        .where(
-            Engagement.ca_profile_id == CaProfile.id,
-            Engagement.status == EngagementStatus.ACTIVE,
-        )
-        .correlate(CaProfile)
-        .scalar_subquery()
-    )
 
 
 def active_client_ids(ca_profile_id) -> set:
@@ -1067,9 +661,9 @@ def active_client_ids(ca_profile_id) -> set:
     return set(db.session.scalars(stmt))
 
 
-def _check_room(ca: CaProfile, business_id) -> None:
+def check_room(ca: CaProfile, business_id) -> None:
     """409 CA_AT_CAPACITY when working for this business would give the CA more active
-    clients than their capacity. A business that is already an active client always fits."""
+    clients than their capacity. A business that is already a client always fits."""
     clients = active_client_ids(ca.id)
     if business_id not in clients and len(clients) >= ca.capacity:
         raise ApiError(
@@ -1079,35 +673,104 @@ def _check_room(ca: CaProfile, business_id) -> None:
         )
 
 
-def create_request(business, ca_profile_id, items: list[dict]) -> dict:
-    """The business asks the CA to do some filings: a new engagement, status `requested`.
+def filing_blocked_reason(filing, busy: set):
+    """Why a filing cannot be given to a CA now, or None if it can."""
+    if filing.status in FILED_STATUSES:
+        return "Already filed."
+    if filing.id in busy:
+        return "Already requested from a CA or with a CA."
+    return None
 
-    `items` is [{compliance_item_id, service_id}]; the price of each filing is copied
-    from the CA's menu now. The CA gets an email. Errors: 404 CA_NOT_FOUND,
-    404 FILING_NOT_FOUND, 400 DUPLICATE_FILING, 409 FILING_ALREADY_FILED,
-    409 FILING_ALREADY_REQUESTED, 400 SERVICE_NOT_OFFERED (also for an ITR service
-    that does not fit the business's ITR form).
-    """
-    ca = _find_listed_ca(ca_profile_id)
-    _check_room(ca, business.id)
-    itr_service_code = _itr_service_code(business)
 
-    # {filing id: the service chosen for it}
-    chosen = {}
+def items_of(engagement: Engagement) -> list[EngagementItem]:
+    """The engagement's filings, in the order they were requested."""
+    stmt = (
+        select(EngagementItem)
+        .where(EngagementItem.engagement_id == engagement.id)
+        .order_by(EngagementItem.created_at)
+    )
+    return db.session.scalars(stmt).all()
+
+
+@bp.get("/marketplace/cas/<uuid:ca_id>/requestable-filings")
+@roles_required(UserRole.BUSINESS)
+def list_requestable_filings(ca_id):
+    """The business's filings, soonest due first, each with this CA's price options and
+    why it cannot be picked (`blocked_reason`, None when it can)."""
+    business = current_business()
+    ca = find_listed_ca(ca_id)
+    services = filing_services(ca)
+    itr_code = itr_service_code(business)
+    filings = compliance.list_filings(business)
+    busy = open_filing_ids([filing.id for filing in filings])
+
+    result = []
+    for filing in filings:
+        options = []
+        for service, price in services:
+            if service_fits(service, filing, itr_code):
+                options.append({"service_id": str(service.id), "name": service.name, "price": money(price)})
+        blocked_reason = filing_blocked_reason(filing, busy)
+        if blocked_reason is None and len(options) == 0:
+            if filing.form_code == FormCode.ITR:
+                blocked_reason = "This CA has not listed a price for the ITR of your business type."
+            else:
+                blocked_reason = "This CA has not listed a price for this filing."
+        result.append(
+            {
+                "id": str(filing.id),
+                "form_code": filing.form_code,
+                "period_label": filing.period_label,
+                "due_date": iso(filing.due_date),
+                "status": filing.status,
+                "options": options,
+                "blocked_reason": blocked_reason,
+            }
+        )
+    return jsonify(result)
+
+
+@bp.post("/marketplace/engagements")
+@roles_required(UserRole.BUSINESS)
+def send_request():
+    """The business asks a CA to do some filings: a new `requested` engagement. The price of
+    each filing is copied from the CA's menu now; the CA gets a tray entry and an email."""
+    data = json_body()
+    errors = {}
+    ca_profile_id = data.get("ca_profile_id")
+    if ca_profile_id is None:
+        errors["ca_profile_id"] = [MISSING]
+    elif read_uuid(ca_profile_id) is None:
+        errors["ca_profile_id"] = ["Not a valid UUID."]
+    items = data.get("items")
+    if items is None:
+        errors["items"] = [MISSING]
+    elif not isinstance(items, list) or len(items) == 0:
+        errors["items"] = ["Choose at least one filing."]
+    else:
+        for item in items:
+            if not isinstance(item, dict) or None in (
+                read_uuid(item.get("compliance_item_id")),
+                read_uuid(item.get("service_id")),
+            ):
+                errors["items"] = ["Each filing needs a compliance_item_id and a service_id."]
+    if errors:
+        raise validation_error(errors)
+
+    business = current_business()
+    ca = find_listed_ca(read_uuid(ca_profile_id))
+    check_room(ca, business.id)
+    itr_code = itr_service_code(business)
+    chosen = {}  # filing id -> the service chosen for it
     for item in items:
-        if item["compliance_item_id"] in chosen:
+        filing_id = read_uuid(item["compliance_item_id"])
+        if filing_id in chosen:
             raise ApiError(400, "DUPLICATE_FILING", "The same filing is in the request twice.")
-        chosen[item["compliance_item_id"]] = item["service_id"]
+        chosen[filing_id] = read_uuid(item["service_id"])
 
-    # Lock the filings first, so a second request at the same moment waits for this one.
     filings = compliance.get_filings_by_ids(list(chosen))
-    busy = _busy_filing_ids(list(chosen))
-
-    # {service id: (CatalogService, the CA's price)}
-    offered = {}
-    for service, price in _filing_services(ca):
-        offered[service.id] = (service, price)
-
+    busy = open_filing_ids(list(chosen))
+    offered = {service.id: (service, price) for service, price in filing_services(ca)}
     for filing_id, service_id in chosen.items():
         filing = filings.get(filing_id)
         if filing is None or filing.business_id != business.id:
@@ -1120,7 +783,7 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
                 "FILING_ALREADY_REQUESTED",
                 f"{filing.period_label} is already requested from a CA or with a CA.",
             )
-        if service_id not in offered or not _fits(offered[service_id][0], filing, itr_service_code):
+        if service_id not in offered or not service_fits(offered[service_id][0], filing, itr_code):
             raise ApiError(
                 400, "SERVICE_NOT_OFFERED", "This CA does not offer that service for this filing."
             )
@@ -1154,7 +817,6 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
     )
     db.session.commit()
     log.info("Engagement %s requested with %d filings", engagement.id, len(chosen))
-
     if ca.user.email_notifications:
         send_email(
             ca.user.email,
@@ -1164,116 +826,57 @@ def create_request(business, ca_profile_id, items: list[dict]) -> dict:
             business_name=business.legal_name,
             filing_count=len(chosen),
         )
-    return _engagement_details(engagement)
+    return jsonify(engagement_to_dict(engagement)), 201
 
 
-def _items_of(engagement: Engagement) -> list[EngagementItem]:
-    """The engagement's filings, in the order they were requested."""
-    stmt = (
-        select(EngagementItem)
-        .where(EngagementItem.engagement_id == engagement.id)
-        .order_by(EngagementItem.created_at)
-    )
-    return db.session.scalars(stmt).all()
-
-
-def _engagement_details(engagement: Engagement) -> dict:
-    """One engagement as both sides see it: the CA, the business, the filings and prices."""
-    ca = db.session.get(CaProfile, engagement.ca_profile_id)
-    business = onboarding.get_business(engagement.business_id)
-    rows = _items_of(engagement)
-
-    filing_ids = []
-    for row in rows:
-        filing_ids.append(row.compliance_item_id)
-    filings = compliance.get_filings_by_ids(filing_ids)
-
-    items = []
-    for row in rows:
-        service = db.session.get(CatalogService, row.service_id)
-        filing = filings.get(row.compliance_item_id)  # None if the filing was removed
-        items.append(
-            {
-                "id": row.id,
-                "compliance_item_id": row.compliance_item_id,
-                "form_code": filing.form_code if filing else None,
-                "period_label": filing.period_label if filing else None,
-                "due_date": filing.due_date if filing else None,
-                "service_name": service.name,
-                "listed_price": row.listed_price,
-                "quoted_price": row.quoted_price,
-                "agreed_price": row.agreed_price,
-            }
-        )
-
-    return {
-        "id": engagement.id,
-        "status": engagement.status,
-        "ca_profile_id": ca.id,
-        "ca_name": ca.user.full_name,
-        "business_name": business.legal_name,
-        "quote_reason": engagement.quote_reason,
-        "requested_at": engagement.requested_at,
-        "expires_at": engagement.expires_at,
-        "responded_at": engagement.responded_at,
-        "activated_at": engagement.activated_at,
-        "completed_at": engagement.completed_at,
-        "items": items,
-        "rating": _rating_of(engagement),
-        "is_pro_bono": engagement.is_pro_bono,
-    }
-
-
-def list_business_engagements(business) -> list[dict]:
+@bp.get("/marketplace/my-engagements")
+@roles_required(UserRole.BUSINESS)
+def list_my_engagements():
     """Every engagement of the business, newest first."""
     stmt = (
         select(Engagement)
-        .where(Engagement.business_id == business.id)
+        .where(Engagement.business_id == current_business().id)
         .order_by(Engagement.requested_at.desc())
     )
-    result = []
-    for engagement in db.session.scalars(stmt):
-        result.append(_engagement_details(engagement))
-    return result
+    return jsonify([engagement_to_dict(engagement) for engagement in db.session.scalars(stmt)])
 
 
-def list_ca_engagements(user: User) -> list[dict]:
-    """Every engagement of the logged-in CA, newest first (empty without a profile)."""
-    ca = _find_profile(user)
+@bp.get("/marketplace/ca-engagements")
+@roles_required(UserRole.CA)
+def list_ca_engagements():
+    """Every engagement of the CA, newest first (empty without a profile)."""
+    ca = find_profile(current_user())
     if ca is None:
-        return []
+        return jsonify([])
     stmt = (
         select(Engagement)
         .where(Engagement.ca_profile_id == ca.id)
         .order_by(Engagement.requested_at.desc())
     )
-    result = []
-    for engagement in db.session.scalars(stmt):
-        result.append(_engagement_details(engagement))
-    return result
+    return jsonify([engagement_to_dict(engagement) for engagement in db.session.scalars(stmt)])
 
 
-# --- Engagement actions ------------------------------------------------------------
+# --- Answering a request ---------------------------------------------------------------------
 
 
-def _ca_engagement(user: User, engagement_id) -> Engagement:
+def ca_engagement(engagement_id) -> Engagement:
     """One of the logged-in CA's engagements. 404 ENGAGEMENT_NOT_FOUND for anyone else's."""
     engagement = db.session.get(Engagement, engagement_id)
-    ca = _find_profile(user)
+    ca = find_profile(current_user())
     if engagement is None or ca is None or engagement.ca_profile_id != ca.id:
         raise ApiError(404, "ENGAGEMENT_NOT_FOUND", "This engagement was not found.")
     return engagement
 
 
-def _business_engagement(business, engagement_id) -> Engagement:
-    """One of the business's engagements. 404 ENGAGEMENT_NOT_FOUND for anyone else's."""
+def business_engagement(engagement_id) -> Engagement:
+    """One of the logged-in business's engagements. 404 ENGAGEMENT_NOT_FOUND otherwise."""
     engagement = db.session.get(Engagement, engagement_id)
-    if engagement is None or engagement.business_id != business.id:
+    if engagement is None or engagement.business_id != current_business().id:
         raise ApiError(404, "ENGAGEMENT_NOT_FOUND", "This engagement was not found.")
     return engagement
 
 
-def _check_status(engagement: Engagement, expected: EngagementStatus) -> None:
+def check_status(engagement: Engagement, expected: str) -> None:
     """409 INVALID_STATUS unless the engagement is in the `expected` status."""
     if engagement.status != expected:
         raise ApiError(
@@ -1283,24 +886,28 @@ def _check_status(engagement: Engagement, expected: EngagementStatus) -> None:
         )
 
 
-def _activate(engagement: Engagement, items: list[EngagementItem]) -> None:
+def check_not_expired(engagement: Engagement) -> None:
+    """409 REQUEST_EXPIRED once the 48 hours to answer have passed (the worker marks such
+    requests `expired`; this also stops a CA who answers just before it runs)."""
+    if engagement.expires_at is not None and engagement.expires_at <= utcnow():
+        raise ApiError(
+            409, "REQUEST_EXPIRED", "This request expired: it was not answered within 48 hours."
+        )
+
+
+def activate(engagement: Engagement, items: list[EngagementItem]) -> None:
     """Start the work: status `active`, and the filings are "With CA". Does not commit."""
     engagement.status = EngagementStatus.ACTIVE
     engagement.activated_at = utcnow()
-    filing_ids = []
-    for item in items:
-        filing_ids.append(item.compliance_item_id)
-    compliance.mark_filings_with_ca(filing_ids)
+    compliance.mark_filings_with_ca([item.compliance_item_id for item in items])
 
 
-def _notify_business(engagement: Engagement, title: str, text: str) -> None:
-    """Add a tray entry for the owner of the engagement's business: the body is the CA's
-    name followed by `text`. Does not commit."""
+def notify_business(engagement: Engagement, title: str, text: str) -> None:
+    """A tray entry for the business owner: the CA's name followed by `text`. Does not commit."""
     business = onboarding.get_business(engagement.business_id)
-    owner = db.session.get(User, business.user_id)
     ca = db.session.get(CaProfile, engagement.ca_profile_id)
     alerts.notify(
-        owner,
+        db.session.get(User, business.user_id),
         NotificationType.ENGAGEMENT_UPDATE,
         title,
         f"{ca.user.full_name} {text}",
@@ -1308,425 +915,233 @@ def _notify_business(engagement: Engagement, title: str, text: str) -> None:
     )
 
 
-def _email_business(engagement: Engagement, subject: str, template: str, **context) -> None:
-    """Email the owner of the engagement's business, if they want emails (call after
-    committing)."""
+def email_business(engagement: Engagement, subject: str, template: str, **context) -> None:
+    """Email the business owner, if they want emails (call after the commit)."""
     business = onboarding.get_business(engagement.business_id)
     owner = db.session.get(User, business.user_id)
     if not owner.email_notifications:
         return
     ca = db.session.get(CaProfile, engagement.ca_profile_id)
     send_email(
-        owner.email,
-        subject,
-        template,
-        owner_name=owner.full_name,
-        ca_name=ca.user.full_name,
-        **context,
+        owner.email, subject, template, owner_name=owner.full_name, ca_name=ca.user.full_name, **context
     )
 
 
-def _check_not_expired(engagement: Engagement) -> None:
-    """409 REQUEST_EXPIRED once the 48 hours to answer have passed.
-
-    The worker marks such requests `expired` every few minutes; this check also stops
-    a CA who answers in the minutes before the worker runs.
-    """
-    if engagement.expires_at is not None and engagement.expires_at <= utcnow():
-        raise ApiError(
-            409, "REQUEST_EXPIRED", "This request expired: it was not answered within 48 hours."
-        )
-
-
-def accept_request(user: User, engagement_id) -> dict:
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/accept")
+@roles_required(UserRole.CA)
+def accept_request(engagement_id):
     """The CA accepts at the listed prices: status `active`."""
-    engagement = _ca_engagement(user, engagement_id)
-    _check_status(engagement, EngagementStatus.REQUESTED)
-    _check_not_expired(engagement)
-    _check_room(db.session.get(CaProfile, engagement.ca_profile_id), engagement.business_id)
-    items = _items_of(engagement)
+    engagement = ca_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.REQUESTED)
+    check_not_expired(engagement)
+    check_room(db.session.get(CaProfile, engagement.ca_profile_id), engagement.business_id)
+    items = items_of(engagement)
     for item in items:
         item.agreed_price = item.listed_price
     engagement.responded_at = utcnow()
-    _activate(engagement, items)
-    _notify_business(
+    activate(engagement, items)
+    notify_business(
         engagement,
         "Your CA accepted your request",
         "accepted your request at their listed prices. The work has started.",
     )
     db.session.commit()
-    _email_business(engagement, "Your CA accepted your request", "engagement_accepted")
-    return _engagement_details(engagement)
+    email_business(engagement, "Your CA accepted your request", "engagement_accepted")
+    return jsonify(engagement_to_dict(engagement))
 
 
-def send_quote(user: User, engagement_id, reason: str, prices: list[dict]) -> dict:
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/quote")
+@roles_required(UserRole.CA)
+def send_quote(engagement_id):
     """The CA sends a new price for every filing, with a reason: status `quoted`.
-
-    `prices` is [{engagement_item_id, price}] and must cover every filing of the request
-    (400 QUOTE_INCOMPLETE otherwise).
-    """
-    engagement = _ca_engagement(user, engagement_id)
-    _check_status(engagement, EngagementStatus.REQUESTED)
-    _check_not_expired(engagement)
-    items = _items_of(engagement)
-
+    400 QUOTE_INCOMPLETE unless the prices cover exactly the request's filings."""
+    data = json_body()
+    errors = {}
+    reason = read_text(data, "reason", 1000, errors)
+    prices = data.get("prices")
     new_prices = {}
-    for entry in prices:
-        new_prices[entry["engagement_item_id"]] = entry["price"]
+    if prices is None:
+        errors["prices"] = [MISSING]
+    elif not isinstance(prices, list) or len(prices) == 0:
+        errors["prices"] = ["Enter the new prices."]
+    else:
+        for entry in prices:
+            item_id = read_uuid(entry.get("engagement_item_id")) if isinstance(entry, dict) else None
+            price = read_price(entry.get("price"), 0) if isinstance(entry, dict) else None
+            if item_id is None or price is None:
+                errors["prices"] = ["Enter a price from 0 to 10,00,000 for each filing."]
+                break
+            new_prices[item_id] = price
+    if errors:
+        raise validation_error(errors)
+
+    engagement = ca_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.REQUESTED)
+    check_not_expired(engagement)
+    items = items_of(engagement)
     for item in items:
         if item.id not in new_prices:
             raise ApiError(
                 400, "QUOTE_INCOMPLETE", "Enter a new price for every filing in the request."
             )
     if len(new_prices) != len(items):
-        raise ApiError(
-            400, "QUOTE_INCOMPLETE", "The quote has a filing that is not in the request."
-        )
+        raise ApiError(400, "QUOTE_INCOMPLETE", "The quote has a filing that is not in the request.")
 
     for item in items:
         item.quoted_price = new_prices[item.id]
     engagement.quote_reason = reason
     engagement.status = EngagementStatus.QUOTED
     engagement.responded_at = utcnow()
-    _notify_business(engagement, "Your CA sent you a quote", f"sent a new price. Reason: {reason}")
+    notify_business(engagement, "Your CA sent you a quote", f"sent a new price. Reason: {reason}")
     db.session.commit()
-    _email_business(engagement, "Your CA sent you a quote", "engagement_quoted", reason=reason)
-    return _engagement_details(engagement)
+    email_business(engagement, "Your CA sent you a quote", "engagement_quoted", reason=reason)
+    return jsonify(engagement_to_dict(engagement))
 
 
-def decline_request(user: User, engagement_id) -> dict:
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/decline")
+@roles_required(UserRole.CA)
+def decline_request(engagement_id):
     """The CA declines: status `declined`; the filings are free to request again."""
-    engagement = _ca_engagement(user, engagement_id)
-    _check_status(engagement, EngagementStatus.REQUESTED)
-    _check_not_expired(engagement)
+    engagement = ca_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.REQUESTED)
+    check_not_expired(engagement)
     engagement.status = EngagementStatus.DECLINED
     engagement.responded_at = utcnow()
-    _notify_business(
+    notify_business(
         engagement,
         "Your CA declined your request",
         'declined your request. You can ask another CA in "Find a CA".',
     )
     db.session.commit()
-    _email_business(engagement, "Your CA declined your request", "engagement_declined")
-    return _engagement_details(engagement)
+    email_business(engagement, "Your CA declined your request", "engagement_declined")
+    return jsonify(engagement_to_dict(engagement))
 
 
-def complete_engagement(user: User, engagement_id) -> dict:
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/complete")
+@roles_required(UserRole.CA)
+def complete_engagement(engagement_id):
     """The CA marks the work as done: status `completed`."""
-    engagement = _ca_engagement(user, engagement_id)
-    _check_status(engagement, EngagementStatus.ACTIVE)
+    engagement = ca_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.ACTIVE)
     engagement.status = EngagementStatus.COMPLETED
     engagement.completed_at = utcnow()
-    _notify_business(
+    notify_business(
         engagement,
         "Your CA completed the work",
         'marked the work as completed. You can rate it in "My engagements".',
     )
     db.session.commit()
-    return _engagement_details(engagement)
+    return jsonify(engagement_to_dict(engagement))
 
 
-def accept_quote(business, engagement_id) -> dict:
-    """The business accepts the CA's quote: the quoted prices are agreed, status `active`."""
-    engagement = _business_engagement(business, engagement_id)
-    _check_status(engagement, EngagementStatus.QUOTED)
-    _check_room(db.session.get(CaProfile, engagement.ca_profile_id), engagement.business_id)
-    items = _items_of(engagement)
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/accept-quote")
+@roles_required(UserRole.BUSINESS)
+def accept_quote(engagement_id):
+    """The business accepts the quote: the quoted prices are agreed, status `active`."""
+    engagement = business_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.QUOTED)
+    check_room(db.session.get(CaProfile, engagement.ca_profile_id), engagement.business_id)
+    items = items_of(engagement)
     for item in items:
         item.agreed_price = item.quoted_price
-    _activate(engagement, items)
+    activate(engagement, items)
     db.session.commit()
-    return _engagement_details(engagement)
+    return jsonify(engagement_to_dict(engagement))
 
 
-def reject_quote(business, engagement_id) -> dict:
-    """The business rejects the CA's quote: status `cancelled`; the filings are free again."""
-    engagement = _business_engagement(business, engagement_id)
-    _check_status(engagement, EngagementStatus.QUOTED)
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/reject-quote")
+@roles_required(UserRole.BUSINESS)
+def reject_quote(engagement_id):
+    """The business rejects the quote: status `cancelled`; the filings are free again."""
+    engagement = business_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.QUOTED)
     engagement.status = EngagementStatus.CANCELLED
     db.session.commit()
-    return _engagement_details(engagement)
+    return jsonify(engagement_to_dict(engagement))
 
 
-def withdraw_request(business, engagement_id) -> dict:
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/withdraw")
+@roles_required(UserRole.BUSINESS)
+def withdraw_request(engagement_id):
     """The business withdraws a request the CA has not answered: status `cancelled`."""
-    engagement = _business_engagement(business, engagement_id)
-    _check_status(engagement, EngagementStatus.REQUESTED)
+    engagement = business_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.REQUESTED)
     engagement.status = EngagementStatus.CANCELLED
     db.session.commit()
-    return _engagement_details(engagement)
+    return jsonify(engagement_to_dict(engagement))
 
 
-# --- Request expiry (MA12): run by the worker, see backend/worker.py ------------------
+@bp.post("/marketplace/engagements/<uuid:engagement_id>/rating")
+@roles_required(UserRole.BUSINESS)
+def rate_engagement(engagement_id):
+    """The business rates a completed engagement once: 1 to 5 stars and an optional review."""
+    data = json_body()
+    errors = {}
+    stars = data.get("stars")
+    if stars is None:
+        errors["stars"] = [MISSING]
+    elif isinstance(stars, bool) or not isinstance(stars, int) or not 1 <= stars <= 5:
+        errors["stars"] = ["Choose 1 to 5 stars."]
+    review = data.get("review", "")
+    if not isinstance(review, str) or len(review) > 2000:
+        errors["review"] = ["Longer than maximum length 2000."]
+    if errors:
+        raise validation_error(errors)
+
+    engagement = business_engagement(engagement_id)
+    check_status(engagement, EngagementStatus.COMPLETED)
+    if db.session.scalar(select(Rating.id).where(Rating.engagement_id == engagement.id)):
+        raise ApiError(409, "ALREADY_RATED", "You have already rated this CA for this work.")
+    db.session.add(Rating(engagement_id=engagement.id, stars=stars, review=review.strip() or None))
+    db.session.commit()
+    log.info("Engagement %s rated %d stars", engagement.id, stars)
+    return jsonify(engagement_to_dict(engagement))
 
 
 def expire_old_requests() -> int:
-    """Requests the CA did not answer within 48 hours become `expired`. Returns how many.
-
-    Only `requested` engagements expire; a `quoted` one waits for the business. The
-    filings are free again at once (`expired` is not an open status). After the commit,
-    each business is emailed so it can pick another CA.
-    """
+    """Requests the CA did not answer within 48 hours become `expired` (a worker job).
+    Returns how many. Only `requested` ones expire; a `quoted` one waits for the business.
+    The filings are free again at once, and each business is emailed after the commit."""
     stmt = select(Engagement).where(
-        Engagement.status == EngagementStatus.REQUESTED,
-        Engagement.expires_at <= utcnow(),
+        Engagement.status == EngagementStatus.REQUESTED, Engagement.expires_at <= utcnow()
     )
     expired = db.session.scalars(stmt).all()
     for engagement in expired:
         engagement.status = EngagementStatus.EXPIRED
-        _notify_business(
+        notify_business(
             engagement,
             "Your CA request expired",
-            f"did not answer within 48 hours. Choose another CA for: {_service_names(engagement)}.",
+            f"did not answer within 48 hours. Choose another CA for: {service_names(engagement)}.",
         )
     db.session.commit()
-
     for engagement in expired:
-        _email_business(
+        email_business(
             engagement,
             "Your CA request expired",
             "engagement_expired",
-            service_names=_service_names(engagement),
+            service_names=service_names(engagement),
         )
     if len(expired) > 0:
         log.info("Expired %d unanswered request(s)", len(expired))
     return len(expired)
 
 
-def _service_names(engagement: Engagement) -> str:
+def service_names(engagement: Engagement) -> str:
     """The services of an engagement, e.g. "GSTR-3B filing, GSTR-1 filing"."""
     names = []
-    for item in _items_of(engagement):
-        service = db.session.get(CatalogService, item.service_id)
-        if service.name not in names:
-            names.append(service.name)
+    for item in items_of(engagement):
+        name = db.session.get(CatalogService, item.service_id).name
+        if name not in names:
+            names.append(name)
     return ", ".join(names)
 
 
-# --- Access checks (MA14): what a CA may see of a business ------------------------------
-# docs/DATA_MODEL.md, "Who may read what". Only an ACTIVE engagement gives access to the
-# business's data, and only to the filings in it. After the engagement ends (completed,
-# declined, expired, cancelled) the CA sees nothing of that business any more.
+# --- The pro-bono queue ------------------------------------------------------------------
 
 
-def own_profile_id(user: User):
-    """The logged-in CA's profile id, or None if they have not saved a profile."""
-    profile = _find_profile(user)
-    if profile is None:
-        return None
-    return profile.id
-
-
-def ca_has_active_access(ca_profile_id, business_id) -> bool:
-    """True while the CA has an ACTIVE engagement with the business."""
-    stmt = select(Engagement.id).where(
-        Engagement.ca_profile_id == ca_profile_id,
-        Engagement.business_id == business_id,
-        Engagement.status == EngagementStatus.ACTIVE,
-    )
-    return db.session.scalar(stmt) is not None
-
-
-def _item_ids(ca_profile_id, business_id, statuses) -> set:
-    """The filings in this CA's engagements with this business that have one of `statuses`."""
-    stmt = (
-        select(EngagementItem.compliance_item_id)
-        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
-        .where(
-            Engagement.ca_profile_id == ca_profile_id,
-            Engagement.business_id == business_id,
-            Engagement.status.in_(statuses),
-        )
-    )
-    return set(db.session.scalars(stmt))
-
-
-def active_engagement_item_ids(ca_profile_id, business_id) -> set:
-    """The filings the CA works on for this business (in ACTIVE engagements only).
-
-    A business may have two CAs (e.g. one for GST, one for ITR): each sees only their own.
-    """
-    return _item_ids(ca_profile_id, business_id, [EngagementStatus.ACTIVE])
-
-
-def open_engagement_item_ids(ca_profile_id, business_id) -> set:
-    """The filings in the CA's open engagements with this business (requested, quoted or
-    active): what a CA may see a summary of while deciding on a request."""
-    return _item_ids(ca_profile_id, business_id, OPEN_STATUSES)
-
-
-def ca_can_access_document(ca_profile_id, document_id) -> bool:
-    """True only for a document linked to a filing of one of the CA's ACTIVE engagements:
-    a document attached to the filing, or the filing's acknowledgement."""
-    stmt = (
-        select(EngagementItem.compliance_item_id)
-        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
-        .where(
-            Engagement.ca_profile_id == ca_profile_id,
-            Engagement.status == EngagementStatus.ACTIVE,
-        )
-    )
-    filing_ids = set(db.session.scalars(stmt))
-    if len(filing_ids) == 0:
-        return False
-
-    allowed = documents.document_ids_for_filings(filing_ids)
-    for filing in compliance.get_filings_by_ids(filing_ids).values():
-        if filing.acknowledgement_document_id is not None:
-            allowed.add(filing.acknowledgement_document_id)
-    return document_id in allowed
-
-
-def active_ca_users_by_filing(filing_ids) -> dict:
-    """{filing id: the CA's User} for the filings among `filing_ids` in an ACTIVE engagement
-    (at most one per filing). Used by the alerts reminders to remind the CA too."""
-    if len(filing_ids) == 0:
-        return {}
-    stmt = (
-        select(EngagementItem.compliance_item_id, User)
-        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
-        .join(CaProfile, Engagement.ca_profile_id == CaProfile.id)
-        .join(User, CaProfile.user_id == User.id)
-        .where(
-            EngagementItem.compliance_item_id.in_(filing_ids),
-            Engagement.status == EngagementStatus.ACTIVE,
-        )
-    )
-    users = {}
-    for filing_id, user in db.session.execute(stmt):
-        users[filing_id] = user
-    return users
-
-
-# --- Used by the ca_workspace module (CW2 to CW7) -------------------------------------
-
-
-def active_work(ca_profile_id) -> list[tuple]:
-    """(engagement id, business id, filing id) for every filing in the CA's ACTIVE engagements."""
-    stmt = (
-        select(Engagement.id, Engagement.business_id, EngagementItem.compliance_item_id)
-        .join(EngagementItem, EngagementItem.engagement_id == Engagement.id)
-        .where(
-            Engagement.ca_profile_id == ca_profile_id,
-            Engagement.status == EngagementStatus.ACTIVE,
-        )
-    )
-    return [tuple(row) for row in db.session.execute(stmt)]
-
-
-def active_cas_of_business(business_id) -> dict:
-    """{engagement id: the CA's User} for the business's ACTIVE engagements."""
-    stmt = (
-        select(Engagement.id, User)
-        .join(CaProfile, Engagement.ca_profile_id == CaProfile.id)
-        .join(User, CaProfile.user_id == User.id)
-        .where(Engagement.business_id == business_id, Engagement.status == EngagementStatus.ACTIVE)
-    )
-    cas = {}
-    for engagement_id, user in db.session.execute(stmt):
-        cas[engagement_id] = user
-    return cas
-
-
-def complete_if_all_filed(engagement_id) -> bool:
-    """Complete an ACTIVE engagement once every one of its filings is filed (CW5), and tell
-    the business. Returns True if it completed. Does not commit."""
-    engagement = db.session.get(Engagement, engagement_id)
-    if engagement is None or engagement.status != EngagementStatus.ACTIVE:
-        return False
-    filing_ids = [item.compliance_item_id for item in _items_of(engagement)]
-    filings = compliance.get_filings_by_ids(filing_ids)
-    for filing in filings.values():
-        if filing.status not in FILED_STATUSES:
-            return False
-    engagement.status = EngagementStatus.COMPLETED
-    engagement.completed_at = utcnow()
-    _notify_business(
-        engagement,
-        "Your CA completed the work",
-        'filed every filing of your request. You can rate the work in "My engagements".',
-    )
-    log.info("Engagement %s completed: every filing is filed", engagement.id)
-    return True
-
-
-# --- Ratings (MA17) --------------------------------------------------------------------
-
-# How many of a CA's latest reviews the CA page shows.
-REVIEWS_SHOWN = 5
-
-
-def _rating_of(engagement: Engagement):
-    """The engagement's rating as {stars, review, created_at}, or None before it is rated."""
-    rating = db.session.scalar(select(Rating).where(Rating.engagement_id == engagement.id))
-    if rating is None:
-        return None
-    return {"stars": rating.stars, "review": rating.review, "created_at": rating.created_at}
-
-
-def rate_engagement(business, engagement_id, stars: int, review: str) -> dict:
-    """The business rates a completed engagement: 1 to 5 stars and an optional review.
-
-    Only once (409 ALREADY_RATED) and only after the CA marked it completed
-    (409 INVALID_STATUS). Another business's engagement → 404.
-    """
-    engagement = _business_engagement(business, engagement_id)
-    _check_status(engagement, EngagementStatus.COMPLETED)
-    if _rating_of(engagement) is not None:
-        raise ApiError(409, "ALREADY_RATED", "You have already rated this CA for this work.")
-
-    review = review.strip()
-    if review == "":
-        review = None
-    db.session.add(Rating(engagement_id=engagement.id, stars=stars, review=review))
-    db.session.commit()
-    log.info("Engagement %s rated %d stars", engagement.id, stars)
-    return _engagement_details(engagement)
-
-
-def _ratings_of_ca(ca_profile_id) -> list:
-    """All ratings of the CA's engagements, newest first."""
-    stmt = (
-        select(Rating)
-        .join(Engagement, Rating.engagement_id == Engagement.id)
-        .where(Engagement.ca_profile_id == ca_profile_id)
-        .order_by(Rating.created_at.desc())
-    )
-    return db.session.scalars(stmt).all()
-
-
-def rating_summary(ca_profile_id) -> dict:
-    """{"rating_average": 4.3 (one decimal) or None before any rating, "rating_count": n}."""
-    ratings = _ratings_of_ca(ca_profile_id)
-    if len(ratings) == 0:
-        return {"rating_average": None, "rating_count": 0}
-    total = 0
-    for rating in ratings:
-        total = total + rating.stars
-    return {"rating_average": round(total / len(ratings), 1), "rating_count": len(ratings)}
-
-
-def latest_reviews(ca_profile_id) -> list[dict]:
-    """The CA's latest ratings (at most REVIEWS_SHOWN), newest first. Anonymous: no business."""
-    reviews = []
-    for rating in _ratings_of_ca(ca_profile_id)[:REVIEWS_SHOWN]:
-        reviews.append(
-            {"stars": rating.stars, "review": rating.review, "created_at": rating.created_at}
-        )
-    return reviews
-
-
-# --- Pro-bono queue (MA16) ---------------------------------------------------------------
-
-# Only businesses whose computed MSME tier is one of these may ask for free help.
-# A platform policy (docs/DECISIONS.md), not a legal value.
-PRO_BONO_TIERS = ["micro"]
-
-
-def _pro_bono_eligibility(business) -> dict:
+def pro_bono_eligibility(business) -> dict:
     """{"eligible": True/False, "reason": text shown to the business}."""
-    tier = onboarding.get_msme_tier(business)
-    if tier in PRO_BONO_TIERS:
+    if onboarding.get_msme_tier(business) in PRO_BONO_TIERS:
         return {
             "eligible": True,
             "reason": "Your business is a micro enterprise, so you can ask for a free CA.",
@@ -1738,100 +1153,81 @@ def _pro_bono_eligibility(business) -> dict:
     }
 
 
-def _queued_request_of(business):
+def queued_request_of(business):
     """The business's request still waiting in the queue, or None."""
-    stmt = select(ProBonoRequest).where(
-        ProBonoRequest.business_id == business.id,
-        ProBonoRequest.status == ProBonoRequestStatus.QUEUED,
+    return db.session.scalar(
+        select(ProBonoRequest).where(
+            ProBonoRequest.business_id == business.id,
+            ProBonoRequest.status == ProBonoRequestStatus.QUEUED,
+        )
+    )
+
+
+def pro_bono_used_this_month(ca_profile_id) -> int:
+    """How many pro-bono engagements the CA started this (Indian) calendar month."""
+    today = today_in_india()
+    month_start = datetime(today.year, today.month, 1, tzinfo=ZoneInfo("Asia/Kolkata"))
+    stmt = select(func.count(Engagement.id)).where(
+        Engagement.ca_profile_id == ca_profile_id,
+        Engagement.is_pro_bono,
+        Engagement.activated_at >= month_start,
     )
     return db.session.scalar(stmt)
 
 
-def _pro_bono_details(request: ProBonoRequest) -> dict:
-    """A pro-bono request as both sides see it."""
-    business = onboarding.get_business(request.business_id)
-    filings = []
-    for filing in compliance.get_filings_by_ids(request.compliance_item_ids).values():
-        filings.append(
-            {
-                "id": filing.id,
-                "form_code": filing.form_code,
-                "period_label": filing.period_label,
-                "due_date": filing.due_date,
-                "blocked_reason": None,
-            }
-        )
-    return {
-        "id": request.id,
-        "status": request.status,
-        "note": request.note,
-        "created_at": request.created_at,
-        "business_name": business.legal_name,
-        "filings": filings,
-    }
-
-
-def _filing_blocked_reason(filing, busy: set):
-    """Why a filing cannot be given to a (pro-bono) CA now, or None if it can."""
-    if filing.status in FILED_STATUSES:
-        return "Already filed."
-    if filing.id in busy:
-        return "Already requested from a CA or with a CA."
-    return None
-
-
-def get_pro_bono_page(business) -> dict:
-    """What the business's pro-bono page shows: eligibility, its queued request, its filings."""
+@bp.get("/marketplace/pro-bono")
+@roles_required(UserRole.BUSINESS)
+def get_pro_bono_page():
+    """The business's pro-bono page: eligibility, its queued request and its filings."""
+    business = current_business()
     filings = compliance.list_filings(business)
-    filing_ids = []
-    for filing in filings:
-        filing_ids.append(filing.id)
-    busy = _busy_filing_ids(filing_ids)
-
-    rows = []
-    for filing in filings:
-        rows.append(
-            {
-                "id": filing.id,
-                "form_code": filing.form_code,
-                "period_label": filing.period_label,
-                "due_date": filing.due_date,
-                "blocked_reason": _filing_blocked_reason(filing, busy),
-            }
-        )
-
-    eligibility = _pro_bono_eligibility(business)
-    queued = _queued_request_of(business)
-    request = None
-    if queued is not None:
-        request = _pro_bono_details(queued)
-    return {
-        "eligible": eligibility["eligible"],
-        "reason": eligibility["reason"],
-        "request": request,
-        "filings": rows,
-    }
+    busy = open_filing_ids([filing.id for filing in filings])
+    queued = queued_request_of(business)
+    eligibility = pro_bono_eligibility(business)
+    return jsonify(
+        {
+            "eligible": eligibility["eligible"],
+            "reason": eligibility["reason"],
+            "request": pro_bono_request_to_dict(queued) if queued else None,
+            "filings": [
+                pro_bono_filing_to_dict(filing, filing_blocked_reason(filing, busy))
+                for filing in filings
+            ],
+        }
+    )
 
 
-def join_pro_bono_queue(business, filing_ids: list, note: str) -> dict:
-    """An eligible business asks for free help with some filings: a `queued` request.
+@bp.post("/marketplace/pro-bono")
+@roles_required(UserRole.BUSINESS)
+def join_pro_bono_queue():
+    """An eligible (micro) business asks for free help with some filings: a `queued`
+    request, one at a time."""
+    data = json_body()
+    errors = {}
+    filing_ids = data.get("compliance_item_ids")
+    if filing_ids is None:
+        errors["compliance_item_ids"] = [MISSING]
+    elif not isinstance(filing_ids, list) or len(filing_ids) == 0:
+        errors["compliance_item_ids"] = ["Choose at least one filing."]
+    elif any(read_uuid(filing_id) is None for filing_id in filing_ids):
+        errors["compliance_item_ids"] = ["Not a valid UUID."]
+    note = data.get("note", "")
+    if not isinstance(note, str) or len(note) > 1000:
+        errors["note"] = ["Longer than maximum length 1000."]
+    if errors:
+        raise validation_error(errors)
 
-    409 NOT_ELIGIBLE_FOR_PRO_BONO (not micro), 409 PRO_BONO_ALREADY_QUEUED (one at a time),
-    404 FILING_NOT_FOUND, 409 FILING_ALREADY_FILED / FILING_ALREADY_REQUESTED.
-    """
-    if not _pro_bono_eligibility(business)["eligible"]:
+    business = current_business()
+    if not pro_bono_eligibility(business)["eligible"]:
         raise ApiError(409, "NOT_ELIGIBLE_FOR_PRO_BONO", "Free help is for micro enterprises only.")
-    if _queued_request_of(business) is not None:
+    if queued_request_of(business) is not None:
         raise ApiError(409, "PRO_BONO_ALREADY_QUEUED", "You are already in the pro-bono queue.")
-
-    # Each filing once, in the order sent.
-    unique_ids = []
+    unique_ids = []  # each filing once, in the order sent
     for filing_id in filing_ids:
-        if filing_id not in unique_ids:
-            unique_ids.append(filing_id)
-
+        if read_uuid(filing_id) not in unique_ids:
+            unique_ids.append(read_uuid(filing_id))
     filings = compliance.get_filings_by_ids(unique_ids)
-    busy = _busy_filing_ids(unique_ids)
+    busy = open_filing_ids(unique_ids)
     for filing_id in unique_ids:
         filing = filings.get(filing_id)
         if filing is None or filing.business_id != business.id:
@@ -1845,127 +1241,99 @@ def join_pro_bono_queue(business, filing_ids: list, note: str) -> dict:
                 f"{filing.period_label} is already requested from a CA or with a CA.",
             )
 
-    request = ProBonoRequest(
-        business_id=business.id, note=note.strip(), compliance_item_ids=unique_ids
-    )
-    db.session.add(request)
+    pro_bono = ProBonoRequest(business_id=business.id, note=note.strip(), compliance_item_ids=unique_ids)
+    db.session.add(pro_bono)
     db.session.commit()
     log.info("Business %s joined the pro-bono queue", business.id)
-    return _pro_bono_details(request)
+    return jsonify(pro_bono_request_to_dict(pro_bono)), 201
 
 
-def cancel_pro_bono_request(business, request_id) -> dict:
+@bp.post("/marketplace/pro-bono/<uuid:request_id>/cancel")
+@roles_required(UserRole.BUSINESS)
+def cancel_pro_bono_request(request_id):
     """The business leaves the queue (only while `queued`)."""
-    request = db.session.get(ProBonoRequest, request_id)
-    if request is None or request.business_id != business.id:
+    pro_bono = db.session.get(ProBonoRequest, request_id)
+    if pro_bono is None or pro_bono.business_id != current_business().id:
         raise ApiError(404, "PRO_BONO_REQUEST_NOT_FOUND", "This request was not found.")
-    if request.status != ProBonoRequestStatus.QUEUED:
+    if pro_bono.status != ProBonoRequestStatus.QUEUED:
         raise ApiError(409, "PRO_BONO_NOT_QUEUED", "This request is no longer in the queue.")
-    request.status = ProBonoRequestStatus.CANCELLED
+    pro_bono.status = ProBonoRequestStatus.CANCELLED
     db.session.commit()
-    return _pro_bono_details(request)
+    return jsonify(pro_bono_request_to_dict(pro_bono))
 
 
-def _month_start():
-    """The start of the current month in Indian time (slots are counted per calendar month)."""
-    today = today_in_india()
-    return datetime(today.year, today.month, 1, tzinfo=ZoneInfo("Asia/Kolkata"))
-
-
-def pro_bono_used_this_month(ca_profile_id) -> int:
-    """How many pro-bono engagements the CA started this month."""
-    stmt = select(Engagement.id).where(
-        Engagement.ca_profile_id == ca_profile_id,
-        Engagement.is_pro_bono,
-        Engagement.activated_at >= _month_start(),
-    )
-    return len(db.session.scalars(stmt).all())
-
-
-def get_pro_bono_queue(user: User) -> dict:
-    """What the CA's pro-bono page shows: their pledge, slots used, and the queue (oldest first)."""
-    ca = get_own_profile(user)
+@bp.get("/marketplace/pro-bono-queue")
+@roles_required(UserRole.CA)
+def get_pro_bono_queue():
+    """The CA's pro-bono page: their pledge, slots used this month and the queue (oldest first)."""
+    ca = get_own_profile(current_user())
     stmt = (
         select(ProBonoRequest)
         .where(ProBonoRequest.status == ProBonoRequestStatus.QUEUED)
         .order_by(ProBonoRequest.created_at)
     )
-    requests = []
-    for request in db.session.scalars(stmt):
-        requests.append(_pro_bono_details(request))
-    return {
-        "pledged": ca.pro_bono_slots_per_month,
-        "used_this_month": pro_bono_used_this_month(ca.id),
-        "verified": ca.verification_status == CaVerificationStatus.VERIFIED,
-        "requests": requests,
-    }
-
-
-def _catalog_service_for(filing, itr_service_code):
-    """The catalog service that fits a filing (for ITR: the business's ITR form), or None."""
-    stmt = (
-        select(CatalogService)
-        .where(CatalogService.form_code == filing.form_code)
-        .order_by(CatalogService.sort_order)
+    return jsonify(
+        {
+            "pledged": ca.pro_bono_slots_per_month,
+            "used_this_month": pro_bono_used_this_month(ca.id),
+            "verified": ca.verification_status == CaVerificationStatus.VERIFIED,
+            "requests": [pro_bono_request_to_dict(item) for item in db.session.scalars(stmt)],
+        }
     )
-    for service in db.session.scalars(stmt):
-        if _fits(service, filing, itr_service_code):
-            return service
-    return None
 
 
-def accept_pro_bono_request(user: User, request_id) -> dict:
-    """A verified CA with a free slot takes a queued request: an `active` engagement at ₹0.
-
-    409 CA_NOT_VERIFIED, 409 NO_PRO_BONO_SLOTS, 404 PRO_BONO_REQUEST_NOT_FOUND,
-    409 PRO_BONO_NOT_QUEUED (another CA was quicker, or it was cancelled),
-    409 FILING_ALREADY_REQUESTED (a filing went to another CA meanwhile).
-    """
-    ca = get_own_profile(user)
+@bp.post("/marketplace/pro-bono/<uuid:request_id>/accept")
+@roles_required(UserRole.CA)
+def accept_pro_bono_request(request_id):
+    """A verified CA with a free slot this month takes a queued request: an `active`
+    engagement at ₹0."""
+    ca = get_own_profile(current_user())
     if ca.verification_status != CaVerificationStatus.VERIFIED:
         raise ApiError(409, "CA_NOT_VERIFIED", "Only verified CAs can take pro-bono requests.")
     if pro_bono_used_this_month(ca.id) >= ca.pro_bono_slots_per_month:
         raise ApiError(409, "NO_PRO_BONO_SLOTS", "You have no free pro-bono slots left this month.")
-
-    request = db.session.get(ProBonoRequest, request_id)
-    if request is None:
+    pro_bono = db.session.get(ProBonoRequest, request_id)
+    if pro_bono is None:
         raise ApiError(404, "PRO_BONO_REQUEST_NOT_FOUND", "This request was not found.")
-    if request.status != ProBonoRequestStatus.QUEUED:
+    if pro_bono.status != ProBonoRequestStatus.QUEUED:
         raise ApiError(409, "PRO_BONO_NOT_QUEUED", "This request is no longer in the queue.")
 
-    business = onboarding.get_business(request.business_id)
-    _check_room(ca, business.id)
-    filings = compliance.get_filings_by_ids(request.compliance_item_ids)
-    busy = _busy_filing_ids(request.compliance_item_ids)
-    for filing_id in request.compliance_item_ids:
+    business = onboarding.get_business(pro_bono.business_id)
+    check_room(ca, business.id)
+    filings = compliance.get_filings_by_ids(pro_bono.compliance_item_ids)
+    busy = open_filing_ids(pro_bono.compliance_item_ids)
+    for filing_id in pro_bono.compliance_item_ids:
         filing = filings.get(filing_id)
-        if filing is None or _filing_blocked_reason(filing, busy) is not None:
+        if filing is None or filing_blocked_reason(filing, busy) is not None:
             raise ApiError(
                 409,
                 "FILING_ALREADY_REQUESTED",
                 "A filing of this request is already filed or with another CA.",
             )
 
-    now = utcnow()
     engagement = Engagement(
         business_id=business.id,
         ca_profile_id=ca.id,
         status=EngagementStatus.REQUESTED,
         is_pro_bono=True,
-        requested_at=request.created_at,
-        responded_at=now,
+        requested_at=pro_bono.created_at,
+        responded_at=utcnow(),
     )
     db.session.add(engagement)
     db.session.flush()  # gives engagement.id
-
-    itr_service_code = _itr_service_code(business)
+    itr_code = itr_service_code(business)
     items = []
-    for filing_id in request.compliance_item_ids:
-        service = _catalog_service_for(filings[filing_id], itr_service_code)
+    for filing_id in pro_bono.compliance_item_ids:
+        service = None  # the first catalog service that fits the filing
+        for candidate in db.session.scalars(
+            select(CatalogService)
+            .where(CatalogService.form_code == filings[filing_id].form_code)
+            .order_by(CatalogService.sort_order)
+        ):
+            if service is None and service_fits(candidate, filings[filing_id], itr_code):
+                service = candidate
         if service is None:
-            raise ApiError(
-                400, "SERVICE_NOT_OFFERED", "No catalog service fits one of the filings."
-            )
+            raise ApiError(400, "SERVICE_NOT_OFFERED", "No catalog service fits one of the filings.")
         item = EngagementItem(
             engagement_id=engagement.id,
             compliance_item_id=filing_id,
@@ -1976,261 +1344,204 @@ def accept_pro_bono_request(user: User, request_id) -> dict:
         db.session.add(item)
         items.append(item)
 
-    _activate(engagement, items)  # status active, filings "With CA"
-    request.status = ProBonoRequestStatus.MATCHED
-    request.engagement_id = engagement.id
-    _notify_business(engagement, "A CA will help you for free", "took your pro-bono request.")
+    activate(engagement, items)  # status active, filings "With CA"
+    pro_bono.status = ProBonoRequestStatus.MATCHED
+    pro_bono.engagement_id = engagement.id
+    notify_business(engagement, "A CA will help you for free", "took your pro-bono request.")
     db.session.commit()
-    log.info("CA %s took pro-bono request %s", ca.id, request.id)
-
-    _email_business(engagement, "A CA will help you for free", "pro_bono_matched")
-    return _engagement_details(engagement)
-
-
-# --- Routes ------------------------------------------------------------------------------
+    log.info("CA %s took pro-bono request %s", ca.id, pro_bono.id)
+    email_business(engagement, "A CA will help you for free", "pro_bono_matched")
+    return jsonify(engagement_to_dict(engagement))
 
 
-# A blueprint is a group of routes. app/routes/__init__.py adds it to the app
-# under /api/v1, so "/marketplace/cas" becomes "/api/v1/marketplace/cas".
-blp = Blueprint("marketplace", __name__, description="CA profiles and the CA list")
+# --- Access checks: what a CA may see of a business ----------------------------------------
+# Only an ACTIVE engagement gives access to the business's data, and only to its filings.
+# After the engagement ends, the CA sees nothing of that business any more.
 
 
-# The logged-in CA reads their own profile.
-@blp.route("/marketplace/ca-profile", methods=["GET"])
-@roles_required(UserRole.CA)
-@blp.response(200, CaProfileSchema)
-def get_my_profile():
-    user = current_user()
-    return get_own_profile(user)
-
-
-# The logged-in CA saves their profile (first time or an update).
-@blp.route("/marketplace/ca-profile", methods=["PUT"])
-@roles_required(UserRole.CA)
-@blp.arguments(CaProfileInputSchema)
-@blp.response(200, CaProfileSchema)
-def save_my_profile(data):
-    user = current_user()
-    return save_own_profile(user, **data)
-
-
-# The logged-in CA uploads their Certificate of Practice (PDF, JPG or PNG). The profile
-# then waits for an admin check (`pending`).
-@blp.route("/marketplace/ca-profile/certificate", methods=["POST"])
-@roles_required(UserRole.CA)
-@blp.arguments(CertificateUploadSchema, location="files")
-@blp.response(200, CaProfileSchema)
-@blp.alt_response(400, schema=ErrorSchema, description="FILE_EMPTY, FILE_TYPE_NOT_ALLOWED, ...")
-@blp.alt_response(404, schema=ErrorSchema, description="CA_PROFILE_NOT_FOUND (save it first)")
-def upload_certificate(files):
-    return save_certificate(current_user(), files["file"])
-
-
-# A business sees the verified CAs, with optional filters and pages.
-@blp.route("/marketplace/cas", methods=["GET"])
-@roles_required(UserRole.BUSINESS)
-@blp.arguments(CaListArgsSchema, location="query")
-@blp.response(200, CaListPageSchema)
-def list_cas(filters):
-    return list_verified_cas(**filters)
-
-
-# A business opens one CA's page: details plus every service they offer with its price.
-@blp.route("/marketplace/cas/<uuid:ca_id>", methods=["GET"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, CaDetailSchema)
-def get_ca(ca_id):
-    return get_verified_ca(ca_id)
-
-
-# Everyone logged in sees the service catalog with the typical price of each service.
-@blp.route("/marketplace/services", methods=["GET"])
-@login_required
-@blp.response(200, CatalogServiceSchema(many=True))
-def list_services():
-    return list_catalog()
-
-
-# The logged-in CA reads the services they offer and their prices.
-@blp.route("/marketplace/ca-services", methods=["GET"])
-@roles_required(UserRole.CA)
-@blp.response(200, CaServiceMenuSchema)
-def get_my_services():
-    user = current_user()
-    return get_own_menu(user)
-
-
-# The logged-in CA saves their whole price menu (it replaces the old one).
-@blp.route("/marketplace/ca-services", methods=["PUT"])
-@roles_required(UserRole.CA)
-@blp.arguments(CaServiceMenuSchema)
-@blp.response(200, CaServiceMenuSchema)
-def save_my_services(data):
-    user = current_user()
-    return save_own_menu(user, data["items"])
-
-
-# --- Engagements -------------------------------------------------------------------
-
-
-# The business sees its filings, each with this CA's price, before sending a request.
-@blp.route("/marketplace/cas/<uuid:ca_id>/requestable-filings", methods=["GET"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, RequestableFilingSchema(many=True))
-def list_requestable_filings_view(ca_id):
-    business = current_business()
-    return list_requestable_filings(business, ca_id)
-
-
-# The business sends a request to a CA for some of its filings.
-@blp.route("/marketplace/engagements", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.arguments(EngagementRequestInputSchema)
-@blp.response(201, EngagementSchema)
-def send_request(data):
-    business = current_business()
-    return create_request(business, data["ca_profile_id"], data["items"])
-
-
-# The business sees all its engagements.
-@blp.route("/marketplace/my-engagements", methods=["GET"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, EngagementSchema(many=True))
-def list_my_engagements():
-    business = current_business()
-    return list_business_engagements(business)
-
-
-# The CA sees all their engagements.
-@blp.route("/marketplace/ca-engagements", methods=["GET"])
-@roles_required(UserRole.CA)
-@blp.response(200, EngagementSchema(many=True))
-def list_ca_engagements_view():
-    user = current_user()
-    return list_ca_engagements(user)
-
-
-# --- CA actions on a request ---
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/accept", methods=["POST"])
-@roles_required(UserRole.CA)
-@blp.response(200, EngagementSchema)
-def accept_request_view(engagement_id):
-    user = current_user()
-    return accept_request(user, engagement_id)
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/quote", methods=["POST"])
-@roles_required(UserRole.CA)
-@blp.arguments(QuoteInputSchema)
-@blp.response(200, EngagementSchema)
-def send_quote_view(data, engagement_id):
-    user = current_user()
-    return send_quote(user, engagement_id, data["reason"], data["prices"])
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/decline", methods=["POST"])
-@roles_required(UserRole.CA)
-@blp.response(200, EngagementSchema)
-def decline_request_view(engagement_id):
-    user = current_user()
-    return decline_request(user, engagement_id)
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/complete", methods=["POST"])
-@roles_required(UserRole.CA)
-@blp.response(200, EngagementSchema)
-def complete_engagement_view(engagement_id):
-    user = current_user()
-    return complete_engagement(user, engagement_id)
-
-
-# --- Business actions on a request ---
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/accept-quote", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, EngagementSchema)
-def accept_quote_view(engagement_id):
-    business = current_business()
-    return accept_quote(business, engagement_id)
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/reject-quote", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, EngagementSchema)
-def reject_quote_view(engagement_id):
-    business = current_business()
-    return reject_quote(business, engagement_id)
-
-
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/withdraw", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, EngagementSchema)
-def withdraw_request_view(engagement_id):
-    business = current_business()
-    return withdraw_request(business, engagement_id)
-
-
-# The business rates the CA once the work is completed (1 to 5 stars + optional review).
-@blp.route("/marketplace/engagements/<uuid:engagement_id>/rating", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.arguments(RatingInputSchema)
-@blp.response(200, EngagementSchema)
-def rate_engagement_view(data, engagement_id):
-    business = current_business()
-    return rate_engagement(
-        business, engagement_id, data["stars"], data["review"]
+def ca_can_see_business(ca_profile_id, business_id) -> bool:
+    """True while the CA has an ACTIVE engagement with the business."""
+    stmt = select(Engagement.id).where(
+        Engagement.ca_profile_id == ca_profile_id,
+        Engagement.business_id == business_id,
+        Engagement.status == EngagementStatus.ACTIVE,
     )
+    return db.session.scalar(stmt) is not None
 
 
-# --- Pro-bono queue (MA16) --------------------------------------------------------------
-
-
-# The business sees whether it may ask for free help, its queued request and its filings.
-@blp.route("/marketplace/pro-bono", methods=["GET"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, ProBonoPageSchema)
-def get_pro_bono_page_view():
-    business = current_business()
-    return get_pro_bono_page(business)
-
-
-# The business joins the pro-bono queue with some filings.
-@blp.route("/marketplace/pro-bono", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.arguments(ProBonoJoinInputSchema)
-@blp.response(201, ProBonoRequestSchema)
-def join_pro_bono_queue_view(data):
-    business = current_business()
-    return join_pro_bono_queue(
-        business, data["compliance_item_ids"], data["note"]
+def active_filing_ids(ca_profile_id, business_id) -> set:
+    """The filings the CA works on for this business (ACTIVE engagements only). A business
+    may have two CAs (e.g. one for GST, one for ITR): each sees only their own."""
+    stmt = (
+        select(EngagementItem.compliance_item_id)
+        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
+        .where(
+            Engagement.ca_profile_id == ca_profile_id,
+            Engagement.business_id == business_id,
+            Engagement.status == EngagementStatus.ACTIVE,
+        )
     )
+    return set(db.session.scalars(stmt))
 
 
-# The business leaves the queue.
-@blp.route("/marketplace/pro-bono/<uuid:request_id>/cancel", methods=["POST"])
-@roles_required(UserRole.BUSINESS)
-@blp.response(200, ProBonoRequestSchema)
-def cancel_pro_bono_request_view(request_id):
-    business = current_business()
-    return cancel_pro_bono_request(business, request_id)
+def ca_can_open_document(ca_profile_id, document_id) -> bool:
+    """True only for a document of a filing in one of the CA's ACTIVE engagements: a file
+    linked to the filing, or the filing's acknowledgement."""
+    stmt = (
+        select(EngagementItem.compliance_item_id)
+        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
+        .where(Engagement.ca_profile_id == ca_profile_id, Engagement.status == EngagementStatus.ACTIVE)
+    )
+    filing_ids = set(db.session.scalars(stmt))
+    if len(filing_ids) == 0:
+        return False
+    allowed = documents.document_ids_for_filings(filing_ids)
+    for filing in compliance.get_filings_by_ids(filing_ids).values():
+        if filing.acknowledgement_document_id is not None:
+            allowed.add(filing.acknowledgement_document_id)
+    return document_id in allowed
 
 
-# The CA sees their pledge, the slots used this month and the queue.
-@blp.route("/marketplace/pro-bono-queue", methods=["GET"])
-@roles_required(UserRole.CA)
-@blp.response(200, ProBonoQueueSchema)
-def get_pro_bono_queue_view():
-    user = current_user()
-    return get_pro_bono_queue(user)
+# --- For other modules -------------------------------------------------------------------
 
 
-# The CA takes a request from the queue: a free engagement starts at once.
-@blp.route("/marketplace/pro-bono/<uuid:request_id>/accept", methods=["POST"])
-@roles_required(UserRole.CA)
-@blp.response(200, EngagementSchema)
-def accept_pro_bono_request_view(request_id):
-    user = current_user()
-    return accept_pro_bono_request(user, request_id)
+def active_ca_users_by_filing(filing_ids) -> dict:
+    """{filing id: the CA's User} for the filings in an ACTIVE engagement (reminders)."""
+    if len(filing_ids) == 0:
+        return {}
+    stmt = (
+        select(EngagementItem.compliance_item_id, User)
+        .join(Engagement, EngagementItem.engagement_id == Engagement.id)
+        .join(CaProfile, Engagement.ca_profile_id == CaProfile.id)
+        .join(User, CaProfile.user_id == User.id)
+        .where(
+            EngagementItem.compliance_item_id.in_(filing_ids),
+            Engagement.status == EngagementStatus.ACTIVE,
+        )
+    )
+    return {filing_id: user for filing_id, user in db.session.execute(stmt)}
+
+
+def active_work(ca_profile_id) -> list[tuple]:
+    """(engagement id, business id, filing id) for every filing in the CA's ACTIVE engagements."""
+    stmt = (
+        select(Engagement.id, Engagement.business_id, EngagementItem.compliance_item_id)
+        .join(EngagementItem, EngagementItem.engagement_id == Engagement.id)
+        .where(Engagement.ca_profile_id == ca_profile_id, Engagement.status == EngagementStatus.ACTIVE)
+    )
+    return [tuple(row) for row in db.session.execute(stmt)]
+
+
+def active_cas_of_business(business_id) -> dict:
+    """{engagement id: the CA's User} for the business's ACTIVE engagements."""
+    stmt = (
+        select(Engagement.id, User)
+        .join(CaProfile, Engagement.ca_profile_id == CaProfile.id)
+        .join(User, CaProfile.user_id == User.id)
+        .where(Engagement.business_id == business_id, Engagement.status == EngagementStatus.ACTIVE)
+    )
+    return {engagement_id: user for engagement_id, user in db.session.execute(stmt)}
+
+
+def complete_if_all_filed(engagement_id) -> bool:
+    """Complete an ACTIVE engagement once every one of its filings is filed, and tell the
+    business. Returns True if it completed. Does not commit."""
+    engagement = db.session.get(Engagement, engagement_id)
+    if engagement is None or engagement.status != EngagementStatus.ACTIVE:
+        return False
+    filings = compliance.get_filings_by_ids([item.compliance_item_id for item in items_of(engagement)])
+    for filing in filings.values():
+        if filing.status not in FILED_STATUSES:
+            return False
+    engagement.status = EngagementStatus.COMPLETED
+    engagement.completed_at = utcnow()
+    notify_business(
+        engagement,
+        "Your CA completed the work",
+        'filed every filing of your request. You can rate the work in "My engagements".',
+    )
+    log.info("Engagement %s completed: every filing is filed", engagement.id)
+    return True
+
+
+def admin_row(profile: CaProfile) -> dict:
+    """Everything an admin sees about a CA (their numbers too, for checking)."""
+    return {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "full_name": profile.user.full_name,
+        "email": profile.user.email,
+        "membership_no": profile.membership_no,
+        "cop_number": profile.cop_number,
+        "city": profile.city,
+        "languages": profile.languages,
+        "specializations": profile.specializations,
+        "capacity": profile.capacity,
+        "years_experience": profile.years_experience,
+        "pro_bono_slots_per_month": profile.pro_bono_slots_per_month,
+        "about": profile.about,
+        "verification_status": profile.verification_status,
+        "rejection_reason": profile.rejection_reason,
+        "verified_at": profile.verified_at,
+        "has_certificate": profile.cop_document_id is not None,
+        "updated_at": profile.updated_at,
+    }
+
+
+def list_cas_for_admin(status) -> list[dict]:
+    """CA profiles (optionally of one status), the longest-waiting first."""
+    stmt = select(CaProfile).order_by(CaProfile.updated_at)
+    if status is not None:
+        stmt = stmt.where(CaProfile.verification_status == status)
+    return [admin_row(profile) for profile in db.session.scalars(stmt)]
+
+
+def ca_for_admin(profile_id) -> CaProfile:
+    profile = db.session.get(CaProfile, profile_id)
+    if profile is None:
+        raise ApiError(404, "CA_NOT_FOUND", "This CA was not found.")
+    return profile
+
+
+def get_ca_for_admin(profile_id) -> dict:
+    return admin_row(ca_for_admin(profile_id))
+
+
+def certificate_document_id(profile_id):
+    """The document id of the CA's Certificate of Practice. 404 CERTIFICATE_MISSING."""
+    profile = ca_for_admin(profile_id)
+    if profile.cop_document_id is None:
+        raise ApiError(404, "CERTIFICATE_MISSING", "This CA has not uploaded a certificate.")
+    return profile.cop_document_id
+
+
+def set_verification(profile_id, admin: User, verified: bool, reason: str | None) -> CaProfile:
+    """An admin verifies or rejects a CA. Verifying needs an uploaded certificate
+    (409 CERTIFICATE_MISSING). Does not commit."""
+    profile = ca_for_admin(profile_id)
+    if verified:
+        if profile.cop_document_id is None:
+            raise ApiError(409, "CERTIFICATE_MISSING", "Ask the CA to upload their certificate first.")
+        profile.verification_status = CaVerificationStatus.VERIFIED
+        profile.verified_at = utcnow()
+        profile.verified_by_id = admin.id
+        profile.rejection_reason = None
+    else:
+        profile.verification_status = CaVerificationStatus.REJECTED
+        profile.rejection_reason = reason
+        profile.verified_at = None
+        profile.verified_by_id = None
+    return profile
+
+
+def count_cas_by_status() -> dict:
+    """{"pending": n, "verified": n, "rejected": n} over all CA profiles."""
+    counts = {"pending": 0, "verified": 0, "rejected": 0}
+    for status in db.session.scalars(select(CaProfile.verification_status)):
+        counts[status] += 1
+    return counts
+
+
+def count_open_engagements() -> int:
+    stmt = select(func.count()).select_from(Engagement).where(Engagement.status.in_(OPEN_STATUSES))
+    return db.session.scalar(stmt)

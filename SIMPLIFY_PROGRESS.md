@@ -295,6 +295,24 @@ working, stop and ask.
 - No test changed. demo_walk.py now also marks one / all notifications read and reads the penalty exposure.
 - Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
 
+### 4.6 marketplace (done)
+- Plain Flask; each route does its work (profile, certificate, Find a CA, CA page, catalog, price menu, requestable
+  filings, request, quote / accept / decline / complete, accept or reject a quote, withdraw, rating, pro-bono
+  page / join / cancel / queue / accept). `profile_to_dict`, `engagement_to_dict`, `rating_to_dict`,
+  `pro_bono_request_to_dict`, `pro_bono_filing_to_dict`; `list_catalog` returns JSON-ready rows.
+- Section 4: access checks are `ca_can_see_business(ca_profile_id, business_id)`,
+  `ca_can_open_document(ca_profile_id, document_id)` and `active_filing_ids(ca_profile_id, business_id)`; callers
+  updated (`utils.require_ca_access`, the documents download route). `open_engagement_item_ids` deleted (nothing
+  in the app used it).
+- `utils.read_uuid` (moved from documents) reads UUIDs from request values.
+- Kept for other modules: `own_profile_id`, `open_filing_ids`, `active_work`, `active_cas_of_business`,
+  `active_ca_users_by_filing`, `complete_if_all_filed`, `expire_old_requests`, `list_cas_for_admin`,
+  `get_ca_for_admin` (still native types until admin is converted), `certificate_document_id`,
+  `set_verification`, `count_cas_by_status`, `count_open_engagements`.
+- Small differences from marshmallow (not features): the 422 for a wrong item inside a list names the list field
+  with one message (e.g. `items`, `prices`) instead of per-index details.
+- Checks: backend 597 passed; frontend 240; build OK; snapshot 102 known, 0 unexplained; walk 0 failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -385,3 +403,5 @@ working, stop and ask.
 | test_onboarding_edit.py::test_switching_to_monthly_returns_changes_the_profile_and_filings, test_switching_back_to_quarterly_removes_the_extra_months | the `moved` checks removed (added/removed and the labels are still checked) | onboarding: "What changed" counts without `moved` |
 | test_compliance_legal_update.py::test_resync_reports_what_moved | renamed test_resync_moves_the_due_date_back_to_the_rule; checks the ITR due date instead of `counts["moved"]` | onboarding: sync counts without `moved` |
 | frontend OnboardingPage.test.jsx (edit test fixture) | `filings` without `restored`/`moved` | onboarding: update the frontend "What changed" box |
+| test_marketplace_engagements.py (access-check tests) | `ca_has_active_access` -> `ca_can_see_business`, `ca_can_access_document` -> `ca_can_open_document`, `active_engagement_item_ids` -> `active_filing_ids` | marketplace: access checks are two plain functions plus active_filing_ids |
+| test_marketplace_engagements.py::test_open_items_cover_requests_but_not_ended_ones | rewritten as test_requested_filings_are_not_active_work (the `open_engagement_item_ids` checks removed) | marketplace: access checks are two plain functions plus active_filing_ids |

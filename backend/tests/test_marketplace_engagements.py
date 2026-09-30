@@ -824,13 +824,13 @@ def _add_document(database, owner, filing=None, name="sales.pdf"):
 def test_access_only_while_the_engagement_is_active(client, setup):
     ca, business = setup["ca"], setup["business"]
     engagement = request_gst(client, setup)
-    assert marketplace_service.ca_has_active_access(ca.id, business.id) is False  # requested
+    assert marketplace_service.ca_can_see_business(ca.id, business.id) is False  # requested
 
     action(client, setup["ca_headers"], engagement["id"], "accept")
-    assert marketplace_service.ca_has_active_access(ca.id, business.id) is True
+    assert marketplace_service.ca_can_see_business(ca.id, business.id) is True
 
     action(client, setup["ca_headers"], engagement["id"], "complete")
-    assert marketplace_service.ca_has_active_access(ca.id, business.id) is False
+    assert marketplace_service.ca_can_see_business(ca.id, business.id) is False
 
 
 def test_access_is_per_ca_and_per_business(client, setup, make_ca, make_business):
@@ -839,8 +839,8 @@ def test_access_is_per_ca_and_per_business(client, setup, make_ca, make_business
     _, other_ca = make_ca({"gstr_3b": "700"}, name="Other CA")
     _, other_business = make_business("Someone Else")
 
-    assert marketplace_service.ca_has_active_access(other_ca.id, setup["business"].id) is False
-    assert marketplace_service.ca_has_active_access(setup["ca"].id, other_business.id) is False
+    assert marketplace_service.ca_can_see_business(other_ca.id, setup["business"].id) is False
+    assert marketplace_service.ca_can_see_business(setup["ca"].id, other_business.id) is False
 
 
 def test_each_ca_sees_only_the_filings_they_work_on(client, setup, make_ca, auth_headers):
@@ -854,24 +854,19 @@ def test_each_ca_sees_only_the_filings_they_work_on(client, setup, make_ca, auth
     ).get_json()
     action(client, auth_headers(second_user), second["id"], "accept")
 
-    assert marketplace_service.active_engagement_item_ids(setup["ca"].id, business.id) == {
+    assert marketplace_service.active_filing_ids(setup["ca"].id, business.id) == {
         setup["gst_3b"].id
     }
-    assert marketplace_service.active_engagement_item_ids(second_ca.id, business.id) == {
+    assert marketplace_service.active_filing_ids(second_ca.id, business.id) == {
         setup["gst_1"].id
     }
 
 
-def test_open_items_cover_requests_but_not_ended_ones(client, setup):
+def test_requested_filings_are_not_active_work(client, setup):
     ca, business = setup["ca"], setup["business"]
-    engagement = request_gst(client, setup)
+    request_gst(client, setup)
 
-    both = {setup["gst_3b"].id, setup["gst_1"].id}
-    assert marketplace_service.open_engagement_item_ids(ca.id, business.id) == both
-    assert marketplace_service.active_engagement_item_ids(ca.id, business.id) == set()
-
-    action(client, setup["ca_headers"], engagement["id"], "decline")
-    assert marketplace_service.open_engagement_item_ids(ca.id, business.id) == set()
+    assert marketplace_service.active_filing_ids(ca.id, business.id) == set()
 
 
 def test_documents_only_of_filings_in_active_work(client, setup, database):
@@ -884,15 +879,15 @@ def test_documents_only_of_filings_in_active_work(client, setup, database):
     unrelated = _add_document(database, owner, None, "other.pdf")
     engagement = request_gst(client, setup)
 
-    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is False  # not active yet
+    assert marketplace_service.ca_can_open_document(ca.id, linked.id) is False  # not active yet
 
     action(client, setup["ca_headers"], engagement["id"], "accept")
-    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is True
-    assert marketplace_service.ca_can_access_document(ca.id, acknowledgement.id) is True
-    assert marketplace_service.ca_can_access_document(ca.id, unrelated.id) is False
+    assert marketplace_service.ca_can_open_document(ca.id, linked.id) is True
+    assert marketplace_service.ca_can_open_document(ca.id, acknowledgement.id) is True
+    assert marketplace_service.ca_can_open_document(ca.id, unrelated.id) is False
 
     action(client, setup["ca_headers"], engagement["id"], "complete")
-    assert marketplace_service.ca_can_access_document(ca.id, linked.id) is False
+    assert marketplace_service.ca_can_open_document(ca.id, linked.id) is False
 
 
 def test_require_ca_access_for_ca_routes(app, client, setup, make_user, auth_headers):

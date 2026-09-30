@@ -11,7 +11,6 @@ import hashlib
 import io
 import logging
 import re
-import uuid
 from datetime import date
 
 from flask import Blueprint, jsonify, request, send_file
@@ -39,6 +38,7 @@ from app.utils import (
     iso,
     json_body,
     read_page_args,
+    read_uuid,
     roles_required,
     validation_error,
 )
@@ -59,14 +59,6 @@ FY_MESSAGE = 'Write the financial year like "2026-27".'
 def is_financial_year(text: str) -> bool:
     match = FY_PATTERN.match(text)
     return match is not None and (int(match.group(1)) + 1) % 100 == int(match.group(2))
-
-
-def read_uuid(text: str | None):
-    """A UUID from a form or query value, or None when it is not one."""
-    try:
-        return uuid.UUID(text)
-    except (TypeError, ValueError):
-        return None
 
 
 def add_document(owner_id, uploaded_by_id, upload, doc_type: DocumentType) -> Document:
@@ -526,7 +518,7 @@ def get_document_file(document_id):
     allowed = document.owner_id == user.id
     if not allowed and user.role == UserRole.CA:
         ca_profile_id = marketplace.own_profile_id(user)
-        allowed = ca_profile_id is not None and marketplace.ca_can_access_document(
+        allowed = ca_profile_id is not None and marketplace.ca_can_open_document(
             ca_profile_id, document.id
         )
     if not allowed:
@@ -580,7 +572,7 @@ def link_document(document_id):
     if item_id is None:
         errors["compliance_item_id"] = [MISSING]
     else:
-        item_id = read_uuid(item_id) if isinstance(item_id, str) else None
+        item_id = read_uuid(item_id)
         if item_id is None:
             errors["compliance_item_id"] = ["Not a valid UUID."]
     checklist_key = data.get("checklist_key", GENERAL_KEY)

@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import smtplib
+import uuid
 from collections.abc import Callable
 from decimal import Decimal, ROUND_HALF_UP
 from email.message import EmailMessage
@@ -122,6 +123,16 @@ def read_page_args(errors: dict) -> tuple[int, int]:
             errors[name] = [f"Must be greater than or equal to 1 and less than or equal to {largest}."]
         numbers[name] = value
     return numbers["page"], numbers["page_size"]
+
+
+def read_uuid(value):
+    """A UUID from a request value (text), or None when it is not one."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
 
 
 def iso(value) -> str | None:
@@ -394,7 +405,7 @@ def require_ca_access(business_id) -> None:
     from app import marketplace  # imported here: marketplace imports this module
 
     ca_profile_id = marketplace.own_profile_id(current_user())
-    if ca_profile_id is None or not marketplace.ca_has_active_access(
+    if ca_profile_id is None or not marketplace.ca_can_see_business(
         ca_profile_id, business_id
     ):
         raise ApiError(404, "BUSINESS_NOT_FOUND", "This business was not found.")
