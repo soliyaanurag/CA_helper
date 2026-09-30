@@ -392,6 +392,31 @@ items, 0 unexplained; demo_walk.py (with the real Scan now) 0 failures.
 
 Uncertain: nothing new. The docs still mention Swagger; they are cleaned in step 7 (Q4 answer).
 
+## Step 6a: frontend file merges (no behaviour change)
+
+Done (with a script; imports merged and rewritten everywhere):
+- `api.js` (client + 11 hook files + health), `lib.js` (cn, labels, money, dates, gstin, session, authRules),
+  `auth.jsx` (AuthProvider + useAuth), `main.jsx` (+ the QueryClient), `routes.jsx` (+ AppShell, RequireRole,
+  PublicLayout, AcceptTermsGate for now), `components/ui.jsx` (5 shadcn files), `components/shared.jsx` (FormField,
+  FormCard, StatusBadge, Stars, Markdown, EngagementCard, NotificationBell, NotificationSettings for now),
+  `components/assistant.jsx` (AssistantChat, AssistantWidget, AssistantPage).
+- Pages: `pages/AuthPages.jsx` (9 pages); business/ `DashboardPage`, `OnboardingPage` (+NicCodeCard), `CalendarPage`,
+  `FilingPage`, `DocumentsPage`, `FindCaPage` (list, CA page, request, typical fees), `EngagementsPage` (+ pro-bono);
+  ca/ `DashboardPage`, `ProfilePage` (+ services & prices), `EngagementsPage` (+ pro-bono queue), `ClientsPage`
+  (list, client page, batches); admin/ `AdminPages.jsx`. Component names are unchanged. The two notification-settings
+  pages (AlertsPage, CaAlertsPage) stay until 6b replaces them.
+- Two local constants named `TABS` collided in AdminPages.jsx: renamed `USER_TABS` and `REGULATORY_TABS`.
+- `components/Placeholder.jsx` deleted: nothing imported it (already dead on main), and section 3 has no place for it.
+- `main.jsx`: the QueryClient is defined before the render (a merged order would have used it before its definition;
+  checked with a one-off smoke test that imports main.jsx and sees the home page).
+- Tests: test files are **kept as separate files** (plan: "*.test.jsx files kept, imports updated"); merging them
+  would have run the fake-timer `beforeEach` of one file for the tests of another. Only the files whose folders went
+  away moved: `api/client.test.js` -> `api.test.js`, `lib/{gstin,labels,money}.test.js` -> `lib.test.js`,
+  `context/AuthProvider.test.jsx` -> `auth.test.jsx`. Imports updated, no assertion changed.
+
+Results: backend 598 passed; frontend 240 passed (34 files); build OK; snapshot 102 known, 0 unexplained; walk 0
+failures.
+
 ## Changed or deleted tests (with their section 4 item)
 
 | Test | Change | Section 4 item |
@@ -486,3 +511,4 @@ Uncertain: nothing new. The docs still mention Swagger; they are cleaned in step
 | test_marketplace_engagements.py::test_open_items_cover_requests_but_not_ended_ones | rewritten as test_requested_filings_are_not_active_work (the `open_engagement_item_ids` checks removed) | marketplace: access checks are two plain functions plus active_filing_ids |
 | test_worker.py::test_jobs_run_inside_app_context | adapted: internal rename (calls `run_job` in a thread instead of `AppScheduler`; same assertion); new test_the_worker_has_its_four_jobs checks the 4 ids and schedules | Q5 answer (not section 4) |
 | test_app_factory.py::test_api_root_redirects_to_the_docs | renamed test_api_root_redirects_to_the_health_check; expects Location `/api/health`; the "`/` is not in the OpenAPI paths" check removed (there is no OpenAPI spec any more) | flask-smorest removed (sections 1 and 6), Q4 answer (redirect to /api/health) |
+| every frontend test file | imports updated to the merged modules; api/client, lib/* and context/AuthProvider tests moved to api.test.js, lib.test.js, auth.test.jsx (no assertion changed) | step 6 file merges (import paths only) |

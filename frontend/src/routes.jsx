@@ -1,43 +1,50 @@
-import { AppShell } from "@/components/AppShell";
-import { PublicLayout } from "@/components/PublicLayout";
-import { RequireRole } from "@/components/RequireRole";
-import { ROLE_HOME } from "@/lib/session";
-import { AdminAuditLogPage } from "@/pages/admin/AdminAuditLogPage";
-import { AdminCaDetailPage } from "@/pages/admin/AdminCaDetailPage";
-import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
-import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
-import { RegulatoryAdminPage } from "@/pages/admin/RegulatoryAdminPage";
+import { useState } from "react";
+import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
+
+import { errorMessage } from "@/api";
+import { useAuth } from "@/auth";
+import { AssistantPage, AssistantWidget } from "@/components/assistant";
+import { FormCard, NotificationBell } from "@/components/shared";
+import { Button } from "@/components/ui";
+import { cn, ROLE_HOME, USER_ROLE_LABELS } from "@/lib";
+import {
+  ChangePasswordPage,
+  ForgotPasswordPage,
+  HomePage,
+  LoginPage,
+  NotFoundPage,
+  ResetPasswordPage,
+  SignupPage,
+  TermsPage,
+  VerifyEmailPage,
+} from "@/pages/AuthPages";
+import {
+  AdminAuditLogPage,
+  AdminCaDetailPage,
+  AdminDashboardPage,
+  AdminUsersPage,
+  RegulatoryAdminPage,
+} from "@/pages/admin/AdminPages";
 import { AlertsPage } from "@/pages/business/AlertsPage";
-import { AssistantPage } from "@/pages/business/AssistantPage";
-import { CaDetailPage } from "@/pages/business/CaDetailPage";
-import { BusinessDashboardPage } from "@/pages/business/BusinessDashboardPage";
-import { CompliancePage } from "@/pages/business/CompliancePage";
+import { CompliancePage } from "@/pages/business/CalendarPage";
+import { BusinessDashboardPage } from "@/pages/business/DashboardPage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
+import { MyEngagementsPage, ProBonoPage } from "@/pages/business/EngagementsPage";
 import { FilingPage } from "@/pages/business/FilingPage";
-import { MarketplacePage } from "@/pages/business/MarketplacePage";
-import { MyEngagementsPage } from "@/pages/business/MyEngagementsPage";
-import { TypicalFeesPage } from "@/pages/business/TypicalFeesPage";
+import {
+  CaDetailPage,
+  MarketplacePage,
+  RequestCaPage,
+  TypicalFeesPage,
+} from "@/pages/business/FindCaPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
-import { ProBonoPage } from "@/pages/business/ProBonoPage";
-import { RequestCaPage } from "@/pages/business/RequestCaPage";
 import { CaAlertsPage } from "@/pages/ca/CaAlertsPage";
-import { CaDashboardPage } from "@/pages/ca/CaDashboardPage";
-import { CaBatchesPage } from "@/pages/ca/CaBatchesPage";
-import { CaClientPage } from "@/pages/ca/CaClientPage";
-import { CaEngagementsPage } from "@/pages/ca/CaEngagementsPage";
-import { CaProBonoPage } from "@/pages/ca/CaProBonoPage";
-import { CaProfilePage } from "@/pages/ca/CaProfilePage";
-import { CaServicesPage } from "@/pages/ca/CaServicesPage";
-import { CaWorkspacePage } from "@/pages/ca/CaWorkspacePage";
-import { ChangePasswordPage } from "@/pages/ChangePasswordPage";
-import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
-import { HomePage } from "@/pages/HomePage";
-import { LoginPage } from "@/pages/LoginPage";
-import { NotFoundPage } from "@/pages/NotFoundPage";
-import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
-import { SignupPage } from "@/pages/SignupPage";
-import { TermsPage } from "@/pages/TermsPage";
-import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
+import { CaBatchesPage, CaClientPage, CaWorkspacePage } from "@/pages/ca/ClientsPage";
+import { CaDashboardPage } from "@/pages/ca/DashboardPage";
+import { CaEngagementsPage, CaProBonoPage } from "@/pages/ca/EngagementsPage";
+import { CaProfilePage, CaServicesPage } from "@/pages/ca/ProfilePage";
+
+// --- routes ------------------------------------------------------------------------------------
 
 /**
  * Every page of the app. To add a page: create it in pages/<role>/, add its
@@ -143,3 +150,170 @@ export const appRoutes = [
   ]),
   { path: "*", element: <NotFoundPage /> },
 ];
+
+// --- AppShell ----------------------------------------------------------------------------------
+
+/**
+ * Layout for the logged-in areas (/business, /ca, /admin): sidebar with the
+ * notification bell, the role's links, user name, change password + logout, the
+ * current page (<Outlet />) and, for business owners and CAs, the floating AI assistant.
+ * `nav` is a list of { label, path } links (NAV in routes.jsx).
+ *
+ * The sidebar is exactly one screen tall and stays in place while the page scrolls
+ * (sticky top-0 h-screen), so the name, "Change password" and "Log out" are always
+ * visible at its bottom. If there are more links than fit, only the link list scrolls.
+ */
+export function AppShell({ role, nav }) {
+  const { user, logout } = useAuth();
+  const title = USER_ROLE_LABELS[role];
+  const home = ROLE_HOME[role];
+
+  return (
+    <div className="flex min-h-screen bg-background text-foreground">
+      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-muted/40 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <Link to={home} className="text-lg font-semibold">
+              CA Helper
+            </Link>
+            <p className="text-xs text-muted-foreground">{title}</p>
+          </div>
+          <NotificationBell />
+        </div>
+        <nav
+          className="mt-6 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+          aria-label={`${title} navigation`}
+        >
+          {nav.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === home} // the home link is active only on the home page
+              className={({ isActive }) =>
+                cn(
+                  "rounded-md px-3 py-2 text-sm",
+                  isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                )
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="space-y-2 border-t pt-4">
+          <p className="truncate text-sm">{user?.full_name}</p>
+          <Button asChild variant="ghost" size="sm" className="w-full">
+            <Link to={`${home}/change-password`}>Change password</Link>
+          </Button>
+          <Button variant="outline" size="sm" className="w-full" onClick={logout}>
+            Log out
+          </Button>
+        </div>
+      </aside>
+      <main className="flex-1 p-8">
+        <Outlet />
+      </main>
+      {/* The floating AI assistant for business owners and CAs (not admins). */}
+      {(role === "business" || role === "ca") && <AssistantWidget role={role} />}
+    </div>
+  );
+}
+
+// --- RequireRole -------------------------------------------------------------------------------
+
+/**
+ * Route guard for an area layout.
+ * - Not logged in -> /login, and back here after logging in; except after the Log out
+ *   button, when the next login goes to that role's home.
+ * - Logged in with another role -> that role's own home.
+ * - Signed up before consent was asked -> the consent step first (once).
+ * The backend checks the role again on every request; this only keeps users
+ * from landing on pages that would fail.
+ */
+export function RequireRole({ role, children }) {
+  const { user, loggedOutOnPurpose, termsAccepted } = useAuth();
+  const location = useLocation();
+
+  if (!user) {
+    const state = loggedOutOnPurpose ? undefined : { from: location.pathname };
+    return <Navigate to="/login" replace state={state} />;
+  }
+  if (user.role !== role) {
+    return <Navigate to={ROLE_HOME[user.role]} replace />;
+  }
+  if (termsAccepted === false) {
+    return <AcceptTermsGate />; // asked once, for accounts from before consent
+  }
+  return children;
+}
+
+// --- PublicLayout ------------------------------------------------------------------------------
+
+/** Layout for public pages: landing, login, signup, verify email, forgot/reset password. */
+export function PublicLayout() {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b px-8 py-4">
+        <Link to="/" className="text-lg font-semibold">
+          CA Helper
+        </Link>
+      </header>
+      <main className="mx-auto max-w-5xl p-8">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+// --- AcceptTermsGate ---------------------------------------------------------------------------
+
+/**
+ * Shown once, instead of the app, to a user who signed up before we asked for consent
+ * (RequireRole renders it while `termsAccepted` is false).
+ */
+export function AcceptTermsGate() {
+  const { acceptTerms, logout } = useAuth();
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  async function onAgree() {
+    setError(null);
+    setSaving(true);
+    try {
+      await acceptTerms();
+    } catch (acceptError) {
+      setError(errorMessage(acceptError));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="p-8">
+      <FormCard
+        title="Our Terms and Privacy Policy"
+        description="Before you continue, please read and accept how CA Helper stores and protects your data."
+      >
+        <Link
+          to="/terms"
+          target="_blank"
+          className="text-sm text-primary underline-offset-4 hover:underline"
+        >
+          Read the Terms and Privacy Policy
+        </Link>
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button onClick={onAgree} disabled={saving}>
+            {saving ? "Saving..." : "I agree"}
+          </Button>
+          <Button variant="outline" onClick={logout}>
+            Log out
+          </Button>
+        </div>
+      </FormCard>
+    </div>
+  );
+}

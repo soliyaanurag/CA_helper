@@ -1,4 +1,4 @@
-import { NotificationSettings } from "@/components/NotificationSettings";
+import { NotificationSettings } from "@/components/shared";
 
 // /business/alerts: which notifications are also emailed.
 export function AlertsPage() {

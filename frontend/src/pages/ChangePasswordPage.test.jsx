@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { loadSession } from "@/lib/session";
+import { loadSession } from "@/lib";
 import { fakeApi, loginAs, renderApp } from "@/test/utils";
 
 const URL = "/api/v1/auth/change-password";

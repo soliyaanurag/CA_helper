@@ -2,46 +2,53 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
-import { usePenaltyEstimate } from "@/api/alerts";
-import { CA_WORKSPACE_KEY, fulfilDocumentRequest, useMyDocumentRequests } from "@/api/caWorkspace";
-import { errorMessage } from "@/api/client";
 import {
-  FILINGS_KEY,
+  CA_WORKSPACE_KEY,
   chooseFilingPath,
+  DOCUMENTS_KEY,
+  downloadDocument,
+  errorMessage,
   filingKey,
+  FILINGS_KEY,
+  fulfilDocumentRequest,
+  linkDocument,
   markFiled,
   tickChecklist,
-  unmarkFiled,
-  useAcknowledgementFile,
-  useFiling,
-  usePeerInsights,
-} from "@/api/compliance";
-import {
-  DOCUMENTS_KEY,
-  UPLOAD_TYPES,
-  downloadDocument,
-  linkDocument,
   unlinkDocument,
+  unmarkFiled,
+  UPLOAD_TYPES,
   uploadDocument,
+  useAcknowledgementFile,
   useDocuments,
-} from "@/api/documents";
-import { useMyEngagements } from "@/api/marketplace";
-import { FormField } from "@/components/FormField";
-import { Markdown } from "@/components/Markdown";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { daysLeftText, daysUntil, formatDate, formatDateTime } from "@/lib/dates";
+  useFiling,
+  useMyDocumentRequests,
+  useMyEngagements,
+  usePeerInsights,
+  usePenaltyEstimate,
+} from "@/api";
+import { FormField, Markdown, StatusBadge } from "@/components/shared";
 import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@/components/ui";
+import {
+  daysLeftText,
+  daysUntil,
   DOCUMENT_TYPE_LABELS,
   ENTITY_TYPE_LABELS,
   filingFormLabel,
+  formatDate,
+  formatDateTime,
+  formatRupees,
   label,
   MSME_TIER_LABELS,
-} from "@/lib/labels";
-import { formatRupees } from "@/lib/money";
+} from "@/lib";
 
 // Statuses in which the business itself can still act on the filing.
 const OPEN_FOR_BUSINESS = ["upcoming", "docs_pending", "ready", "overdue"];
